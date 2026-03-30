@@ -1,0 +1,16 @@
+# Dependencias
+node_modules/
+frontend/node_modules/
+
+# Builds
+dist/
+frontend/dist/
+
+# Variables de entorno
+.env
+
+# Editor
+.vscode/
+
+# Sistema
+.DS_Store
