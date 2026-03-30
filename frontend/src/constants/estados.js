@@ -19,3 +19,19 @@ export const ESTADOS_TRAMO = {
   EN_TRANSITO: 'EN_TRANSITO',
   COMPLETADO: 'COMPLETADO',
 }
+
+export const ESTADOS_ENVIO = {
+  PENDIENTE: 'Pendiente',
+  ALMACEN: 'En Almacén',
+  TRANSITO: 'En Tránsito',
+  REPLANIFICADO: 'Replanificado',
+  ENTREGADO: 'Entregado',
+  DEMORADO: 'Demorado',
+  RIESGO: 'En Riesgo'
+};
+
+export const SEMAFORO = {
+  VERDE: 'bg-green-500', // Cumplimiento normal
+  AMBAR: 'bg-yellow-500', // Riesgo de incumplimiento (>50% tiempo transcurrido)
+  ROJO: 'bg-red-500'      // Plazo vencido o crítico
+};

@@ -1,8 +1,674 @@
-// Lista de todos los envíos registrados con filtros.
-// Permite registrar nuevas maletas y ver el detalle de cada envío.
+import { useMemo, useState } from 'react'
+import {
+  Search,
+  Plus,
+  Download,
+  FileText,
+  Package,
+  AlertTriangle,
+  Plane,
+  CheckCircle2,
+  MoreHorizontal,
+  MapPin,
+  Clock3,
+  ChevronRight,
+  PlaneTakeoff,
+  Building2,
+  X,
+  Filter,
+} from 'lucide-react'
 
-function GestionMaletasPage() {
-  return <div>Gestión de Maletas (pendiente)</div>
+import styles from './GestionMaletasModule.module.css'
+
+const ENVIOS_MOCK = [
+  {
+    id: 'TRK-2026-001',
+    aerolinea: 'LATAM Airlines',
+    origen: 'LIM',
+    destino: 'MAD',
+    origenCiudad: 'Lima',
+    destinoCiudad: 'Madrid',
+    cantidad: 45,
+    estado: 'En tránsito',
+    riesgo: 'verde',
+    ubicacion: 'En vuelo (Océano Atlántico)',
+    plazo: '48h',
+    registro: '29/03/2026 08:00',
+    estimada: '30/03/2026 22:00',
+    progreso: 65,
+    ruta: ['LIM', 'BOG', 'MAD'],
+    historial: [
+      { etapa: 'Registro inicial', detalle: 'Carga registrada en Lima', hora: '29/03/2026 08:00' },
+      { etapa: 'Salida', detalle: 'Vuelo LIM → BOG', hora: '29/03/2026 12:30' },
+      { etapa: 'Conexión', detalle: 'Nodo intermedio BOG', hora: '29/03/2026 18:40' },
+      { etapa: 'En vuelo', detalle: 'Vuelo BOG → MAD', hora: '30/03/2026 02:20' },
+    ],
+  },
+  {
+    id: 'TRK-2026-002',
+    aerolinea: 'Iberia',
+    origen: 'BOG',
+    destino: 'UIO',
+    origenCiudad: 'Bogotá',
+    destinoCiudad: 'Quito',
+    cantidad: 120,
+    estado: 'En almacén',
+    riesgo: 'ambar',
+    ubicacion: 'UIO - Almacén Central',
+    plazo: '24h',
+    registro: '30/03/2026 02:00',
+    estimada: '30/03/2026 20:00',
+    progreso: 85,
+    ruta: ['BOG', 'UIO'],
+    historial: [
+      { etapa: 'Registro inicial', detalle: 'Carga registrada en Bogotá', hora: '30/03/2026 02:00' },
+      { etapa: 'Arribo', detalle: 'Ingreso a UIO', hora: '30/03/2026 10:15' },
+      { etapa: 'Almacén', detalle: 'En espera de salida local', hora: '30/03/2026 11:00' },
+    ],
+  },
+  {
+    id: 'TRK-2026-003',
+    aerolinea: 'Lufthansa',
+    origen: 'FRA',
+    destino: 'EZE',
+    origenCiudad: 'Frankfurt',
+    destinoCiudad: 'Buenos Aires',
+    cantidad: 210,
+    estado: 'Demorado',
+    riesgo: 'rojo',
+    ubicacion: 'FRA - Nodo de Conexión',
+    plazo: '48h',
+    registro: '27/03/2026 10:00',
+    estimada: '29/03/2026 19:00',
+    progreso: 100,
+    ruta: ['FRA', 'GRU', 'EZE'],
+    historial: [
+      { etapa: 'Registro inicial', detalle: 'Carga registrada en Frankfurt', hora: '27/03/2026 10:00' },
+      { etapa: 'Incidencia', detalle: 'Cancelación de tramo FRA → GRU', hora: '27/03/2026 17:30' },
+      { etapa: 'Revisión', detalle: 'Pendiente de replanificación', hora: '28/03/2026 06:45' },
+      { etapa: 'Demora', detalle: 'Plazo comprometido excedido', hora: '29/03/2026 20:10' },
+    ],
+  },
+  {
+    id: 'TRK-2026-004',
+    aerolinea: 'Avianca',
+    origen: 'SAL',
+    destino: 'MIA',
+    origenCiudad: 'San Salvador',
+    destinoCiudad: 'Miami',
+    cantidad: 60,
+    estado: 'Replanificado',
+    riesgo: 'ambar',
+    ubicacion: 'SAL - Zona de Espera',
+    plazo: '24h',
+    registro: '29/03/2026 20:00',
+    estimada: '30/03/2026 18:20',
+    progreso: 45,
+    ruta: ['SAL', 'MIA'],
+    historial: [
+      { etapa: 'Registro inicial', detalle: 'Carga registrada en San Salvador', hora: '29/03/2026 20:00' },
+      { etapa: 'Incidencia', detalle: 'Cambio de vuelo asignado', hora: '30/03/2026 03:10' },
+      { etapa: 'Replanificación', detalle: 'Ruta ajustada por capacidad', hora: '30/03/2026 03:30' },
+    ],
+  },
+  {
+    id: 'TRK-2026-005',
+    aerolinea: 'Air France',
+    origen: 'CDG',
+    destino: 'JFK',
+    origenCiudad: 'París',
+    destinoCiudad: 'Nueva York',
+    cantidad: 88,
+    estado: 'Entregado',
+    riesgo: 'verde',
+    ubicacion: 'JFK - Entregado',
+    plazo: '48h',
+    registro: '28/03/2026 07:20',
+    estimada: '29/03/2026 16:40',
+    progreso: 100,
+    ruta: ['CDG', 'JFK'],
+    historial: [
+      { etapa: 'Registro inicial', detalle: 'Carga registrada en París', hora: '28/03/2026 07:20' },
+      { etapa: 'Salida', detalle: 'Vuelo CDG → JFK', hora: '28/03/2026 14:10' },
+      { etapa: 'Entrega', detalle: 'Carga entregada en JFK', hora: '29/03/2026 11:30' },
+    ],
+  },
+]
+
+function KpiCard({ titulo, valor, subtitulo, icono, variante = 'default' }) {
+  return (
+    <article className={`${styles.kpiCard} ${styles[`kpiCard--${variante}`]}`}>
+      <div className={styles.kpiHeader}>
+        <span className={styles.kpiLabel}>{titulo}</span>
+        <div className={styles.kpiIcono}>{icono}</div>
+      </div>
+      <div className={styles.kpiValor}>{valor}</div>
+      <div className={styles.kpiSubtitulo}>{subtitulo}</div>
+    </article>
+  )
 }
 
-export default GestionMaletasPage
+function BadgeEstado({ estado }) {
+  const mapa = {
+    'En tránsito': styles.badgeInfo,
+    'En almacén': styles.badgeNeutral,
+    Replanificado: styles.badgeWarningSoft,
+    Demorado: styles.badgeDanger,
+    Entregado: styles.badgeSuccess,
+  }
+
+  return (
+    <span className={`${styles.badge} ${mapa[estado] || styles.badgeNeutral}`}>
+      {estado}
+    </span>
+  )
+}
+
+function BadgeRiesgo({ riesgo }) {
+  const mapa = {
+    verde: styles.riesgoVerde,
+    ambar: styles.riesgoAmbar,
+    rojo: styles.riesgoRojo,
+  }
+
+  return <span className={`${styles.riesgoDot} ${mapa[riesgo] || ''}`} />
+}
+
+function BotonAccion({ icono, children, primario = false }) {
+  return (
+    <button className={primario ? styles.botonPrimario : styles.botonSecundario}>
+      {icono}
+      <span>{children}</span>
+    </button>
+  )
+}
+
+function FilaDetalle({ icono, label, value }) {
+  return (
+    <div className={styles.detailRow}>
+      <div className={styles.detailIcon}>{icono}</div>
+      <div>
+        <div className={styles.detailLabel}>{label}</div>
+        <div className={styles.detailValue}>{value}</div>
+      </div>
+    </div>
+  )
+}
+
+function MaletasPage() {
+  const [query, setQuery] = useState('')
+  const [estado, setEstado] = useState('Todos')
+  const [riesgo, setRiesgo] = useState('Todos')
+  const [aerolinea, setAerolinea] = useState('Todas')
+  const [selected, setSelected] = useState(ENVIOS_MOCK[0])
+  const [panelAbierto, setPanelAbierto] = useState(false)
+
+  const aerolineas = useMemo(
+    () => ['Todas', ...new Set(ENVIOS_MOCK.map((e) => e.aerolinea))],
+    []
+  )
+
+  const filtered = useMemo(() => {
+    return ENVIOS_MOCK.filter((envio) => {
+      const q = query.trim().toLowerCase()
+
+      const matchesQuery =
+        !q ||
+        envio.id.toLowerCase().includes(q) ||
+        envio.aerolinea.toLowerCase().includes(q) ||
+        envio.origenCiudad.toLowerCase().includes(q) ||
+        envio.destinoCiudad.toLowerCase().includes(q) ||
+        envio.origen.toLowerCase().includes(q) ||
+        envio.destino.toLowerCase().includes(q)
+
+      const matchesEstado = estado === 'Todos' || envio.estado === estado
+      const matchesRiesgo = riesgo === 'Todos' || envio.riesgo === riesgo
+      const matchesAerolinea = aerolinea === 'Todas' || envio.aerolinea === aerolinea
+
+      return matchesQuery && matchesEstado && matchesRiesgo && matchesAerolinea
+    })
+  }, [query, estado, riesgo, aerolinea])
+
+  const kpis = useMemo(() => {
+    const activos = ENVIOS_MOCK.filter((e) => e.estado !== 'Entregado').length
+    const enRiesgo = ENVIOS_MOCK.filter((e) => e.riesgo !== 'verde').length
+    const maletasTransito = ENVIOS_MOCK.reduce((acc, e) => acc + e.cantidad, 0)
+    const entregados = ENVIOS_MOCK.filter((e) => e.estado === 'Entregado').length
+
+    return { activos, enRiesgo, maletasTransito, entregados }
+  }, [])
+
+  const seleccionarEnvio = (envio) => {
+    setSelected(envio)
+    setPanelAbierto(true)
+  }
+
+  const limpiarFiltros = () => {
+    setQuery('')
+    setEstado('Todos')
+    setRiesgo('Todos')
+    setAerolinea('Todas')
+  }
+
+  return (
+    <div className={styles.page}>
+      <div className={styles.layout}>
+        <div className={styles.mainColumn}>
+          <section className={styles.header}>
+            <div className={styles.headerTextos}>
+              <h1 className={styles.titulo}>Gestión Operativa de Maletas</h1>
+              <p className={styles.subtitulo}>
+                Registro, monitoreo y seguimiento de envíos B2B dentro de la red Tasf.B2B.
+              </p>
+            </div>
+
+            <div className={styles.headerAcciones}>
+              <BotonAccion icono={<Download size={16} />}>Exportar</BotonAccion>
+              <BotonAccion icono={<FileText size={16} />}>Carga masiva</BotonAccion>
+              <BotonAccion icono={<Plus size={16} />} primario>
+                Registrar envío
+              </BotonAccion>
+            </div>
+          </section>
+
+          <section className={styles.kpisGrid}>
+            <KpiCard
+              titulo="Envíos activos"
+              valor={kpis.activos}
+              subtitulo="Operaciones actualmente en curso"
+              icono={<Package size={18} />}
+              variante="azul"
+            />
+            <KpiCard
+              titulo="En riesgo"
+              valor={kpis.enRiesgo}
+              subtitulo="Envíos con advertencia o criticidad"
+              icono={<AlertTriangle size={18} />}
+            />
+            <KpiCard
+              titulo="Maletas en tránsito"
+              valor={kpis.maletasTransito}
+              subtitulo="Conteo total de maletas registradas"
+              icono={<Plane size={18} />}
+            />
+            <KpiCard
+              titulo="Entregados"
+              valor={kpis.entregados}
+              subtitulo="Envíos completados en el periodo"
+              icono={<CheckCircle2 size={18} />}
+              variante="oscuro"
+            />
+          </section>
+
+          <section className={styles.filtrosCard}>
+            <div className={styles.cardTitleRow}>
+              <div className={styles.cardTitleIcon}>
+                <Filter size={16} />
+              </div>
+              <div>
+                <h2 className={styles.cardTitle}>Filtros de búsqueda</h2>
+                <p className={styles.cardSubtitle}>
+                  Busca por envío, aerolínea, ciudad o aplica filtros operativos.
+                </p>
+              </div>
+            </div>
+
+            <div className={styles.filtrosGrid}>
+              <div className={styles.searchBox}>
+                <Search size={18} className={styles.searchIcon} />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="ID, aerolínea, origen o destino"
+                  className={styles.input}
+                />
+              </div>
+
+              <select
+                className={styles.select}
+                value={aerolinea}
+                onChange={(e) => setAerolinea(e.target.value)}
+              >
+                {aerolineas.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                className={styles.select}
+                value={estado}
+                onChange={(e) => setEstado(e.target.value)}
+              >
+                <option>Todos</option>
+                <option>En tránsito</option>
+                <option>En almacén</option>
+                <option>Replanificado</option>
+                <option>Demorado</option>
+                <option>Entregado</option>
+              </select>
+
+              <select
+                className={styles.select}
+                value={riesgo}
+                onChange={(e) => setRiesgo(e.target.value)}
+              >
+                <option>Todos</option>
+                <option value="verde">Verde</option>
+                <option value="ambar">Ámbar</option>
+                <option value="rojo">Rojo</option>
+              </select>
+
+              <button className={styles.botonLimpiar} onClick={limpiarFiltros}>
+                Limpiar
+              </button>
+            </div>
+          </section>
+
+          <section className={styles.tablaCard}>
+            <div className={styles.tablaHeader}>
+              <div>
+                <h2 className={styles.cardTitle}>Envíos registrados</h2>
+                <p className={styles.cardSubtitle}>
+                  {filtered.length} resultado(s) en la vista actual
+                </p>
+              </div>
+
+              <button
+                className={styles.botonPanelMobile}
+                onClick={() => setPanelAbierto(true)}
+                disabled={!selected}
+              >
+                Ver detalle
+              </button>
+            </div>
+
+            <div className={styles.tablaWrapper}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>ID envío</th>
+                    <th>Aerolínea</th>
+                    <th>Ruta</th>
+                    <th>Cant.</th>
+                    <th>Riesgo</th>
+                    <th>Ubicación actual</th>
+                    <th>Estado</th>
+                    <th>Plazo</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((envio) => {
+                    const isSelected = selected?.id === envio.id
+
+                    return (
+                      <tr
+                        key={envio.id}
+                        className={isSelected ? styles.rowSelected : ''}
+                        onClick={() => seleccionarEnvio(envio)}
+                      >
+                        <td>
+                          <div className={styles.idCell}>
+                            <span className={styles.idPrimary}>{envio.id}</span>
+                            <span className={styles.idSecondary}>Registro: {envio.registro}</span>
+                          </div>
+                        </td>
+
+                        <td className={styles.strongCell}>{envio.aerolinea}</td>
+
+                        <td>
+                          <div className={styles.rutaCell}>
+                            <span className={styles.rutaPill}>{envio.origen}</span>
+                            <ChevronRight size={14} />
+                            <span className={styles.rutaPill}>{envio.destino}</span>
+                          </div>
+                        </td>
+
+                        <td className={styles.centerCell}>{envio.cantidad}</td>
+
+                        <td className={styles.centerCell}>
+                          <BadgeRiesgo riesgo={envio.riesgo} />
+                        </td>
+
+                        <td>
+                          <div className={styles.ubicacionCell}>
+                            <MapPin size={14} />
+                            <span>{envio.ubicacion}</span>
+                          </div>
+                        </td>
+
+                        <td>
+                          <BadgeEstado estado={envio.estado} />
+                        </td>
+
+                        <td className={styles.centerCell}>{envio.plazo}</td>
+
+                        <td className={styles.centerCell}>
+                          <button
+                            className={styles.iconButton}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              seleccionarEnvio(envio)
+                            }}
+                          >
+                            <MoreHorizontal size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+
+              {filtered.length === 0 && (
+                <div className={styles.emptyState}>
+                  <Search size={28} />
+                  <h3>No se encontraron envíos</h3>
+                  <p>Ajusta los filtros o cambia el término de búsqueda.</p>
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+
+        <aside className={styles.sidePanel}>
+          {selected ? (
+            <>
+              <div className={styles.sideHeader}>
+                <div>
+                  <p className={styles.sideEyebrow}>Detalle del envío</p>
+                  <h2 className={styles.sideTitle}>{selected.id}</h2>
+                </div>
+                <button className={styles.iconButton} onClick={() => setSelected(null)}>
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className={styles.sideBody}>
+                <section className={styles.progresoCard}>
+                  <div className={styles.progresoTop}>
+                    <span>Progreso hacia destino</span>
+                    <strong>{selected.progreso}%</strong>
+                  </div>
+
+                  <div className={styles.progressBar}>
+                    <div
+                      className={`${styles.progressValue} ${
+                        selected.riesgo === 'rojo'
+                          ? styles.progressRojo
+                          : selected.riesgo === 'ambar'
+                          ? styles.progressAmbar
+                          : styles.progressAzul
+                      }`}
+                      style={{ width: `${selected.progreso}%` }}
+                    />
+                  </div>
+
+                  <div className={styles.progresoBottom}>
+                    <span>Plazo comprometido: {selected.plazo}</span>
+                    <span
+                      className={`${styles.badge} ${
+                        selected.riesgo === 'rojo'
+                          ? styles.badgeDanger
+                          : selected.riesgo === 'ambar'
+                          ? styles.badgeWarningSoft
+                          : styles.badgeSuccess
+                      }`}
+                    >
+                      {selected.riesgo === 'rojo'
+                        ? 'Crítico'
+                        : selected.riesgo === 'ambar'
+                        ? 'Alerta'
+                        : 'Normal'}
+                    </span>
+                  </div>
+                </section>
+
+                <div className={styles.detailGrid}>
+                  <FilaDetalle
+                    icono={<Building2 size={16} />}
+                    label="Aerolínea"
+                    value={selected.aerolinea}
+                  />
+                  <FilaDetalle
+                    icono={<PlaneTakeoff size={16} />}
+                    label="Ruta principal"
+                    value={`${selected.origen} → ${selected.destino}`}
+                  />
+                  <FilaDetalle
+                    icono={<Package size={16} />}
+                    label="Cantidad de maletas"
+                    value={`${selected.cantidad} maletas`}
+                  />
+                  <FilaDetalle
+                    icono={<MapPin size={16} />}
+                    label="Ubicación actual"
+                    value={selected.ubicacion}
+                  />
+                  <FilaDetalle
+                    icono={<Clock3 size={16} />}
+                    label="Entrega estimada"
+                    value={selected.estimada}
+                  />
+                </div>
+
+                <section className={styles.infoCard}>
+                  <div className={styles.infoHeader}>
+                    <h3>Tramos de la ruta</h3>
+                    <BadgeEstado estado={selected.estado} />
+                  </div>
+
+                  <div className={styles.tramos}>
+                    {selected.ruta.map((stop, i) => (
+                      <div className={styles.tramoItem} key={`${stop}-${i}`}>
+                        <span className={styles.rutaPill}>{stop}</span>
+                        {i < selected.ruta.length - 1 && <ChevronRight size={14} />}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                <section className={styles.infoCard}>
+                  <h3 className={styles.historialTitulo}>Historial operativo</h3>
+
+                  <div className={styles.timeline}>
+                    {selected.historial.map((item, idx) => (
+                      <div className={styles.timelineItem} key={`${item.hora}-${idx}`}>
+                        <div className={styles.timelineDot} />
+                        <div className={styles.timelineContent}>
+                          <div className={styles.timelineEtapa}>{item.etapa}</div>
+                          <div className={styles.timelineDetalle}>{item.detalle}</div>
+                          <div className={styles.timelineHora}>{item.hora}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                <button className={styles.botonPlan}>
+                  <FileText size={16} />
+                  <span>Ver plan de viaje completo</span>
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className={styles.emptyPanel}>
+              <Package size={26} />
+              <h3>Selecciona un envío</h3>
+              <p>El detalle operativo aparecerá en este panel.</p>
+            </div>
+          )}
+        </aside>
+      </div>
+
+      {panelAbierto && selected && (
+        <div className={styles.mobileOverlay} onClick={() => setPanelAbierto(false)}>
+          <div className={styles.mobilePanel} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.sideHeader}>
+              <div>
+                <p className={styles.sideEyebrow}>Detalle del envío</p>
+                <h2 className={styles.sideTitle}>{selected.id}</h2>
+              </div>
+              <button className={styles.iconButton} onClick={() => setPanelAbierto(false)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className={styles.sideBody}>
+              <section className={styles.progresoCard}>
+                <div className={styles.progresoTop}>
+                  <span>Progreso hacia destino</span>
+                  <strong>{selected.progreso}%</strong>
+                </div>
+
+                <div className={styles.progressBar}>
+                  <div
+                    className={`${styles.progressValue} ${
+                      selected.riesgo === 'rojo'
+                        ? styles.progressRojo
+                        : selected.riesgo === 'ambar'
+                        ? styles.progressAmbar
+                        : styles.progressAzul
+                    }`}
+                    style={{ width: `${selected.progreso}%` }}
+                  />
+                </div>
+
+                <div className={styles.progresoBottom}>
+                  <span>Plazo comprometido: {selected.plazo}</span>
+                </div>
+              </section>
+
+              <div className={styles.detailGrid}>
+                <FilaDetalle
+                  icono={<Building2 size={16} />}
+                  label="Aerolínea"
+                  value={selected.aerolinea}
+                />
+                <FilaDetalle
+                  icono={<PlaneTakeoff size={16} />}
+                  label="Ruta principal"
+                  value={`${selected.origen} → ${selected.destino}`}
+                />
+                <FilaDetalle
+                  icono={<Package size={16} />}
+                  label="Cantidad de maletas"
+                  value={`${selected.cantidad} maletas`}
+                />
+                <FilaDetalle
+                  icono={<MapPin size={16} />}
+                  label="Ubicación actual"
+                  value={selected.ubicacion}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default MaletasPage

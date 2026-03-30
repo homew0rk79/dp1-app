@@ -1,3 +1,4 @@
+@import "tailwindcss";
 :root {
   --color-primary:       #1a3a5c;
   --color-primary-hover: #14304e;
@@ -45,10 +46,10 @@ body {
 }
 
 #root {
-  height: 100vh;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 button {
