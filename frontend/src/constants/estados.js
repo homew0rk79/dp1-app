@@ -22,12 +22,12 @@ export const ESTADOS_TRAMO = {
 
 export const ESTADOS_ENVIO = {
   PENDIENTE: 'Pendiente',
-  ALMACEN: 'En Almacén',
-  TRANSITO: 'En Tránsito',
+  ALMACEN: 'En almacén',
+  TRANSITO: 'En tránsito',
   REPLANIFICADO: 'Replanificado',
   ENTREGADO: 'Entregado',
   DEMORADO: 'Demorado',
-  RIESGO: 'En Riesgo'
+  RIESGO: 'En Riesgo',
 };
 
 export const SEMAFORO = {

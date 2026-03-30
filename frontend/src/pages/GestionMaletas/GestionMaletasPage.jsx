@@ -18,6 +18,7 @@ import {
   Filter,
 } from 'lucide-react'
 
+import { ESTADOS_ENVIO } from '../../constants/estados'
 import styles from './GestionMaletasModule.module.css'
 
 const ENVIOS_MOCK = [
@@ -29,7 +30,7 @@ const ENVIOS_MOCK = [
     origenCiudad: 'Lima',
     destinoCiudad: 'Madrid',
     cantidad: 45,
-    estado: 'En tránsito',
+    estado: ESTADOS_ENVIO.TRANSITO,
     riesgo: 'verde',
     ubicacion: 'En vuelo (Océano Atlántico)',
     plazo: '48h',
@@ -52,7 +53,7 @@ const ENVIOS_MOCK = [
     origenCiudad: 'Bogotá',
     destinoCiudad: 'Quito',
     cantidad: 120,
-    estado: 'En almacén',
+    estado: ESTADOS_ENVIO.ALMACEN,
     riesgo: 'ambar',
     ubicacion: 'UIO - Almacén Central',
     plazo: '24h',
@@ -74,7 +75,7 @@ const ENVIOS_MOCK = [
     origenCiudad: 'Frankfurt',
     destinoCiudad: 'Buenos Aires',
     cantidad: 210,
-    estado: 'Demorado',
+    estado: ESTADOS_ENVIO.DEMORADO,
     riesgo: 'rojo',
     ubicacion: 'FRA - Nodo de Conexión',
     plazo: '48h',
@@ -97,7 +98,7 @@ const ENVIOS_MOCK = [
     origenCiudad: 'San Salvador',
     destinoCiudad: 'Miami',
     cantidad: 60,
-    estado: 'Replanificado',
+    estado: ESTADOS_ENVIO.REPLANIFICADO,
     riesgo: 'ambar',
     ubicacion: 'SAL - Zona de Espera',
     plazo: '24h',
@@ -119,7 +120,7 @@ const ENVIOS_MOCK = [
     origenCiudad: 'París',
     destinoCiudad: 'Nueva York',
     cantidad: 88,
-    estado: 'Entregado',
+    estado: ESTADOS_ENVIO.ENTREGADO,
     riesgo: 'verde',
     ubicacion: 'JFK - Entregado',
     plazo: '48h',
@@ -150,11 +151,11 @@ function KpiCard({ titulo, valor, subtitulo, icono, variante = 'default' }) {
 
 function BadgeEstado({ estado }) {
   const mapa = {
-    'En tránsito': styles.badgeInfo,
-    'En almacén': styles.badgeNeutral,
-    Replanificado: styles.badgeWarningSoft,
-    Demorado: styles.badgeDanger,
-    Entregado: styles.badgeSuccess,
+    [ESTADOS_ENVIO.TRANSITO]: styles.badgeInfo,
+    [ESTADOS_ENVIO.ALMACEN]: styles.badgeNeutral,
+    [ESTADOS_ENVIO.REPLANIFICADO]: styles.badgeWarningSoft,
+    [ESTADOS_ENVIO.DEMORADO]: styles.badgeDanger,
+    [ESTADOS_ENVIO.ENTREGADO]: styles.badgeSuccess,
   }
 
   return (
@@ -195,7 +196,7 @@ function FilaDetalle({ icono, label, value }) {
   )
 }
 
-function MaletasPage() {
+function GestionMaletasPage() {
   const [query, setQuery] = useState('')
   const [estado, setEstado] = useState('Todos')
   const [riesgo, setRiesgo] = useState('Todos')
@@ -230,10 +231,10 @@ function MaletasPage() {
   }, [query, estado, riesgo, aerolinea])
 
   const kpis = useMemo(() => {
-    const activos = ENVIOS_MOCK.filter((e) => e.estado !== 'Entregado').length
+    const activos = ENVIOS_MOCK.filter((e) => e.estado !== ESTADOS_ENVIO.ENTREGADO).length
     const enRiesgo = ENVIOS_MOCK.filter((e) => e.riesgo !== 'verde').length
     const maletasTransito = ENVIOS_MOCK.reduce((acc, e) => acc + e.cantidad, 0)
-    const entregados = ENVIOS_MOCK.filter((e) => e.estado === 'Entregado').length
+    const entregados = ENVIOS_MOCK.filter((e) => e.estado === ESTADOS_ENVIO.ENTREGADO).length
 
     return { activos, enRiesgo, maletasTransito, entregados }
   }, [])
@@ -342,11 +343,11 @@ function MaletasPage() {
                 onChange={(e) => setEstado(e.target.value)}
               >
                 <option>Todos</option>
-                <option>En tránsito</option>
-                <option>En almacén</option>
-                <option>Replanificado</option>
-                <option>Demorado</option>
-                <option>Entregado</option>
+                <option value={ESTADOS_ENVIO.TRANSITO}>{ESTADOS_ENVIO.TRANSITO}</option>
+                <option value={ESTADOS_ENVIO.ALMACEN}>{ESTADOS_ENVIO.ALMACEN}</option>
+                <option value={ESTADOS_ENVIO.REPLANIFICADO}>{ESTADOS_ENVIO.REPLANIFICADO}</option>
+                <option value={ESTADOS_ENVIO.DEMORADO}>{ESTADOS_ENVIO.DEMORADO}</option>
+                <option value={ESTADOS_ENVIO.ENTREGADO}>{ESTADOS_ENVIO.ENTREGADO}</option>
               </select>
 
               <select
@@ -671,4 +672,4 @@ function MaletasPage() {
   )
 }
 
-export default MaletasPage
+export default GestionMaletasPage
