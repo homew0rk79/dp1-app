@@ -1,0 +1,53 @@
+.leyenda {
+  position: absolute;
+  bottom: 30px;
+  right: 12px;
+  z-index: 1000;
+  background: white;
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1rem;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--color-border);
+  min-width: 175px;
+  pointer-events: none;
+}
+
+.titulo {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--color-text);
+  padding: 0.15rem 0;
+}
+
+.dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.15);
+  flex-shrink: 0;
+}
+
+.linea {
+  width: 22px;
+  height: 2px;
+  border-top: 2px dashed #2563eb;
+  flex-shrink: 0;
+}
+
+.divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: 0.4rem 0;
+}

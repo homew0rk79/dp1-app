@@ -1,0 +1,116 @@
+.sidebar {
+  width: var(--sidebar-width);
+  flex-shrink: 0;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.section {
+  padding: 1rem 1rem 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.sectionScroll {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 0.5rem;
+}
+
+.sectionBottom {
+  padding: 0.85rem 1rem;
+  flex-shrink: 0;
+}
+
+.sectionTitle {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-text-muted);
+  margin-bottom: 0.6rem;
+}
+
+/* KPIs */
+.kpiList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+/* Lista de aeropuertos */
+.aeropuertoList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.aeropuertoItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.42rem 0.5rem;
+  border-radius: var(--radius-sm);
+  transition: background 0.12s;
+  cursor: default;
+}
+
+.aeropuertoItem:hover {
+  background: var(--color-bg);
+}
+
+.aeropuertoInfo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.aeropuertoNombre {
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.aeropuertoPais {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
+
+.aeropuertoOcupacion {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+
+.ocupacionTexto {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  min-width: 32px;
+  text-align: right;
+}
+
+/* Botón simulación */
+.btnSimulacion {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  background: var(--color-accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+
+.btnSimulacion:hover {
+  background: var(--color-accent-hover);
+}

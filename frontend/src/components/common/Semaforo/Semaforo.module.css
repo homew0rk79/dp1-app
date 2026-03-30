@@ -1,0 +1,11 @@
+.dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.verde { background-color: var(--color-verde); box-shadow: 0 0 5px var(--color-verde); }
+.ambar { background-color: var(--color-ambar); box-shadow: 0 0 5px var(--color-ambar); }
+.rojo  { background-color: var(--color-rojo);  box-shadow: 0 0 5px var(--color-rojo);  }
