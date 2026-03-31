@@ -1,0 +1,422 @@
+.page {
+  background: #f3f6fb;
+  padding: 18px;
+  min-height: calc(100vh - 72px);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* ── Header ─────────────────────────────────── */
+.header {
+  background: #ffffff;
+  border: 1px solid #dbe4f0;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+  border-radius: 18px;
+  padding: 18px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.headerTextos { min-width: 0; }
+
+.titulo {
+  margin: 0;
+  color: #0f172a;
+  font-size: 2rem;
+  line-height: 1.1;
+  font-weight: 800;
+}
+
+.subtitulo {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 0.96rem;
+}
+
+.headerAcciones {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* ── KPI grid ────────────────────────────────── */
+.kpisGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+@media (max-width: 900px) {
+  .kpisGrid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.kpiCard {
+  background: #ffffff;
+  border: 1px solid #dbe4f0;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+  border-radius: 18px;
+  padding: 16px 18px;
+}
+
+.kpiHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.kpiLabel {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.kpiIcono {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.kpiCard--verde .kpiIcono { background: var(--color-verde-bg); color: #15803d; }
+.kpiCard--ambar .kpiIcono { background: var(--color-ambar-bg); color: #b45309; }
+.kpiCard--rojo  .kpiIcono { background: var(--color-rojo-bg);  color: #b91c1c; }
+.kpiCard--azul  .kpiIcono { background: #eff6ff; color: #1d4ed8; }
+
+.kpiValor {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.1;
+  margin-bottom: 4px;
+}
+
+.kpiSub {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+/* ── Selector escenario ───────────────────────── */
+.escenarioBar {
+  background: #ffffff;
+  border: 1px solid #dbe4f0;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+  border-radius: 18px;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.escenarioLabel {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.escenarioBtns {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btnEscenario {
+  padding: 6px 16px;
+  border-radius: 20px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btnEscenario:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.btnEscenario--activo {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* ── Tabs ─────────────────────────────────────── */
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 2px solid var(--color-border);
+  margin-bottom: 0;
+}
+
+.tab {
+  padding: 10px 20px;
+  border: none;
+  background: transparent;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.tab:hover { color: var(--color-accent); }
+
+.tab--activo {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
+  font-weight: 700;
+}
+
+.tabsWrapper {
+  background: #ffffff;
+  border: 1px solid #dbe4f0;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.tabsNav {
+  padding: 0 20px;
+  border-bottom: 2px solid var(--color-border);
+}
+
+.tabContent {
+  padding: 20px;
+}
+
+/* ── Cards genéricas de sección ───────────────── */
+.card {
+  background: #ffffff;
+  border: 1px solid #dbe4f0;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+  border-radius: 18px;
+  padding: 20px;
+}
+
+.cardTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.cardTitleIcon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.cardTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.cardSubtitle {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin: 2px 0 0;
+}
+
+/* ── Dos columnas ─────────────────────────────── */
+.dos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .dos { grid-template-columns: 1fr; }
+}
+
+/* ── Tabla de datos ───────────────────────────── */
+.tablaWrapper {
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table thead th {
+  background: #f8fafc;
+  color: var(--color-text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table thead th.right { text-align: right; }
+.table thead th.center { text-align: center; }
+
+.table tbody tr {
+  border-bottom: 1px solid var(--color-border);
+  transition: background 0.12s;
+}
+
+.table tbody tr:last-child { border-bottom: none; }
+.table tbody tr:hover { background: #f8fafc; }
+
+.table tbody td {
+  padding: 10px 14px;
+  color: var(--color-text);
+}
+
+.table tbody td.right { text-align: right; }
+.table tbody td.center { text-align: center; }
+
+/* ── Semáforo en tabla ────────────────────────── */
+.semaforoCell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dot--verde { background: var(--color-verde); }
+.dot--ambar { background: var(--color-ambar); }
+.dot--rojo  { background: var(--color-rojo); }
+
+/* ── Barra de ocupación ───────────────────────── */
+.barraOcupacion {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 80px;
+}
+
+.barraTrack {
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.barraFill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+
+.barraFill--verde { background: var(--color-verde); }
+.barraFill--ambar { background: var(--color-ambar); }
+.barraFill--rojo  { background: var(--color-rojo); }
+
+.barraLabel {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+/* ── Botones ──────────────────────────────────── */
+.botonSecundario {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.botonSecundario:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+/* ── Estado vacío ─────────────────────────────── */
+.emptyState {
+  padding: 40px;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.emptyState h3 {
+  margin: 12px 0 6px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.emptyState p {
+  font-size: 0.85rem;
+}
+
+/* ── Badge ──────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge--verde { background: var(--color-verde-bg); color: #15803d; }
+.badge--ambar { background: var(--color-ambar-bg); color: #b45309; }
+.badge--rojo  { background: var(--color-rojo-bg);  color: #b91c1c; }
+.badge--info  { background: #eff6ff; color: #1d4ed8; }
+
+/* ── Sección interna ──────────────────────────── */
+.seccion {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.seccionTitulo {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0;
+}

@@ -1,0 +1,10 @@
+.wrapper {
+  width: 100%;
+}
+
+.titulo {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 12px;
+}
