@@ -12,7 +12,6 @@ import {
   MapPinned,
   SlidersHorizontal,
   ShieldCheck,
-  BrainCircuit,
   Database,
   CheckCircle2,
   AlertTriangle,
@@ -75,13 +74,10 @@ function ConfiguracionPage() {
 
     aeropuertoDefault: 'Lima',
     zonaHoraria: 'UTC',
-    escenarioActivo: 'Tiempo real',
-
     semaforoVerdeMax: 60,
     semaforoAmbarMax: 85,
     alertaPreventiva: 90,
 
-    algoritmoActivo: 'Algoritmo A',
     validacionDatos: true,
     cambiosSinReinicio: true,
     cargaMasiva: true,
@@ -136,8 +132,6 @@ function ConfiguracionPage() {
           </section>
 
           <section className={styles.kpisGrid}>
-            <KpiMini titulo="Escenario activo" valor={config.escenarioActivo} estado="azul" />
-            <KpiMini titulo="Algoritmo" valor={config.algoritmoActivo} />
             <KpiMini titulo="Zona horaria" valor={config.zonaHoraria} />
             <KpiMini titulo="Alerta preventiva" valor={`${config.alertaPreventiva}%`} estado="oscuro" />
           </section>
@@ -366,37 +360,6 @@ function ConfiguracionPage() {
                   <span className={`${styles.previewDot} ${styles.dotRojo}`} />
                   <span>Crítico: {config.semaforoAmbarMax + 1}% - 100%</span>
                 </div>
-              </div>
-            </SectionCard>
-
-            <SectionCard
-              icono={<BrainCircuit size={18} />}
-              titulo="Planificador y simulación"
-              subtitulo="Controla algoritmo activo y escenario operativo de ejecución."
-            >
-              <div className={styles.grid2}>
-                <Campo label="Algoritmo activo">
-                  <select
-                    className={styles.select}
-                    value={config.algoritmoActivo}
-                    onChange={(e) => actualizar('algoritmoActivo', e.target.value)}
-                  >
-                    <option>Algoritmo A</option>
-                    <option>Algoritmo B</option>
-                  </select>
-                </Campo>
-
-                <Campo label="Escenario operativo">
-                  <select
-                    className={styles.select}
-                    value={config.escenarioActivo}
-                    onChange={(e) => actualizar('escenarioActivo', e.target.value)}
-                  >
-                    <option>Tiempo real</option>
-                    <option>Simulación por periodo</option>
-                    <option>Simulación hasta colapso</option>
-                  </select>
-                </Campo>
               </div>
             </SectionCard>
 
