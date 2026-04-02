@@ -1,0 +1,55 @@
+.alerta {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 18px 20px;
+  background: #fef2f2;
+  border: 2px solid #fca5a5;
+  border-radius: 16px;
+  animation: pulso 2s ease-in-out infinite;
+}
+
+@keyframes pulso {
+  0%, 100% { border-color: #fca5a5; }
+  50% { border-color: #ef4444; }
+}
+
+.icono {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: #fee2e2;
+  color: #b91c1c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.contenido {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.titulo {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #991b1b;
+}
+
+.descripcion {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #b91c1c;
+  line-height: 1.5;
+}
+
+.tiempo {
+  font-size: 0.82rem;
+  color: #991b1b;
+}
+
+.tiempo strong {
+  font-weight: 800;
+}

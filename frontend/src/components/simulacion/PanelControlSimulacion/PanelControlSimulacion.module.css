@@ -1,0 +1,140 @@
+.panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.tiempoBloque {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tiempoLabel {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #64748b;
+}
+
+.tiempoValor {
+  font-size: 2.6rem;
+  font-weight: 800;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  transition: color 0.3s;
+}
+
+.tiempoActivo {
+  color: #2563eb;
+}
+
+.estadoBadge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+
+.estado--idle {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+
+.estado--corriendo {
+  background: #ecfdf5;
+  border-color: #bbf7d0;
+  color: #15803d;
+}
+
+.estado--pausado {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  color: #c2410c;
+}
+
+.estado--finalizado {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+.controles {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.botonIniciar,
+.botonPausar,
+.botonDetener {
+  height: 48px;
+  border-radius: 14px;
+  padding: 0 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s;
+  border: none;
+}
+
+.botonIniciar {
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+}
+
+.botonIniciar:hover {
+  background: #1d4ed8;
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.4);
+}
+
+.botonPausar {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+}
+
+.botonPausar:hover {
+  background: #ffedd5;
+}
+
+.botonDetener {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.botonDetener:hover {
+  background: #fee2e2;
+}
+
+@media (max-width: 600px) {
+  .panel {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .controles {
+    flex-direction: column;
+  }
+
+  .botonIniciar,
+  .botonPausar,
+  .botonDetener {
+    justify-content: center;
+  }
+}
