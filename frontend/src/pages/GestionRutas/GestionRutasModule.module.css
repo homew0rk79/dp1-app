@@ -1,0 +1,850 @@
+.page {
+  background: #f3f6fb;
+  padding: 18px;
+  min-height: calc(100vh - 72px);
+  box-sizing: border-box;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 18px;
+  align-items: start;
+  width: 100%;
+  max-width: none;
+}
+
+.mainColumn {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.header,
+.filtrosCard,
+.tablaCard,
+.sidePanel,
+.kpiCard,
+.progresoCard,
+.infoCard,
+.detailRow,
+.aeropuertosCard {
+  background: #ffffff;
+  border: 1px solid #dbe4f0;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+}
+
+.header,
+.filtrosCard,
+.tablaCard,
+.sidePanel,
+.kpiCard,
+.progresoCard,
+.infoCard,
+.aeropuertosCard {
+  border-radius: 18px;
+}
+
+.header {
+  padding: 18px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.headerTextos {
+  min-width: 0;
+}
+
+.titulo {
+  margin: 0;
+  color: #0f172a;
+  font-size: 2rem;
+  line-height: 1.1;
+  font-weight: 800;
+}
+
+.subtitulo {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 0.96rem;
+}
+
+.headerAcciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.botonSecundario,
+.botonPrimario,
+.botonLimpiar,
+.botonPlan,
+.botonPanelMobile {
+  height: 40px;
+  border-radius: 12px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.botonSecundario {
+  background: #fff;
+  border: 1px solid #d7e0ec;
+  color: #334155;
+}
+
+.botonSecundario:hover {
+  background: #f8fafc;
+}
+
+.botonPrimario {
+  background: #2563eb;
+  border: 1px solid #2563eb;
+  color: white;
+}
+
+.botonPrimario:hover {
+  background: #1d4ed8;
+}
+
+.botonLimpiar {
+  background: #fff;
+  border: 1px solid #d7e0ec;
+  color: #475569;
+}
+
+.botonLimpiar:hover {
+  background: #f8fafc;
+}
+
+.botonPlan {
+  width: 100%;
+  background: #fff;
+  border: 1px solid #d7e0ec;
+  color: #334155;
+}
+
+.botonPlan:hover {
+  background: #f8fafc;
+}
+
+.botonPanelMobile {
+  display: none;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+}
+
+.kpisGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.kpiCard {
+  padding: 16px 18px;
+}
+
+.kpiCard--azul {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  border-color: transparent;
+  color: white;
+}
+
+.kpiCard--oscuro {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border-color: transparent;
+  color: white;
+}
+
+.kpiCard--coral {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  border-color: transparent;
+  color: white;
+}
+
+.kpiHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.kpiLabel {
+  color: inherit;
+  opacity: 0.86;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.kpiIcono {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: rgba(148, 163, 184, 0.13);
+  color: inherit;
+}
+
+.kpiValor {
+  margin-top: 10px;
+  font-size: 2rem;
+  line-height: 1;
+  font-weight: 800;
+  color: inherit;
+}
+
+.kpiSubtitulo {
+  margin-top: 8px;
+  font-size: 0.82rem;
+  color: inherit;
+  opacity: 0.82;
+}
+
+.filtrosCard,
+.tablaCard {
+  padding: 16px;
+}
+
+.filtrosCard {
+  overflow: visible;
+  background: #ffffff;
+}
+
+.cardTitleRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.cardTitleIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: #eef2f7;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cardTitle {
+  margin: 0;
+  color: #0f172a;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.cardSubtitle {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 0.84rem;
+}
+
+.filtrosGrid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 12px;
+  overflow: visible;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.filtrosGrid .searchBox {
+  flex: 1 1 260px;
+  min-width: min(100%, 220px);
+  max-width: 100%;
+}
+
+.filtrosGrid .select {
+  flex: 1 1 170px;
+  min-width: 150px;
+  width: auto;
+  max-width: 100%;
+}
+
+.filtrosGrid .botonLimpiar {
+  flex: 0 0 auto;
+  min-width: 100px;
+  align-self: center;
+}
+
+.searchBox {
+  position: relative;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+}
+
+.input,
+.select {
+  width: 100%;
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid #d7e0ec;
+  background: #fff;
+  color: #334155;
+  font-size: 0.92rem;
+  outline: none;
+}
+
+.input {
+  padding: 0 14px 0 38px;
+}
+
+.select {
+  padding: 0 12px;
+}
+
+.input:focus,
+.select:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.tablaHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e6edf5;
+}
+
+.idCell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.idPrimary {
+  color: #2563eb;
+  font-family: monospace;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.idSecondary {
+  color: #94a3b8;
+  font-size: 0.74rem;
+}
+
+.strongCell {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.centerCell {
+  text-align: center;
+}
+
+.rutaCell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #475569;
+}
+
+.rutaPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.iconButton {
+  width: 34px;
+  height: 34px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.iconButton:hover {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.74rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.badgeInfo {
+  background: #e0f2fe;
+  border-color: #bae6fd;
+  color: #0369a1;
+}
+
+.badgeNeutral {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+
+.badgeWarningSoft {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  color: #c2410c;
+}
+
+.badgeDanger {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.badgeSuccess {
+  background: #ecfdf5;
+  border-color: #bbf7d0;
+  color: #15803d;
+}
+
+.riesgoDot {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px #fff;
+}
+
+.riesgoVerde {
+  background: #22c55e;
+}
+
+.riesgoAmbar {
+  background: #f59e0b;
+}
+
+.riesgoRojo {
+  background: #ef4444;
+}
+
+.sidePanel {
+  min-width: 0;
+  overflow: hidden;
+  position: sticky;
+  top: 16px;
+}
+
+.sideHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 16px 14px;
+  border-bottom: 1px solid #e6edf5;
+}
+
+.sideEyebrow {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.sideTitle {
+  margin: 4px 0 0;
+  color: #0f172a;
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.sideBody {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.progresoCard {
+  padding: 14px;
+  border-radius: 16px;
+  background: #f8fafc;
+}
+
+.progresoTop,
+.progresoBottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.progresoTop {
+  margin-bottom: 10px;
+  color: #334155;
+  font-size: 0.92rem;
+}
+
+.progresoTop strong {
+  color: #2563eb;
+}
+
+.progresoBottom {
+  margin-top: 10px;
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.detailRow {
+  border-radius: 14px;
+  padding: 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.detailIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: #f1f5f9;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.detailLabel {
+  color: #64748b;
+  font-size: 0.74rem;
+}
+
+.detailValue {
+  margin-top: 2px;
+  color: #0f172a;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.infoCard {
+  padding: 14px;
+}
+
+.infoHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.infoHeader h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.tramos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.tramoItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #64748b;
+}
+
+.emptyState,
+.emptyPanel {
+  padding: 34px 18px;
+  text-align: center;
+  color: #64748b;
+}
+
+.emptyState svg,
+.emptyPanel svg {
+  color: #94a3b8;
+}
+
+.emptyState h3,
+.emptyPanel h3 {
+  margin: 12px 0 4px;
+  color: #0f172a;
+  font-size: 1rem;
+}
+
+.emptyState p,
+.emptyPanel p {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.mobileOverlay {
+  display: none;
+}
+
+.aeropuertosCard {
+  padding: 16px;
+}
+
+.thCenter {
+  text-align: center;
+}
+
+.aeropuertoRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(140px, 1fr) 32px;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.aeropuertoRow:last-child {
+  border-bottom: none;
+}
+
+.aeropuertoNombre {
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 0.92rem;
+}
+
+.aeropuertoContinente {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.ocupacionMeta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+
+.accionesCell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}
+
+.linkAccion {
+  background: none;
+  border: none;
+  color: #2563eb;
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 4px 4px;
+  white-space: nowrap;
+}
+
+.linkAccion:hover {
+  text-decoration: underline;
+}
+
+.exitoBanner {
+  background: #ecfdf5;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.singleColumn {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.detalleHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #2563eb;
+  font-weight: 700;
+  font-size: 0.92rem;
+  text-decoration: none;
+  padding: 4px 0;
+  width: fit-content;
+}
+
+.backLink:hover {
+  text-decoration: underline;
+}
+
+.detalleTitulo {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.tramosInnerTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+
+.tramosInnerTable th {
+  text-align: left;
+  padding: 8px 10px;
+  color: #64748b;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-bottom: 1px solid #e6edf5;
+}
+
+.tramosInnerTable td {
+  padding: 10px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+@media (max-width: 1400px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr) 330px;
+  }
+}
+
+@media (max-width: 1180px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .sidePanel {
+    display: none;
+  }
+
+  .botonPanelMobile {
+    display: inline-flex;
+  }
+}
+
+@media (max-width: 1024px) {
+  .kpisGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .aeropuertoRow {
+    grid-template-columns: 1fr auto;
+    gap: 8px 12px;
+  }
+
+  .aeropuertoRow .ocupacionBar {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 720px) {
+  .page {
+    padding: 14px;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .headerAcciones {
+    justify-content: stretch;
+  }
+
+  .headerAcciones button {
+    flex: 1;
+  }
+
+  .titulo {
+    font-size: 1.6rem;
+  }
+
+  .kpisGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .filtrosGrid {
+    gap: 10px;
+  }
+
+  .filtrosGrid .searchBox {
+    flex: 1 1 100%;
+  }
+
+  .tablaHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .mobileOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: rgba(15, 23, 42, 0.35);
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .mobilePanel {
+    width: min(100%, 420px);
+    height: 100%;
+    overflow-y: auto;
+    background: #f3f6fb;
+    padding: 12px;
+  }
+}
