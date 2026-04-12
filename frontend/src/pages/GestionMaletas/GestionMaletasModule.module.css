@@ -708,6 +708,135 @@
   font-size: 0.88rem;
 }
 
+.accionesCell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.iconButtonDanger:hover {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.sidePanelAcciones {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ── Modales ────────────────────────────── */
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.modalCard {
+  background: #fff;
+  border-radius: 20px;
+  border: 1px solid #dbe4f0;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.18);
+  width: 100%;
+  max-width: 680px;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.modalCardSmall {
+  max-width: 420px;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid #e6edf5;
+  flex-shrink: 0;
+}
+
+.modalBody {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.formGroupFull {
+  grid-column: 1 / -1;
+}
+
+.formLabel {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.botonPeligro {
+  height: 40px;
+  border-radius: 12px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s ease;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+}
+
+.botonPeligro:hover {
+  background: #fee2e2;
+}
+
+.eliminarTexto {
+  margin: 0;
+  color: #334155;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.eliminarTexto strong {
+  color: #0f172a;
+  font-family: monospace;
+}
+
 .mobileOverlay {
   display: none;
 }

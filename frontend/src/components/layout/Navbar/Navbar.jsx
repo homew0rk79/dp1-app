@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import {
-  Map, Luggage, Route, PlayCircle,
+  Map, Luggage, Route,
   BarChart2, Settings, PlaneTakeoff,
 } from 'lucide-react'
 import styles from './Navbar.module.css'
@@ -9,7 +9,6 @@ const NAV_ITEMS = [
   { to: '/visualizador', label: 'Visualizador', icon: Map },
   { to: '/maletas',      label: 'Maletas',       icon: Luggage },
   { to: '/rutas',        label: 'Rutas',         icon: Route },
-  { to: '/simulacion',   label: 'Simulación',    icon: PlayCircle },
   { to: '/reportes',     label: 'Reportes',      icon: BarChart2 },
   { to: '/configuracion',label: 'Configuración', icon: Settings },
 ]

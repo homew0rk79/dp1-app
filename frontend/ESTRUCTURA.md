@@ -25,7 +25,9 @@
 El frontend está dividido en dos grandes responsabilidades:
 
 - **Visualizador**: mapa interactivo en tiempo real que muestra el estado de las operaciones (maletas, rutas, aeropuertos) usando colores de semáforo.
-- **Panel de gestión**: pantallas para registrar maletas, gestionar rutas, ejecutar simulaciones, ver reportes y configurar parámetros del sistema.
+- **Panel de gestión**: pantallas para registrar maletas, gestionar rutas, ver reportes y configurar parámetros del sistema.
+
+El **control de simulación** (selección de escenario, inicio, pausa y detención) se realiza desde el panel lateral (`Sidebar`), que permanece visible en todo momento. Al iniciar, el visualizador se activa automáticamente.
 
 La comunicación con el backend Java se hace mediante llamadas REST (para operaciones) y WebSocket (para actualizaciones en tiempo real del mapa).
 
@@ -45,6 +47,10 @@ frontend/
     ├── assets/
     ├── components/
     │   ├── common/
+    │   ├── layout/
+    │   │   ├── Layout/
+    │   │   ├── Navbar/
+    │   │   └── Sidebar/         ← incluye el panel de control de simulación
     │   ├── mapa/
     │   ├── simulacion/
     │   └── reportes/
@@ -52,7 +58,6 @@ frontend/
     │   ├── Visualizador/
     │   ├── GestionMaletas/
     │   ├── GestionRutas/
-    │   ├── Simulacion/
     │   ├── Reportes/
     │   └── Configuracion/
     ├── hooks/
@@ -161,7 +166,9 @@ components/mapa/
 
 ### `components/simulacion/`
 
-Componentes relacionados con el control y configuración de los **3 escenarios de simulación**.
+Componentes de control de los **3 escenarios de simulación**. Se usan desde el `Sidebar`,
+no desde una página dedicada. El usuario selecciona escenario y parámetros en el panel
+lateral y lanza la simulación desde allí.
 
 ```
 components/simulacion/
@@ -169,11 +176,6 @@ components/simulacion/
 │   ├── SelectorEscenario.jsx        # Permite elegir entre los 3 escenarios:
 │   └── SelectorEscenario.module.css # "Día a día", "Simulación de periodo" y
 │                                    # "Simulación hasta colapso".
-│
-├── ConfiguradorPeriodo/
-│   ├── ConfiguradorPeriodo.jsx        # Formulario de parámetros para la simulación
-│   └── ConfiguradorPeriodo.module.css # de periodo: duración (3, 5 o 7 días),
-│                                      # algoritmo activo y carga inicial de maletas.
 │
 ├── PanelControlSimulacion/
 │   ├── PanelControlSimulacion.jsx        # Barra de control con botones: iniciar,
@@ -185,6 +187,10 @@ components/simulacion/
     └── IndicadorColapso.module.css # detecta que las operaciones han colapsado
                                     # (envíos incumpliendo plazos sistemáticamente).
 ```
+
+> **Nota:** El `Sidebar` gestiona directamente el estado de la simulación usando
+> `useSimulacionStore` y los controles inline. Los componentes de esta carpeta están
+> disponibles si se necesita reutilizarlos en otras vistas.
 
 ---
 
@@ -198,14 +204,9 @@ components/reportes/
 │   └── GraficoBarras.jsx              # Gráfico de barras para mostrar métricas
 │                                      # como maletas entregadas vs. demoradas por día.
 │
-├── GraficoLinea/
-│   └── GraficoLinea.jsx               # Gráfico de línea para evolución temporal
-│                                      # de indicadores durante la simulación.
-│
-└── TablaComparativaAlgoritmos/
-    └── TablaComparativaAlgoritmos.jsx  # Tabla comparativa del desempeño de los dos
-                                        # algoritmos metaheurísticos: tiempo de ejecución,
-                                        # calidad de solución y tasa de cumplimiento.
+└── GraficoLinea/
+    └── GraficoLinea.jsx               # Gráfico de línea para evolución temporal
+                                       # de indicadores durante la simulación.
 ```
 
 > Se recomienda usar **Recharts** para los gráficos (ligero, compatible con React).
@@ -247,12 +248,6 @@ pages/
 │                                 # asignados, tiempos estimados y estado general.
 │                                 # Permite reasignar si hubo cancelación.
 │
-├── Simulacion/
-│   └── SimulacionPage.jsx        # Pantalla para configurar y ejecutar los 3 escenarios.
-│                                 # Contiene: SelectorEscenario, ConfiguradorPeriodo,
-│                                 # PanelControlSimulacion e IndicadorColapso.
-│                                 # Al ejecutar, redirige al Visualizador.
-│
 ├── Reportes/
 │   ├── ReportesPage.jsx          # Índice de reportes disponibles post-simulación.
 │   │
@@ -262,9 +257,9 @@ pages/
 │   ├── ReporteOcupacion.jsx      # Ocupación de vuelos y almacenes en aeropuertos,
 │   │                             # con indicadores semáforo según rangos configurados.
 │   │
-│   └── ReporteAlgoritmos.jsx     # Comparativa técnica de los dos algoritmos:
-│                                 # tiempo de ejecución, calidad de solución y
-│                                 # métricas de cumplimiento por escenario.
+│   └── ReporteAlgoritmos.jsx     # Desempeño del algoritmo planificador:
+│                                 # calidad de solución, tasa de cumplimiento y
+│                                 # tiempo de ejecución por escenario ejecutado.
 │
 └── Configuracion/
     ├── ConfiguracionPage.jsx     # Menú de configuración del sistema.
@@ -293,10 +288,6 @@ hooks/
 │                       # Usado por el Visualizador para recibir actualizaciones
 │                       # del mapa sin recargar la página.
 │
-├── useSimulacion.js    # Controla el estado de la simulación activa:
-│                       # escenario seleccionado, parámetros, si está corriendo.
-│                       # Expone: { escenario, iniciar, pausar, detener, estado }.
-│
 └── useSemaforo.js      # Dado un valor numérico y los rangos configurados,
                         # retorna el color correspondiente ('verde'|'ambar'|'rojo').
                         # Usado por IconoAeropuerto, Semaforo, reportes, etc.
@@ -324,7 +315,7 @@ services/
 │                           # obtenerEstadoSimulacion(), obtenerResultados()
 │
 ├── reportesService.js      # getReporteDesempeno(), getReporteOcupacion(),
-│                           # getReporteAlgoritmos(), getReporteDemorados()
+│                           # getReporteAlgoritmo(), getReporteDemorados()
 │
 └── configuracionService.js # getAeropuertos(), guardarAeropuerto(),
                             # getVuelos(), guardarVuelo(),
@@ -343,8 +334,9 @@ store/
 ├── simulacionStore.js      # Estado de la simulación:
 │                           # - escenarioActivo (DIA_A_DIA | PERIODO | COLAPSO)
 │                           # - estadoEjecucion (idle | corriendo | pausado | finalizado)
-│                           # - parametros (duración, algoritmo seleccionado)
+│                           # - parametros (duracionPeriodo)
 │                           # - colapsoDetectado (boolean)
+│                           # Consumido principalmente por el Sidebar.
 │
 ├── maletasStore.js         # Cache de maletas activas y su última ubicación conocida.
 │                           # Actualizado por WebSocket en tiempo real.
@@ -352,7 +344,6 @@ store/
 └── configuracionStore.js   # Parámetros globales del sistema:
                             # - rangosSemaforo { verde, ambar, rojo }
                             # - capacidades por defecto
-                            # - algoritmoActivo (ALGORITMO_1 | ALGORITMO_2)
 ```
 
 ---
@@ -401,6 +392,7 @@ constants/
                         # CAPACIDAD_VUELO_MAX_INTERCONTINENTAL = 400
                         # CAPACIDAD_ALMACEN_MIN = 500
                         # CAPACIDAD_ALMACEN_MAX = 800
+                        # DURACIONES_PERIODO = [3, 5, 7]
 ```
 
 ---
@@ -412,7 +404,7 @@ constants/
 | Tipo | Convención | Ejemplo |
 |---|---|---|
 | Componente React | PascalCase | `MapaInteractivo.jsx` |
-| Hook | camelCase con prefijo `use` | `useSimulacion.js` |
+| Hook | camelCase con prefijo `use` | `useWebSocket.js` |
 | Service | camelCase con sufijo `Service` | `maletasService.js` |
 | Store | camelCase con sufijo `Store` | `simulacionStore.js` |
 | Utilidad | camelCase | `formatters.js` |

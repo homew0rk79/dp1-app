@@ -6,11 +6,53 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: width 0.22s ease;
+  position: relative;
+}
+
+.collapsed {
+  width: 48px;
+}
+
+/* Toggle button */
+.toggleBtn {
+  position: absolute;
+  top: 10px;
+  right: 8px;
+  z-index: 10;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.toggleBtn:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+/* When collapsed, center the button */
+.collapsed .toggleBtn {
+  right: 50%;
+  transform: translateX(50%);
 }
 
 .section {
   padding: 1rem 1rem 0.75rem;
   border-bottom: 1px solid var(--color-border);
+  /* leave room for the toggle button at the top of the first section */
+}
+
+.section:first-of-type {
+  padding-top: 2.6rem;
 }
 
 .sectionScroll {
@@ -20,8 +62,9 @@
 }
 
 .sectionBottom {
-  padding: 0.85rem 1rem;
+  padding: 0.85rem 1rem 1rem;
   flex-shrink: 0;
+  border-top: 1px solid var(--color-border);
 }
 
 .sectionTitle {
@@ -94,23 +137,131 @@
   text-align: right;
 }
 
-/* Botón simulación */
-.btnSimulacion {
+/* Panel de simulación */
+.simPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.simField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.simLabel {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.simSelect {
   width: 100%;
+  padding: 0.38rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.8rem;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.simSelect:focus {
+  border-color: var(--color-accent);
+}
+
+.simSelect:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.simEstado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.25rem 0;
+}
+
+.simEstadoBadge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.simEstado--idle       { background: #f1f5f9; color: #64748b; }
+.simEstado--corriendo  { background: var(--color-verde-bg, #dcfce7); color: #15803d; }
+.simEstado--pausado    { background: var(--color-ambar-bg, #fef9c3); color: #b45309; }
+.simEstado--finalizado { background: #eff6ff; color: #1d4ed8; }
+
+.simTiempo {
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  letter-spacing: 0.02em;
+}
+
+.simControles {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.simBtnIniciar,
+.simBtnSecundario,
+.simBtnPeligro {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  padding: 0.6rem 1rem;
-  background: var(--color-accent);
-  color: white;
-  border: none;
+  gap: 0.3rem;
+  padding: 0.42rem 0.5rem;
   border-radius: var(--radius-sm);
-  font-size: 0.85rem;
+  border: none;
+  font-size: 0.78rem;
   font-weight: 600;
-  transition: background 0.15s;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
 }
 
-.btnSimulacion:hover {
-  background: var(--color-accent-hover);
+.simBtnIniciar {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.simBtnIniciar:hover:not(:disabled) { background: var(--color-accent-hover); }
+.simBtnIniciar:disabled { opacity: 0.45; cursor: default; }
+
+.simBtnSecundario {
+  background: #f1f5f9;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.simBtnSecundario:hover { background: #e2e8f0; }
+
+.simBtnPeligro {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.simBtnPeligro:hover { background: #fecaca; }
+
+.simColapso {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.6rem;
+  background: #fee2e2;
+  color: #b91c1c;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
 }

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { ALGORITMOS, DURACIONES_PERIODO } from '../constants/restricciones'
+import { DURACIONES_PERIODO } from '../constants/restricciones'
 
 const useSimulacionStore = create((set) => ({
   escenarioActivo: null,
@@ -8,7 +8,6 @@ const useSimulacionStore = create((set) => ({
   tiempoSegundos: 0,
   parametros: {
     duracionPeriodo: DURACIONES_PERIODO[1], // 5 días por defecto
-    algoritmo: ALGORITMOS.ALGORITMO_1,
   },
 
   setEscenario: (escenario) => set({ escenarioActivo: escenario }),
