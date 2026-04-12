@@ -22,8 +22,3 @@ export const DURACIONES_PERIODO = [3, 5, 7]
 export const DURACION_SIMULACION_MIN_MINUTOS = 30
 export const DURACION_SIMULACION_MAX_MINUTOS = 90
 
-// Algoritmos disponibles
-export const ALGORITMOS = {
-  ALGORITMO_1: 'ALGORITMO_1',
-  ALGORITMO_2: 'ALGORITMO_2',
-}
