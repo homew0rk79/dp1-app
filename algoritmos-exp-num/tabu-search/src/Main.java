@@ -42,7 +42,16 @@ public class Main {
         System.out.println("\n=== SOLUCIÓN FINAL ===");
         mejor.imprimirResumen();
 
-        System.out.println("\n=== PRIMERAS 10 RUTAS DE LA MEJOR SOLUCIÓN ===");
-        mejor.getRutas().stream().limit(10).forEach(System.out::println);
+        System.out.println("\n=== MUESTRA DE RUTAS PLANIFICADAS (primeras 10 con ruta válida) ===");
+        mejor.getRutas().stream()
+            .filter(r -> !r.isSinSolucion())
+            .limit(10)
+            .forEach(r -> {
+                Envio e = r.getEnvio();
+                System.out.printf("  [%s] %s → %s | %d maletas | %d escala(s) | %d min%n",
+                    e.getId(), e.getOrigen(), e.getDestino(),
+                    e.getCantidad(), r.getNumEscalas(), r.calcularTiempoTotal());
+                r.getVuelos().forEach(v -> System.out.println("    " + v));
+            });
     }
 }

@@ -6,7 +6,12 @@
       "Bash(npm install:*)",
       "Bash(npx vite:*)",
       "Bash(npm run:*)",
-      "Bash(node_modules/.bin/vite build:*)"
+      "Bash(node_modules/.bin/vite build:*)",
+      "Read(//c/Users/ERLIN/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/2aafe82a-d21c-44bb-a3eb-c9e302590575/5b2508af-d1f3-410b-a62c-1e35612b5aac/skills/docx/**)",
+      "Bash(pandoc --track-changes=all \"C:\\\\Users\\\\ERLIN\\\\OneDrive - BDO Perú\\\\PUCP\\\\9no ciclo\\\\DP1\\\\Semana 5\\\\21.dis.selec.algoritmos.v02.docx\" -o output.md)",
+      "Bash(python scripts/office/unpack.py \"C:\\\\Users\\\\ERLIN\\\\OneDrive - BDO Perú\\\\PUCP\\\\9no ciclo\\\\DP1\\\\Semana 5\\\\21.dis.selec.algoritmos.v02.docx\" unpacked_doc/)",
+      "Bash(pip install *)",
+      "Bash(python -c ' *)"
     ]
   }
 }
