@@ -1,7 +1,9 @@
 package model;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public class Ruta {
 
@@ -39,20 +41,20 @@ public class Ruta {
         vuelos.add(v);
     }
 
-    // Calcula el tiempo total de entrega en minutos.
-    // Suma: espera inicial + duración vuelo1 + espera escala + duración vuelo2 + ...
+    // Calcula el tiempo total de entrega en minutos usando tiempos absolutos.
+    // tiempoActual arranca en el minuto absoluto de registro y avanza con cada vuelo.
     public int calcularTiempoTotal() {
         if (sinSolucion || vuelos.isEmpty()) return Integer.MAX_VALUE;
 
-        int tiempoActual = envio.getMinutosRegistro();
-        int tiempoTotal  = 0;
+        int tiempoActual = envio.getMinutosRegistro(); // absoluto desde 2026-01-01
+        int tiempoInicio = tiempoActual;
 
         for (Vuelo vuelo : vuelos) {
-            int espera = vuelo.tiempoEspera(tiempoActual);
-            tiempoTotal  += espera + vuelo.getDuracionMinutos();
-            tiempoActual  = vuelo.getLlegadaMinutos();
+            int salidaAbsoluta = proximaSalidaAbsolutaLocal(
+                tiempoActual, vuelo.getSalidaMinutos(), 30);
+            tiempoActual = salidaAbsoluta + vuelo.getDuracionMinutos();
         }
-        return tiempoTotal;
+        return tiempoActual - tiempoInicio;
     }
 
     // Verifica que la secuencia de vuelos sea coherente:
@@ -75,6 +77,42 @@ public class Ruta {
     // Número de escalas intermedias (0 = vuelo directo)
     public int getNumEscalas() {
         return Math.max(0, vuelos.size() - 1);
+    }
+
+    /**
+     * Devuelve los intervalos de tiempo [entrada, salida] en minutos absolutos
+     * para cada aeropuerto donde las maletas ocupan almacén:
+     *   - Aeropuerto origen: desde hora de registro hasta salida del primer vuelo.
+     *   - Aeropuertos de tránsito: desde llegada del vuelo anterior hasta salida del siguiente.
+     *   - Aeropuerto destino: NO incluido (el cliente recoge las maletas).
+     *
+     * Clave del mapa: código ICAO del aeropuerto.
+     * Valor: int[]{tiempoEntrada, tiempoSalida} en minutos absolutos desde día 0.
+     */
+    public Map<String, int[]> calcularIntervalosAlmacen() {
+        Map<String, int[]> intervalos = new LinkedHashMap<>();
+        if (sinSolucion || vuelos.isEmpty()) return intervalos;
+
+        int tiempoActual = envio.getMinutosRegistro();
+
+        for (int i = 0; i < vuelos.size(); i++) {
+            Vuelo v = vuelos.get(i);
+            String aeropuerto = (i == 0) ? envio.getOrigen() : vuelos.get(i - 1).getDestino();
+            int entrada = tiempoActual;
+            int salidaAbsoluta = proximaSalidaAbsolutaLocal(tiempoActual, v.getSalidaMinutos(), 30);
+            intervalos.put(aeropuerto, new int[]{entrada, salidaAbsoluta});
+            tiempoActual = salidaAbsoluta + v.getDuracionMinutos();
+        }
+        return intervalos;
+    }
+
+    private static int proximaSalidaAbsolutaLocal(int tiempoActual, int salidaEnDia, int margen) {
+        int dia = tiempoActual / 1440;
+        int minDentroDelDia = tiempoActual % 1440;
+        if (minDentroDelDia + margen <= salidaEnDia) {
+            return dia * 1440 + salidaEnDia;
+        }
+        return (dia + 1) * 1440 + salidaEnDia;
     }
 
     public Envio getEnvio()         { return envio; }

@@ -25,7 +25,16 @@ public class Envio {
     // Estado durante la ejecución del algoritmo
     private boolean entregado;
 
+    // Plazo máximo de entrega en minutos desde la hora de registro:
+    // 1440 min (1 día) si origen y destino son del mismo continente,
+    // 2880 min (2 días) si son de distinto continente.
+    // Se fija en Main después de cargar los aeropuertos.
+    private int plazoMaximoMinutos;
+
     private static final DateTimeFormatter FMT_FECHA = DateTimeFormatter.ofPattern("yyyyMMdd");
+
+    // Día 0 de la simulación: un día antes del mínimo en los datos (20260102)
+    private static final LocalDate FECHA_INICIO_SIMULACION = LocalDate.of(2026, 1, 1);
 
     public Envio(String id, String origen, String destino,
                  String fechaStr, String hhStr, String mmStr,
@@ -45,9 +54,14 @@ public class Envio {
         this.fechaHoraRegistro = fecha.atTime(hh, mm);
     }
 
-    // Minutos desde medianoche del día de registro → útil para comparar con horarios de vuelo
+    // Minutos absolutos desde FECHA_INICIO_SIMULACION (día 0 = 2026-01-01).
+    // Ejemplo: paquete del 2026-01-03 a las 02:15 → 2*1440 + 135 = 3015
     public int getMinutosRegistro() {
-        return fechaHoraRegistro.getHour() * 60 + fechaHoraRegistro.getMinute();
+        long dias = fechaHoraRegistro.toLocalDate().toEpochDay()
+                  - FECHA_INICIO_SIMULACION.toEpochDay();
+        return (int)(dias * 1440)
+             + fechaHoraRegistro.getHour() * 60
+             + fechaHoraRegistro.getMinute();
     }
 
     public boolean esLocal() {
@@ -60,8 +74,10 @@ public class Envio {
     public LocalDateTime getFechaHoraRegistro()    { return fechaHoraRegistro; }
     public int getCantidad()                       { return cantidad; }
     public String getIdCliente()                   { return idCliente; }
-    public boolean isEntregado()                   { return entregado; }
-    public void setEntregado(boolean entregado)    { this.entregado = entregado; }
+    public boolean isEntregado()                        { return entregado; }
+    public void setEntregado(boolean entregado)         { this.entregado = entregado; }
+    public int getPlazoMaximoMinutos()                  { return plazoMaximoMinutos; }
+    public void setPlazoMaximoMinutos(int plazo)        { this.plazoMaximoMinutos = plazo; }
 
     @Override
     public String toString() {

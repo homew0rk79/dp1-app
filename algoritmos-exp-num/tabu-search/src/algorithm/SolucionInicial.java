@@ -4,7 +4,9 @@ import model.Envio;
 import model.Ruta;
 import model.Vuelo;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Genera la solución de partida para el algoritmo Tabu Search.
@@ -31,9 +33,15 @@ import java.util.List;
 public class SolucionInicial {
 
     private final GrafoVuelos grafo;
+    private final Map<String, Integer> capacidadMaxAeropuertos;
+
+    public SolucionInicial(GrafoVuelos grafo, Map<String, Integer> capacidadMaxAeropuertos) {
+        this.grafo = grafo;
+        this.capacidadMaxAeropuertos = capacidadMaxAeropuertos;
+    }
 
     public SolucionInicial(GrafoVuelos grafo) {
-        this.grafo = grafo;
+        this(grafo, Collections.emptyMap());
     }
 
     /**
@@ -41,7 +49,7 @@ public class SolucionInicial {
      * Imprime progreso cada 10.000 envíos para dar visibilidad.
      */
     public Solucion construir(List<Envio> envios) {
-        Solucion solucion = new Solucion();
+        Solucion solucion = new Solucion(capacidadMaxAeropuertos);
         int procesados = 0;
         int sinRuta = 0;
 
