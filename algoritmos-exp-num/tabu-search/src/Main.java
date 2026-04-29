@@ -2,10 +2,23 @@ import algorithm.*;
 import data.DataLoader;
 import model.*;
 
+import java.io.FileWriter;
+import java.io.PrintWriter;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class Main {
+
+    // Cambia ESCENARIO para seleccionar el modo de ejecución:
+    //   "prueba"   → 5 000 envios de SPIM, EBCI, EHAM y VIDP   (experimento DCA)
+    //   "5dias"    → dataset completo, parametros intensivos     30–90 min
+    //   "completo" → dataset completo, parametros balanceados    30–60 min
+    private static final String ESCENARIO = "prueba";
+
+    // Numero de corridas independientes para el experimento estadistico
+    private static final int CORRIDAS = 15;
 
     public static void main(String[] args) throws Exception {
 
@@ -14,44 +27,163 @@ public class Main {
         String rutaVuelos       = base + "/planes_vuelo.txt";
         String directorioEnvios = base + "/_envios_preliminar_";
 
-        // ── 1. Cargar datos ────────────────────────────────────────────────────
+        separador('=');
+        System.out.println("  EXPERIMENTO NUMERICO — BUSQUEDA TABU");
+        System.out.println("  Escenario: " + ESCENARIO.toUpperCase() + " | Corridas: " + CORRIDAS);
+        separador('=');
+
+        // ── 1. Cargar datos ───────────────────────────────────────────────────
+        System.out.println("\nCargando datos del sistema...");
         DataLoader loader = new DataLoader(rutaAeropuertos, rutaVuelos, directorioEnvios);
-        loader.cargarAeropuertos();                 // 30 aeropuertos
-        List<Vuelo> vuelos = loader.cargarVuelos(); // 2866 vuelos
+        Map<String, Aeropuerto> aeropuertos = loader.cargarAeropuertos();
+        List<Vuelo> vuelos = loader.cargarVuelos();
 
-        // 50 envíos por archivo = 1500 totales. Quitar el argumento para los 330K reales.
-        List<Envio> envios = loader.cargarEnvios(50);
+        // ── 2. Seleccionar parametros segun escenario ─────────────────────────
+        List<Envio> envios;
+        int maxIter, tenencia, muestra;
 
-        // ── 2. Construir grafo ─────────────────────────────────────────────────
+        switch (ESCENARIO) {
+            case "5dias":
+                envios   = loader.cargarEnvios();
+                maxIter  = 200;
+                tenencia = 60;
+                muestra  = 500_000;
+                break;
+            case "completo":
+                envios   = loader.cargarEnvios();
+                maxIter  = 300;
+                tenencia = 50;
+                muestra  = 200_000;
+                break;
+            default: // "prueba"
+                envios   = loader.cargarEnvios(Arrays.asList("SPIM", "EBCI", "EHAM", "VIDP"), 25_000);
+                maxIter  = 200;
+                tenencia = 45;
+                muestra  = 1_000;
+                break;
+        }
+
+        System.out.printf("%nDatos cargados exitosamente:%n");
+        System.out.printf("  Aeropuertos en la red : %,d%n", aeropuertos.size());
+        System.out.printf("  Vuelos disponibles    : %,d%n", vuelos.size());
+        System.out.printf("  Envios a planificar   : %,d%n", envios.size());
+
+        // ── 3. Fijar plazo de entrega por envio ───────────────────────────────
+        int sinPlazo = 0;
+        for (Envio envio : envios) {
+            Aeropuerto orig = aeropuertos.get(envio.getOrigen());
+            Aeropuerto dest = aeropuertos.get(envio.getDestino());
+            if (orig != null && dest != null) {
+                boolean mismo = orig.getContinente().equals(dest.getContinente());
+                envio.setPlazoMaximoMinutos(mismo ? 1440 : 2880);
+            } else {
+                sinPlazo++;
+            }
+        }
+        if (sinPlazo > 0)
+            System.out.printf("  Advertencia: %d envios sin aeropuerto reconocido (sin plazo asignado)%n", sinPlazo);
+
+        // ── 4. Construir grafo y capacidades ──────────────────────────────────
+        Map<String, Integer> capacidadAeropuertos = new HashMap<>();
+        for (Aeropuerto a : aeropuertos.values())
+            capacidadAeropuertos.put(a.getCodigo(), a.getCapacidadMax());
+
         GrafoVuelos grafo = new GrafoVuelos(vuelos);
 
-        // ── 3. Solución inicial (BFS + greedy) ────────────────────────────────
-        System.out.println("\n=== SOLUCIÓN INICIAL ===");
-        SolucionInicial generador = new SolucionInicial(grafo);
+        // ── 5. Solucion inicial (determinista — igual para todas las corridas) ─
+        separador('-');
+        System.out.println("Construyendo solucion inicial (BFS + greedy)...");
+        separador('-');
+        SolucionInicial generador = new SolucionInicial(grafo, capacidadAeropuertos);
         Solucion inicial = generador.construir(envios);
+        System.out.println();
         inicial.imprimirResumen();
 
-        // ── 4. Tabu Search ────────────────────────────────────────────────────
-        //   maxIteraciones = 100
-        //   tenenciaTabu   = 30  (movimientos que permanecen tabú)
-        //   tamanoMuestra  = 200 (envíos evaluados por iteración)
-        TabuSearch tabu = new TabuSearch(grafo, 100, 30, 200);
-        Solucion mejor = tabu.ejecutar(inicial, envios);
+        // ── 6. Bucle de corridas ──────────────────────────────────────────────
+        separador('=');
+        System.out.printf("  INICIO DEL EXPERIMENTO: %d corridas independientes%n", CORRIDAS);
+        separador('=');
 
-        // ── 5. Resultados finales ─────────────────────────────────────────────
-        System.out.println("\n=== SOLUCIÓN FINAL ===");
-        mejor.imprimirResumen();
+        String csvPath = "resultados_TS_" + ESCENARIO + ".csv";
+        long[] tiempos       = new long[CORRIDAS];
+        double[] cumplimiento = new double[CORRIDAS];
+        double[] costos       = new double[CORRIDAS];
+        double[] escalas      = new double[CORRIDAS];
 
-        System.out.println("\n=== MUESTRA DE RUTAS PLANIFICADAS (primeras 10 con ruta válida) ===");
-        mejor.getRutas().stream()
-            .filter(r -> !r.isSinSolucion())
-            .limit(10)
-            .forEach(r -> {
-                Envio e = r.getEnvio();
-                System.out.printf("  [%s] %s → %s | %d maletas | %d escala(s) | %d min%n",
-                    e.getId(), e.getOrigen(), e.getDestino(),
-                    e.getCantidad(), r.getNumEscalas(), r.calcularTiempoTotal());
-                r.getVuelos().forEach(v -> System.out.println("    " + v));
-            });
+        try (PrintWriter csv = new PrintWriter(new FileWriter(csvPath))) {
+            csv.println("corrida,semilla,tiempo_ms,pct_cumplimiento,costo_total,escalas_promedio");
+
+            for (int c = 1; c <= CORRIDAS; c++) {
+                long semilla = c;
+                separador('-');
+                System.out.printf("  Corrida %d de %d  (semilla aleatoria: %d)%n", c, CORRIDAS, semilla);
+                separador('-');
+
+                long t1 = System.currentTimeMillis();
+                TabuSearch tabu = new TabuSearch(grafo, maxIter, tenencia, muestra, semilla);
+                Solucion resultado = tabu.ejecutar(inicial, envios);
+                long tMs = System.currentTimeMillis() - t1;
+
+                double pct     = resultado.getPorcentajeCumplimientoPlazo();
+                double costo   = resultado.getCostoTotal();
+                double escProm = resultado.getEscalasPromedio();
+
+                tiempos[c - 1]      = tMs;
+                cumplimiento[c - 1] = pct;
+                costos[c - 1]       = costo;
+                escalas[c - 1]      = escProm;
+
+                System.out.println();
+                System.out.printf("  Resultados de la corrida %d:%n", c);
+                System.out.printf("    Tiempo de ejecucion      : %,d ms  (%.1f s)%n", tMs, tMs / 1000.0);
+                System.out.printf("    Cumplimiento de plazos   : %.2f%%%n", pct);
+                System.out.printf("    Funcion objetivo (costo) : %,.0f%n", costo);
+                System.out.printf("    Escalas promedio         : %.2f por envio%n", escProm);
+
+                csv.printf("%d,%d,%d,%.4f,%.0f,%.4f%n", c, semilla, tMs, pct, costo, escProm);
+            }
+        }
+
+        // ── 7. Resumen del experimento ────────────────────────────────────────
+        separador('=');
+        System.out.printf("  RESUMEN FINAL — %d CORRIDAS — BUSQUEDA TABU%n", CORRIDAS);
+        separador('=');
+
+        long   sumTiempo  = 0;
+        double sumCumpl   = 0, sumCosto = 0, sumEscalas = 0;
+        long   minTiempo  = Long.MAX_VALUE,  maxTiempo  = Long.MIN_VALUE;
+        double minCosto   = Double.MAX_VALUE, maxCosto   = Double.MIN_VALUE;
+
+        for (int i = 0; i < CORRIDAS; i++) {
+            sumTiempo  += tiempos[i];
+            sumCumpl   += cumplimiento[i];
+            sumCosto   += costos[i];
+            sumEscalas += escalas[i];
+            if (tiempos[i] < minTiempo) minTiempo = tiempos[i];
+            if (tiempos[i] > maxTiempo) maxTiempo = tiempos[i];
+            if (costos[i]  < minCosto)  minCosto  = costos[i];
+            if (costos[i]  > maxCosto)  maxCosto  = costos[i];
+        }
+
+        System.out.printf("  Tiempo de ejecucion:%n");
+        System.out.printf("    Promedio : %,d ms  (%.1f s)%n", sumTiempo / CORRIDAS, sumTiempo / CORRIDAS / 1000.0);
+        System.out.printf("    Minimo   : %,d ms%n", minTiempo);
+        System.out.printf("    Maximo   : %,d ms%n", maxTiempo);
+        System.out.printf("  Cumplimiento de plazos (promedio) : %.2f%%%n", sumCumpl / CORRIDAS);
+        System.out.printf("  Funcion objetivo:%n");
+        System.out.printf("    Promedio : %,.0f%n", sumCosto / CORRIDAS);
+        System.out.printf("    Minimo   : %,.0f%n", minCosto);
+        System.out.printf("    Maximo   : %,.0f%n", maxCosto);
+        System.out.printf("  Escalas promedio (promedio)       : %.2f%n", sumEscalas / CORRIDAS);
+
+        separador('-');
+        System.out.printf("  Resultados exportados a: %s%n", csvPath);
+        separador('=');
+    }
+
+    private static void separador(char c) {
+        StringBuilder sb = new StringBuilder(60);
+        for (int i = 0; i < 60; i++) sb.append(c);
+        System.out.println(sb.toString());
     }
 }

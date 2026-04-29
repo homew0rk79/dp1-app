@@ -11,7 +11,8 @@
       "Bash(pandoc --track-changes=all \"C:\\\\Users\\\\ERLIN\\\\OneDrive - BDO Perú\\\\PUCP\\\\9no ciclo\\\\DP1\\\\Semana 5\\\\21.dis.selec.algoritmos.v02.docx\" -o output.md)",
       "Bash(python scripts/office/unpack.py \"C:\\\\Users\\\\ERLIN\\\\OneDrive - BDO Perú\\\\PUCP\\\\9no ciclo\\\\DP1\\\\Semana 5\\\\21.dis.selec.algoritmos.v02.docx\" unpacked_doc/)",
       "Bash(pip install *)",
-      "Bash(python -c ' *)"
+      "Bash(python -c ' *)",
+      "Bash(python3 -c ' *)"
     ]
   }
 }
