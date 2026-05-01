@@ -8,7 +8,7 @@ import java.util.*;
 public class Main {
 
     // "prueba", "5dias", "completo"
-    private static final String ESCENARIO = "prueba";
+    private static final String ESCENARIO = "completo";
     private static final int CORRIDAS = 15;
 
     public static void main(String[] args) throws Exception {
@@ -38,6 +38,14 @@ public class Main {
 
             case "completo":
                 enviosBase = loader.cargarEnvios(-1);
+
+                Collections.shuffle(enviosBase, new Random(42));
+
+                int limite = 430_000;
+                if (enviosBase.size() > limite) {
+                    enviosBase = enviosBase.subList(0, limite);
+                }
+
                 break;
 
             default:

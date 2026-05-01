@@ -276,9 +276,7 @@ public class DataLoader {
             String destino = partes[4];
             int cantidad = Integer.parseInt(partes[5]);
 
-            double plazoDefault = 2.0;
-
-            return new Shipment(id, origen, destino, cantidad, plazoDefault);
+            return new Shipment(id, origen, destino, cantidad, 1.0);
         } catch (Exception e) {
             System.err.println("[DataLoader] Línea malformada ignorada: " + linea);
             return null;

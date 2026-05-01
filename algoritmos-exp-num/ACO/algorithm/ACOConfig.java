@@ -106,8 +106,8 @@ public class ACOConfig {
                 100.0,  // Q
                 TAU_MIN,
                 TAU_MAX,
-                20,     // numAnts
-                200,    // maxIterations
+                8,     // numAnts
+                60,    // maxIterations
                 0.5,    // w1 (tiempo)
                 0.3,    // w2 (capacidad vuelo)
                 0.2,    // w3 (almacén)
