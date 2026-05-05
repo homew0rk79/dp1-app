@@ -4,10 +4,13 @@ import model.*;
 
 import java.io.FileWriter;
 import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 public class Main {
 
@@ -15,7 +18,8 @@ public class Main {
     //   "prueba"   → 5 000 envios de SPIM, EBCI, EHAM y VIDP   (experimento DCA)
     //   "5dias"    → dataset completo, parametros intensivos     30–90 min
     //   "completo" → dataset completo, parametros balanceados    30–60 min
-    private static final String ESCENARIO = "prueba";
+    //   "exp_num"  → todo el dataset mezclado (semilla 42), muestra de 430 000
+    private static final String ESCENARIO = "exp_num";
 
     // Numero de corridas independientes para el experimento estadistico
     private static final int CORRIDAS = 15;
@@ -55,8 +59,18 @@ public class Main {
                 tenencia = 50;
                 muestra  = 200_000;
                 break;
+            case "exp_num": {
+                List<Envio> enviosBase = loader.cargarEnvios(-1);
+                Collections.shuffle(enviosBase, new Random(42));
+                int limite = Math.min(430_000, enviosBase.size());
+                envios   = new ArrayList<>(enviosBase.subList(0, limite));
+                maxIter  = 300;
+                tenencia = 50;
+                muestra  = 5_000;   // ~1.2% del dataset; 500k > 430k volteaba el guard de muestrear()
+                break;
+            }
             default: // "prueba"
-                envios   = loader.cargarEnvios(Arrays.asList("SPIM", "EBCI", "EHAM", "VIDP"), 25_000);
+                envios   = loader.cargarEnvios(Arrays.asList("SPIM", "EBCI", "EHAM", "VIDP"), 5_000);
                 maxIter  = 200;
                 tenencia = 45;
                 muestra  = 1_000;
@@ -138,7 +152,8 @@ public class Main {
                 System.out.printf("    Tiempo de ejecucion      : %,d ms  (%.1f s)%n", tMs, tMs / 1000.0);
                 System.out.printf("    Cumplimiento de plazos   : %.2f%%%n", pct);
                 System.out.printf("    Funcion objetivo (costo) : %,.0f%n", costo);
-                System.out.printf("    Escalas promedio         : %.2f por envio%n", escProm);
+                System.out.printf("    Escalas promedio         : %.4f por envio%n", escProm);
+                imprimirColapsados(resultado);
 
                 csv.printf("%d,%d,%d,%.4f,%.0f,%.4f%n", c, semilla, tMs, pct, costo, escProm);
             }
@@ -174,11 +189,32 @@ public class Main {
         System.out.printf("    Promedio : %,.0f%n", sumCosto / CORRIDAS);
         System.out.printf("    Minimo   : %,.0f%n", minCosto);
         System.out.printf("    Maximo   : %,.0f%n", maxCosto);
-        System.out.printf("  Escalas promedio (promedio)       : %.2f%n", sumEscalas / CORRIDAS);
+        System.out.printf("  Escalas promedio (promedio)       : %.4f%n", sumEscalas / CORRIDAS);
 
         separador('-');
         System.out.printf("  Resultados exportados a: %s%n", csvPath);
         separador('=');
+    }
+
+    private static void imprimirColapsados(Solucion s) {
+        final int TOP = 10;
+        List<String> vuelos = s.reporteVuelosSaturados();
+        List<String> aerops = s.reporteAeropuertosSaturados();
+
+        if (vuelos.isEmpty() && aerops.isEmpty()) {
+            System.out.println("  [Sin colapsos de vuelo ni aeropuerto en esta corrida]");
+            return;
+        }
+        if (!vuelos.isEmpty()) {
+            System.out.printf("  Vuelos saturados: %,d total — top %d por exceso:%n",
+                vuelos.size(), Math.min(vuelos.size(), TOP));
+            vuelos.stream().limit(TOP).forEach(System.out::println);
+        }
+        if (!aerops.isEmpty()) {
+            System.out.printf("  Aeropuertos saturados: %,d pares aeropuerto-dia — top %d por exceso:%n",
+                aerops.size(), Math.min(aerops.size(), TOP));
+            aerops.stream().limit(TOP).forEach(System.out::println);
+        }
     }
 
     private static void separador(char c) {
