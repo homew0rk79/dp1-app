@@ -5,6 +5,7 @@ import model.Ruta;
 import model.Vuelo;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Estado completo del sistema: para cada envío, qué ruta tiene asignada.
@@ -324,6 +325,65 @@ public class Solucion {
             getTotalEnvios(), contarEnviosConRuta(), contarEnviosSinRuta(),
             getCostoTotal(), getTiempoPromedioEntrega()
         );
+    }
+
+    // ── Reportes de colapso (para output de consola, no CSV) ─────────────────
+
+    /** Vuelos que superan su capacidad, ordenados por exceso descendente. */
+    public List<String> reporteVuelosSaturados() {
+        return ocupacionVuelos.entrySet().stream()
+            .filter(e -> {
+                Integer cap = capacidadMaxVuelos.get(e.getKey());
+                return cap != null && e.getValue() > cap;
+            })
+            .sorted((a, b) -> {
+                int excA = a.getValue() - capacidadMaxVuelos.getOrDefault(a.getKey(), 0);
+                int excB = b.getValue() - capacidadMaxVuelos.getOrDefault(b.getKey(), 0);
+                return Integer.compare(excB, excA);
+            })
+            .map(e -> {
+                int cap = capacidadMaxVuelos.getOrDefault(e.getKey(), 0);
+                int ocu = e.getValue();
+                String[] k = e.getKey().split("-");
+                String vuelo = k.length >= 4
+                    ? String.format("%-4s->%-4s %s d%-2s", k[0], k[1], formatearMin(Integer.parseInt(k[2])), k[3].substring(1))
+                    : e.getKey();
+                return String.format("    %-24s  ocup=%,5d  cap=%,5d  exceso=%,5d", vuelo, ocu, cap, ocu - cap);
+            })
+            .collect(Collectors.toList());
+    }
+
+    /** Pares (aeropuerto, dia) que superan capacidad, ordenados por exceso descendente. */
+    public List<String> reporteAeropuertosSaturados() {
+        List<String[]> rows = new ArrayList<>();
+        for (Map.Entry<String, Map<Integer, Integer>> ae : ocupacionDiariaAeropuerto.entrySet()) {
+            String aeropuerto = ae.getKey();
+            int cap = capacidadMaxAeropuertos.getOrDefault(aeropuerto, Integer.MAX_VALUE);
+            if (cap == Integer.MAX_VALUE) continue;
+            for (Map.Entry<Integer, Integer> de : ae.getValue().entrySet()) {
+                int ocup = de.getValue();
+                if (ocup > cap) {
+                    rows.add(new String[]{
+                        aeropuerto,
+                        de.getKey().toString(),
+                        String.valueOf(ocup),
+                        String.valueOf(cap),
+                        String.valueOf(ocup - cap)
+                    });
+                }
+            }
+        }
+        rows.sort((a, b) -> Integer.compare(Integer.parseInt(b[4]), Integer.parseInt(a[4])));
+        List<String> result = new ArrayList<>();
+        for (String[] r : rows) {
+            result.add(String.format("    %-6s  dia %-3s  ocup=%,5d  cap=%,5d  exceso=%,5d",
+                r[0], r[1], Integer.parseInt(r[2]), Integer.parseInt(r[3]), Integer.parseInt(r[4])));
+        }
+        return result;
+    }
+
+    private static String formatearMin(int minutos) {
+        return String.format("%02d:%02d", minutos / 60, minutos % 60);
     }
 
     public void imprimirResumen() {
