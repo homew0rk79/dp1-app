@@ -1,54 +1,92 @@
 import { useEffect, useState } from 'react'
-import { MapContainer, TileLayer, CircleMarker, Polyline, Popup } from 'react-leaflet'
+import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 
 import LeyendaMapa from '../LeyendaMapa/LeyendaMapa'
+import CanvasVuelos from '../CanvasVuelos/CanvasVuelos'
+import SimulacionControles from '../../SimulacionControles/SimulacionControles'
 import { getColorSemaforo, COLORES_SEMAFORO } from '../../../utils/semaforo'
 import { formatearCapacidad } from '../../../utils/formatters'
 import useConfiguracionStore from '../../../store/configuracionStore'
 import usePlanificadorWS from '../../../hooks/usePlanificadorWS'
+import useAnimacionTimeline from '../../../hooks/useAnimacionTimeline'
 import { simulacionService } from '../../../services/simulacionService'
 import styles from './MapaInteractivo.module.css'
 
 function MapaInteractivo() {
   const rangosSemaforo = useConfiguracionStore((s) => s.rangosSemaforo)
 
-  // Aeropuertos base (código, ciudad, lat, lng, capacidadMax)
   const [aeropuertos, setAeropuertos] = useState([])
-  // Ocupación en tiempo real: { SKBO: { ocupacion: 380, capacidadMax: 430, semaforo: "AMBAR" }, ... }
-  const [ocupacion, setOcupacion] = useState({})
-  // Rutas activas: [{ origen: "SKBO", destino: "SEQM", maletas: 247 }, ...]
-  const [rutas, setRutas] = useState([])
+  // Ocupación durante el algoritmo (snapshot WS), usada antes de tener manifest
+  const [ocupacionWS, setOcupacionWS] = useState({})
 
-  const { snapshot } = usePlanificadorWS()
+  const { snapshot, completado } = usePlanificadorWS()
 
-  // Cargar aeropuertos del backend al montar
+  const {
+    manifest,
+    cargarManifest,
+    playing,
+    velocidad,
+    velocidadRef,
+    tiempoRef,
+    tiempoDisplay,
+    play,
+    pause,
+    seekTo,
+    setVelocidad,
+    onTick,
+  } = useAnimacionTimeline()
+
+  // Cargar aeropuertos base al montar
   useEffect(() => {
     simulacionService.obtenerAeropuertos()
       .then(res => setAeropuertos(res.data))
-      .catch(() => {}) // silencioso si el backend no respondió aún
+      .catch(() => {})
   }, [])
 
-  // Actualizar mapa cuando llega un snapshot del WebSocket
+  // Ocupación en tiempo real durante la ejecución del algoritmo
   useEffect(() => {
     if (!snapshot) return
-
     const nuevaOcupacion = {}
     snapshot.aeropuertos?.forEach(a => {
       nuevaOcupacion[a.codigo] = {
-        ocupacion: a.porcentajeOcupacion,
+        ocupacion:       a.porcentajeOcupacion,
         ocupacionMaletas: a.ocupacion,
-        capacidadMax: a.capacidadMax,
-        semaforo: a.semaforo,
+        capacidadMax:    a.capacidadMax,
+        semaforo:        a.semaforo,
       }
     })
-    setOcupacion(nuevaOcupacion)
-    setRutas(snapshot.rutas ?? [])
+    setOcupacionWS(nuevaOcupacion)
   }, [snapshot])
 
-  // Construir lookup código → aeropuerto para las rutas
-  const porCodigo = {}
-  aeropuertos.forEach(a => { porCodigo[a.codigo] = a })
+  // Al completar la planificación, cargar el manifest de animación
+  useEffect(() => {
+    if (!completado) return
+    simulacionService.obtenerManifestAnimacion()
+      .then(res => {
+        if (res.data) cargarManifest(res.data)
+      })
+      .catch(() => {})
+  }, [completado, cargarManifest])
+
+  // Ocupación de aeropuertos: interpola linealmente entre días para suavizar la transición
+  function getOcupacion(codigo) {
+    if (manifest) {
+      const aero = manifest.aeropuertos.find(a => a.codigo === codigo)
+      const cap  = aero?.capacidadMax ?? 1
+      const diaActual  = Math.floor(tiempoDisplay / 1440)
+      const fraccion   = (tiempoDisplay % 1440) / 1440
+      const m0 = aero?.ocupacionPorDia?.[diaActual]   ?? aero?.ocupacionPorDia?.[String(diaActual)]   ?? 0
+      const m1 = aero?.ocupacionPorDia?.[diaActual+1] ?? aero?.ocupacionPorDia?.[String(diaActual+1)] ?? m0
+      const maletas = m0 + (m1 - m0) * fraccion
+      return {
+        ocupacion:        Math.round((maletas / cap) * 1000) / 10,
+        ocupacionMaletas: Math.round(maletas),
+        capacidadMax:     cap,
+      }
+    }
+    return ocupacionWS[codigo] ?? null
+  }
 
   return (
     <div className={styles.contenedor}>
@@ -64,35 +102,23 @@ function MapaInteractivo() {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         />
 
-        {/* Rutas activas desde snapshot */}
-        {rutas.map((ruta, i) => {
-          const origen  = porCodigo[ruta.origen]
-          const destino = porCodigo[ruta.destino]
-          if (!origen || !destino) return null
-          const grosor = Math.max(1, Math.min(6, ruta.maletas / 100))
-          return (
-            <Polyline
-              key={i}
-              positions={[
-                [origen.lat,  origen.lng],
-                [destino.lat, destino.lng],
-              ]}
-              pathOptions={{
-                color: '#2563eb',
-                weight: grosor,
-                opacity: 0.55,
-                dashArray: '6 5',
-              }}
-            />
-          )
-        })}
+        {/* Animación canvas — solo activo cuando hay manifest */}
+        {manifest && (
+          <CanvasVuelos
+            manifest={manifest}
+            tiempoRef={tiempoRef}
+            velocidadRef={velocidadRef}
+            playing={playing}
+            onTick={onTick}
+          />
+        )}
 
         {/* Aeropuertos */}
         {aeropuertos.map((aeropuerto) => {
-          const estado = ocupacion[aeropuerto.codigo]
-          const pctOcup = estado?.ocupacion ?? 0
-          const color    = getColorSemaforo(pctOcup, rangosSemaforo)
-          const colorHex = COLORES_SEMAFORO[color]
+          const estado    = getOcupacion(aeropuerto.codigo)
+          const pctOcup   = estado?.ocupacion ?? 0
+          const color     = getColorSemaforo(pctOcup, rangosSemaforo)
+          const colorHex  = COLORES_SEMAFORO[color]
 
           return (
             <CircleMarker
@@ -118,7 +144,7 @@ function MapaInteractivo() {
                     <span>
                       {formatearCapacidad(
                         estado?.ocupacionMaletas ?? 0,
-                        aeropuerto.capacidadMax
+                        aeropuerto.capacidadMax,
                       )}
                     </span>
                   </div>
@@ -136,6 +162,18 @@ function MapaInteractivo() {
       </MapContainer>
 
       <LeyendaMapa />
+
+      {/* Controles de animación — aparecen solo cuando hay manifest */}
+      <SimulacionControles
+        manifest={manifest}
+        tiempoDisplay={tiempoDisplay}
+        playing={playing}
+        velocidad={velocidad}
+        onPlay={play}
+        onPause={pause}
+        onSeek={seekTo}
+        onVelocidad={setVelocidad}
+      />
     </div>
   )
 }

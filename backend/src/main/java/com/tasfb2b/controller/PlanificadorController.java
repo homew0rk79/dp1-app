@@ -1,8 +1,6 @@
 package com.tasfb2b.controller;
 
-import com.tasfb2b.dto.EstadoDTO;
-import com.tasfb2b.dto.IniciarRequestDTO;
-import com.tasfb2b.dto.MetricasDTO;
+import com.tasfb2b.dto.*;
 import com.tasfb2b.service.PlanificadorService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -56,5 +54,12 @@ public class PlanificadorController {
         MetricasDTO m = service.getMetricas();
         if (m == null) return ResponseEntity.noContent().build();
         return ResponseEntity.ok(m);
+    }
+
+    @GetMapping("/animacion")
+    public ResponseEntity<AnimacionManifestDTO> getAnimacionManifest() {
+        AnimacionManifestDTO manifest = service.getAnimacionManifest();
+        if (manifest == null) return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(manifest);
     }
 }
