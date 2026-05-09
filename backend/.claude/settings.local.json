@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mvnw.cmd compile *)",
+      "Bash(./mvnw compile *)",
+      "Bash(./mvnw spring-boot:run)",
+      "Bash(npm install *)"
+    ]
+  }
+}

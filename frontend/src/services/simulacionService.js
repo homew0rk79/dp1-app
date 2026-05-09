@@ -1,9 +1,9 @@
 import api from './api'
 
 export const simulacionService = {
-  iniciar: (data) => api.post('/simulacion/iniciar', data),
-  pausar: () => api.post('/simulacion/pausar'),
-  detener: () => api.post('/simulacion/detener'),
-  obtenerEstado: () => api.get('/simulacion/estado'),
-  obtenerResultados: () => api.get('/simulacion/resultados'),
+  iniciar: (data) => api.post('/planificacion/iniciar', data),
+  obtenerEstado: () => api.get('/planificacion/estado'),
+  obtenerMetricas: () => api.get('/planificacion/metricas'),
+  obtenerAeropuertos: () => api.get('/aeropuertos'),
+  obtenerVuelos: () => api.get('/vuelos'),
 }
