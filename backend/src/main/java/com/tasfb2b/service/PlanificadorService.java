@@ -300,6 +300,65 @@ public class PlanificadorService {
     }
 
     // =========================================================================
+    // =========================================================================
+    // Manifest de animación
+    // =========================================================================
+
+    public AnimacionManifestDTO getAnimacionManifest() {
+        if (solucionActual == null || vuelosCargados == null || aeropuertosCargados == null) {
+            return null;
+        }
+
+        Map<String, Vuelo> vuelos = new HashMap<>();
+        for (Vuelo v : vuelosCargados) {
+            vuelos.put(v.getClave(), v);
+        }
+
+        List<OcurrenciaVueloDTO> ocurrencias = new ArrayList<>();
+        int maxLlegada = 0;
+
+        for (Map.Entry<String, Integer> e : solucionActual.getOcupacionVuelos().entrySet()) {
+            if (e.getValue() <= 0) continue;
+            String[] k = e.getKey().split("-");
+            if (k.length < 4) continue;
+
+            String origen = k[0];
+            String destino = k[1];
+            int salidaMinutos;
+            int dia;
+            try {
+                salidaMinutos = Integer.parseInt(k[2]);
+                dia = Integer.parseInt(k[3].substring(1));
+            } catch (NumberFormatException ex) {
+                continue;
+            }
+
+            String clave = origen + "-" + destino + "-" + salidaMinutos;
+            Vuelo vuelo = vuelos.get(clave);
+            if (vuelo == null) continue;
+
+            int salidaAbs  = dia * 1440 + salidaMinutos;
+            int llegadaAbs = salidaAbs + vuelo.getDuracionMinutos();
+
+            ocurrencias.add(new OcurrenciaVueloDTO(
+                origen, destino, salidaAbs, llegadaAbs, e.getValue(), vuelo.getCapacidadMax()));
+            maxLlegada = Math.max(maxLlegada, llegadaAbs);
+        }
+
+        ocurrencias.sort(Comparator.comparingInt(OcurrenciaVueloDTO::getSalidaAbs));
+
+        Map<String, Map<Integer, Integer>> ocupDiaria = solucionActual.getOcupacionDiariaAeropuerto();
+        List<AeropuertoManifestDTO> aeropuertos = aeropuertosCargados.values().stream()
+            .map(a -> new AeropuertoManifestDTO(
+                a.getCodigo(), a.getCiudad(), a.getPais(), a.getContinente(),
+                a.getLat(), a.getLng(), a.getCapacidadMax(),
+                ocupDiaria.getOrDefault(a.getCodigo(), Collections.emptyMap())))
+            .collect(Collectors.toList());
+
+        return new AnimacionManifestDTO(maxLlegada, ocurrencias, aeropuertos);
+    }
+
+    // =========================================================================
     // RAN-02: Rutas y replanificación
     // =========================================================================
 

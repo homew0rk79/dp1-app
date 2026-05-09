@@ -382,6 +382,16 @@ public class Solucion {
         return result;
     }
 
+    // ── Acceso a mapas internos (solo lectura) ────────────────────────────────
+
+    public Map<String, Integer> getOcupacionVuelos() {
+        return Collections.unmodifiableMap(ocupacionVuelos);
+    }
+
+    public Map<String, Map<Integer, Integer>> getOcupacionDiariaAeropuerto() {
+        return Collections.unmodifiableMap(ocupacionDiariaAeropuerto);
+    }
+
     // ── Datos para snapshot WebSocket ────────────────────────────────────────
 
     /**

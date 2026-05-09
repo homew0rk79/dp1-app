@@ -18,7 +18,10 @@
       "PowerShell(gentle-ai *)",
       "PowerShell(engram *)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\ERLIN\\\\Documents\\\\GitHub\\\\dp1-app\" -Force)",
-      "Bash(Select-Object Name, PSIsContainer)"
+      "Bash(Select-Object Name, PSIsContainer)",
+      "mcp__plugin_engram_engram__mem_context",
+      "mcp__plugin_engram_engram__mem_search",
+      "mcp__plugin_engram_engram__mem_save"
     ]
   }
 }

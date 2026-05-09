@@ -6,4 +6,5 @@ export const simulacionService = {
   obtenerMetricas: () => api.get('/planificacion/metricas'),
   obtenerAeropuertos: () => api.get('/aeropuertos'),
   obtenerVuelos: () => api.get('/vuelos'),
+  obtenerManifestAnimacion: () => api.get('/planificacion/animacion'),
 }
