@@ -20,19 +20,11 @@ import tabStyles from '../../components/common/Tabla/Tabla.module.css'
 import BarraProgreso from '../../components/common/BarraProgreso/BarraProgreso'
 import Semaforo from '../../components/common/Semaforo/Semaforo'
 import Badge from '../../components/common/Badge/Badge'
-import { AEROPUERTOS_MOCK } from '../../mocks/aeropuertos'
-import { obtenerRutas, obtenerDetalleRuta, reasignarRuta } from '../../services/rutasService'
+import { obtenerRutas, obtenerDetalleRuta } from '../../services/rutasService'
 import useConfiguracionStore from '../../store/configuracionStore'
+import usePlanificadorWS from '../../hooks/usePlanificadorWS'
 import { getColorSemaforo } from '../../utils/semaforo'
-import ReasignarModal from './ReasignarModal'
 import styles from './GestionRutasModule.module.css'
-
-const ESTADOS_FILTRO = [
-  { value: 'todos', label: 'Todos' },
-  { value: 'pendiente', label: 'Pendiente' },
-  { value: 'en_transito', label: 'En tránsito' },
-  { value: 'completado', label: 'Completado' },
-]
 
 function textoEstado(estado) {
   const m = {
@@ -41,19 +33,6 @@ function textoEstado(estado) {
     completado: 'Completado',
   }
   return m[estado] ?? estado
-}
-
-function BadgeEstadoRuta({ estado }) {
-  const mapa = {
-    pendiente: styles.badgeNeutral,
-    en_transito: styles.badgeInfo,
-    completado: styles.badgeSuccess,
-  }
-  return (
-    <span className={`${styles.badge} ${mapa[estado] || styles.badgeNeutral}`}>
-      {textoEstado(estado)}
-    </span>
-  )
 }
 
 function BadgeCumplimiento({ cumplimiento }) {
@@ -99,6 +78,7 @@ function varianteBarra(cumplimiento) {
 function GestionRutasPage() {
   const navigate = useNavigate()
   const rangosSemaforo = useConfiguracionStore((s) => s.rangosSemaforo)
+  const { snapshot } = usePlanificadorWS()
   const [rutas, setRutas] = useState([])
   const [cargando, setCargando] = useState(true)
   const [detalle, setDetalle] = useState(null)
@@ -107,13 +87,9 @@ function GestionRutasPage() {
   const [query, setQuery] = useState('')
   const [origen, setOrigen] = useState('Todos')
   const [destino, setDestino] = useState('Todos')
-  const [estado, setEstado] = useState('todos')
 
   const [selectedId, setSelectedId] = useState(null)
   const [panelAbierto, setPanelAbierto] = useState(false)
-
-  const [modalReasignar, setModalReasignar] = useState(null)
-  const [mensajeExito, setMensajeExito] = useState('')
 
   const cargarLista = useCallback(async () => {
     setCargando(true)
@@ -168,11 +144,10 @@ function GestionRutasPage() {
 
       const matchOrigen = origen === 'Todos' || r.origen === origen
       const matchDest = destino === 'Todos' || r.destino === destino
-      const matchEstado = estado === 'todos' || r.estado === estado
 
-      return matchQ && matchOrigen && matchDest && matchEstado
+      return matchQ && matchOrigen && matchDest
     })
-  }, [rutas, query, origen, destino, estado])
+  }, [rutas, query, origen, destino])
 
   useEffect(() => {
     if (filtered.length === 0) return
@@ -187,44 +162,29 @@ function GestionRutasPage() {
     setQuery('')
     setOrigen('Todos')
     setDestino('Todos')
-    setEstado('todos')
   }
 
-  const abrirReasignar = (id, e) => {
-    e?.stopPropagation()
-    setModalReasignar(id)
-  }
+  const kpisEstaticos = useMemo(() => {
+    const activas = rutas.filter((r) => r.estado !== 'sin_ruta').length
+    const verdes = rutas.filter((r) => r.cumplimiento === 'verde').length
+    const riesgo = rutas.filter((r) => r.cumplimiento === 'rojo').length
+    const cumplimiento =
+      rutas.length > 0 ? (verdes / rutas.length * 100).toFixed(1) + '%' : '—'
+    return { activas, cumplimiento, vuelos: rutas.length, riesgo }
+  }, [rutas])
 
-  const confirmarReasignar = async (nuevaRutaId) => {
-    const id = modalReasignar
-    if (!id) return
-    const res = await reasignarRuta(id, { nuevaRutaId })
-    if (res.ok) {
-      setMensajeExito(res.mensaje)
-      setTimeout(() => setMensajeExito(''), 5000)
-      await cargarLista()
-      const d = await obtenerDetalleRuta(id)
-      setDetalle(d)
-    }
-  }
-
-  const kpisEstaticos = {
-    activas: '24',
-    cumplimiento: '91,5%',
-    vuelos: '156',
-    riesgo: '4',
-  }
-
-  const aeropuertosVista = AEROPUERTOS_MOCK.slice(0, 6)
+  const aeropuertosVista = useMemo(() => {
+    if (!snapshot?.aeropuertos?.length) return []
+    return snapshot.aeropuertos.slice(0, 6).map((a) => ({
+      id: a.codigo,
+      nombre: a.ciudad,
+      continente: a.continente,
+      ocupacion: a.porcentajeOcupacion ?? 0,
+    }))
+  }, [snapshot])
 
   return (
     <div className={styles.page}>
-      {mensajeExito ? (
-        <div className={styles.exitoBanner} style={{ marginBottom: 14 }}>
-          {mensajeExito}
-        </div>
-      ) : null}
-
       <div className={styles.layout}>
         <div className={styles.mainColumn}>
           <section className={styles.header}>
@@ -350,14 +310,6 @@ function GestionRutasPage() {
                 ))}
               </select>
 
-              <select className={styles.select} value={estado} onChange={(e) => setEstado(e.target.value)}>
-                {ESTADOS_FILTRO.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    Estado: {opt.label}
-                  </option>
-                ))}
-              </select>
-
               <button type="button" className={styles.botonLimpiar} onClick={limpiarFiltros}>
                 Limpiar
               </button>
@@ -388,8 +340,9 @@ function GestionRutasPage() {
                 <tr>
                   <th>ID</th>
                   <th>Origen → Destino</th>
-                  <th>Estado</th>
                   <th>Tiempo estimado</th>
+                  <th>Ingreso</th>
+                  <th>Límite entrega</th>
                   <th className={styles.thCenter}>Cumplimiento</th>
                   <th className={styles.thCenter}>Acciones</th>
                 </tr>
@@ -421,33 +374,23 @@ function GestionRutasPage() {
                           <span className={styles.rutaPill}>{r.destino}</span>
                         </div>
                       </td>
-                      <td>
-                        <BadgeEstadoRuta estado={r.estado} />
-                      </td>
                       <td>{r.tiempoEstimado}</td>
+                      <td>{r.fechaIngreso ?? '—'}</td>
+                      <td>{r.fechaLimite ?? '—'}</td>
                       <td className={styles.centerCell}>
                         <BadgeCumplimiento cumplimiento={r.cumplimiento} />
                       </td>
                       <td className={styles.centerCell}>
-                        <div className={styles.accionesCell}>
-                          <button
-                            type="button"
-                            className={styles.linkAccion}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              navigate(`/gestion-rutas/${r.id}`)
-                            }}
-                          >
-                            Ver detalle
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.linkAccion}
-                            onClick={(e) => abrirReasignar(r.id, e)}
-                          >
-                            Reasignar
-                          </button>
-                        </div>
+                        <button
+                          type="button"
+                          className={styles.linkAccion}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            navigate(`/gestion-rutas/${r.id}`)
+                          }}
+                        >
+                          Ver detalle
+                        </button>
                       </td>
                     </tr>
                   )
@@ -516,15 +459,6 @@ function GestionRutasPage() {
                 <Link className={styles.botonPlan} to={`/gestion-rutas/${detalle.id}`} style={{ textAlign: 'center', textDecoration: 'none' }}>
                   Abrir detalle completo
                 </Link>
-
-                <button
-                  type="button"
-                  className={styles.botonPrimario}
-                  style={{ width: '100%' }}
-                  onClick={() => setModalReasignar(detalle.id)}
-                >
-                  Reasignar ruta
-                </button>
               </div>
             </>
           )}
@@ -564,12 +498,6 @@ function GestionRutasPage() {
         </div>
       )}
 
-      <ReasignarModal
-        abierto={!!modalReasignar}
-        rutaId={modalReasignar}
-        onCerrar={() => setModalReasignar(null)}
-        onConfirmar={confirmarReasignar}
-      />
     </div>
   )
 }

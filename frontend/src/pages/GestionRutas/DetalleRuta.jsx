@@ -10,8 +10,7 @@ import {
 
 import BarraProgreso from '../../components/common/BarraProgreso/BarraProgreso'
 import Badge from '../../components/common/Badge/Badge'
-import { obtenerDetalleRuta, reasignarRuta } from '../../services/rutasService'
-import ReasignarModal from './ReasignarModal'
+import { obtenerDetalleRuta } from '../../services/rutasService'
 import styles from './GestionRutasModule.module.css'
 
 function textoEstado(estado) {
@@ -45,8 +44,6 @@ function DetalleRuta() {
   const { id } = useParams()
   const [detalle, setDetalle] = useState(null)
   const [cargando, setCargando] = useState(true)
-  const [modalAbierto, setModalAbierto] = useState(false)
-  const [mensajeExito, setMensajeExito] = useState('')
 
   const cargar = useCallback(async () => {
     if (!id) return
@@ -62,16 +59,6 @@ function DetalleRuta() {
   useEffect(() => {
     cargar()
   }, [cargar])
-
-  const confirmarReasignar = async (nuevaRutaId) => {
-    if (!id) return
-    const res = await reasignarRuta(id, { nuevaRutaId })
-    if (res.ok) {
-      setMensajeExito(res.mensaje)
-      setTimeout(() => setMensajeExito(''), 5000)
-      await cargar()
-    }
-  }
 
   if (cargando) {
     return (
@@ -100,8 +87,6 @@ function DetalleRuta() {
   return (
     <div className={styles.page}>
       <div className={styles.singleColumn}>
-        {mensajeExito ? <div className={styles.exitoBanner} style={{ marginBottom: 16 }}>{mensajeExito}</div> : null}
-
         <header className={styles.detalleHeader}>
           <Link className={styles.backLink} to="/gestion-rutas">
             <ArrowLeft size={18} />
@@ -201,17 +186,7 @@ function DetalleRuta() {
           </p>
         </section>
 
-        <button type="button" className={styles.botonPrimario} style={{ marginTop: 20 }} onClick={() => setModalAbierto(true)}>
-          Reasignar ruta
-        </button>
       </div>
-
-      <ReasignarModal
-        abierto={modalAbierto}
-        rutaId={id ?? null}
-        onCerrar={() => setModalAbierto(false)}
-        onConfirmar={confirmarReasignar}
-      />
     </div>
   )
 }
