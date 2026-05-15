@@ -46,7 +46,7 @@ function MapaInteractivo() {
 
   // Ocupación en tiempo real durante la ejecución del algoritmo
   useEffect(() => {
-    if (!snapshot) return
+    if (!snapshot) { setOcupacionWS({}); return }
     const nuevaOcupacion = {}
     snapshot.aeropuertos?.forEach(a => {
       nuevaOcupacion[a.codigo] = {

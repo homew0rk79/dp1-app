@@ -22,3 +22,8 @@ export const DURACIONES_PERIODO = [3, 5, 7]
 export const DURACION_SIMULACION_MIN_MINUTOS = 30
 export const DURACION_SIMULACION_MAX_MINUTOS = 90
 
+// Rango de fechas del dataset
+export const FECHA_INICIO_SIMULACION_ALGORITMO = '2026-01-01' // día 0 del algoritmo
+export const FECHA_INICIO_DATOS = '2026-01-02'                // primer envío registrado
+export const FECHA_FIN_DATOS    = '2028-12-31'
+

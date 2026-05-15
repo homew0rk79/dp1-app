@@ -117,6 +117,11 @@ public class DataLoader {
      */
     private static String determinarContinente(String codigoIcao) {
         if (codigoIcao == null || codigoIcao.isEmpty()) return "DESCONOCIDO";
+        // UM = Bielorrusia, UK = Ucrania — prefijo U pero continente Europa
+        if (codigoIcao.length() >= 2) {
+            String pref2 = codigoIcao.substring(0, 2);
+            if (pref2.equals("UM") || pref2.equals("UK")) return "EUROPA";
+        }
         switch (codigoIcao.charAt(0)) {
             case 'S': case 'M': case 'T': case 'K': case 'C': case 'N': return "AMERICA";
             case 'E': case 'L':                                          return "EUROPA";

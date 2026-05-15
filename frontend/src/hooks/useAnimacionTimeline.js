@@ -44,9 +44,10 @@ function useAnimacionTimeline() {
   }, [setVelocidadAnimacion])
 
   const cargarManifest = useCallback((data) => {
-    tiempoRef.current  = 0
-    lastDiaRef.current = 0
-    setTiempoDisplay(0)
+    const inicio = data.fechaInicioMinutos ?? 0
+    tiempoRef.current  = inicio
+    lastDiaRef.current = Math.floor(inicio / 1440)
+    setTiempoDisplay(inicio)
     setPlaying(false)
     setManifest(data)
   }, [setManifest])

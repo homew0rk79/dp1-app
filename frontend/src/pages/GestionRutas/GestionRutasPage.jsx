@@ -78,7 +78,7 @@ function varianteBarra(cumplimiento) {
 function GestionRutasPage() {
   const navigate = useNavigate()
   const rangosSemaforo = useConfiguracionStore((s) => s.rangosSemaforo)
-  const { snapshot } = usePlanificadorWS()
+  const { snapshot, completado } = usePlanificadorWS()
   const [rutas, setRutas] = useState([])
   const [cargando, setCargando] = useState(true)
   const [detalle, setDetalle] = useState(null)
@@ -166,12 +166,13 @@ function GestionRutasPage() {
 
   const kpisEstaticos = useMemo(() => {
     const activas = rutas.filter((r) => r.estado !== 'sin_ruta').length
-    const verdes = rutas.filter((r) => r.cumplimiento === 'verde').length
-    const riesgo = rutas.filter((r) => r.cumplimiento === 'rojo').length
-    const cumplimiento =
-      rutas.length > 0 ? (verdes / rutas.length * 100).toFixed(1) + '%' : '—'
+    const riesgo  = rutas.filter((r) => r.cumplimiento === 'rojo').length
+    // Usar el porcentaje global del backend (sobre todas las maletas, no solo las 300 mostradas)
+    const cumplimiento = completado != null
+      ? completado.porcentajeCumplimiento.toFixed(1) + '%'
+      : '—'
     return { activas, cumplimiento, vuelos: rutas.length, riesgo }
-  }, [rutas])
+  }, [rutas, completado])
 
   const aeropuertosVista = useMemo(() => {
     if (!snapshot?.aeropuertos?.length) return []

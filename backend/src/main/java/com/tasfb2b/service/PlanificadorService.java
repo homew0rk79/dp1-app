@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
@@ -59,10 +60,16 @@ public class PlanificadorService {
     private volatile int progreso = 0;
     private volatile String escenarioActual = null;
 
+    // Día 0 del algoritmo (igual que Envio.FECHA_INICIO_SIMULACION)
+    private static final LocalDate DIA_CERO_ALGORITMO = LocalDate.of(2026, 1, 1);
+    // Primer día con datos reales
+    private static final LocalDate PRIMER_DIA_DATOS   = LocalDate.of(2026, 1, 2);
+
     // ── Datos cargados ────────────────────────────────────────────────────────
     private volatile Map<String, Aeropuerto> aeropuertosCargados = null;
     private volatile List<Vuelo> vuelosCargados = null;
     private volatile Solucion solucionActual = null;
+    private volatile LocalDate fechaInicioSimulacion = PRIMER_DIA_DATOS;
 
     private final WebSocketEventPublisher wsPublisher;
 
@@ -155,6 +162,7 @@ public class PlanificadorService {
 
     private void ejecutar(String escenario, LocalDate fechaInicio, int numDias) {
         try {
+            fechaInicioSimulacion = fechaInicio != null ? fechaInicio : PRIMER_DIA_DATOS;
             setEstado(Estado.CARGANDO, 5, "Cargando aeropuertos y vuelos...", 0);
 
             DataLoader loader = new DataLoader(rutaAeropuertos, rutaVuelos, directorioEnvios);
@@ -219,12 +227,15 @@ public class PlanificadorService {
                                                     int numDias) throws Exception {
         switch (escenario.toUpperCase()) {
             case "DIA_A_DIA": {
-                LocalDate fecha = fechaInicio != null ? fechaInicio : LocalDate.of(2026, 1, 2);
-                return loader.cargarEnviosPorPeriodo(fecha, 1);
+                LocalDate fecha = fechaInicio != null ? fechaInicio : PRIMER_DIA_DATOS;
+                long totalDias = ChronoUnit.DAYS.between(PRIMER_DIA_DATOS, fecha) + 1;
+                return loader.cargarEnviosPorPeriodo(PRIMER_DIA_DATOS, (int) totalDias);
             }
             case "PERIODO": {
-                LocalDate fecha = fechaInicio != null ? fechaInicio : LocalDate.of(2026, 1, 2);
-                return loader.cargarEnviosPorPeriodo(fecha, numDias > 0 ? numDias : 5);
+                LocalDate fecha = fechaInicio != null ? fechaInicio : PRIMER_DIA_DATOS;
+                int dias = numDias > 0 ? numDias : 5;
+                long totalDias = ChronoUnit.DAYS.between(PRIMER_DIA_DATOS, fecha) + dias;
+                return loader.cargarEnviosPorPeriodo(PRIMER_DIA_DATOS, (int) totalDias);
             }
             case "COLAPSO":
             default:
@@ -355,7 +366,8 @@ public class PlanificadorService {
                 ocupDiaria.getOrDefault(a.getCodigo(), Collections.emptyMap())))
             .collect(Collectors.toList());
 
-        return new AnimacionManifestDTO(maxLlegada, ocurrencias, aeropuertos);
+        int fechaInicioMin = (int)(ChronoUnit.DAYS.between(DIA_CERO_ALGORITMO, fechaInicioSimulacion) * 1440);
+        return new AnimacionManifestDTO(maxLlegada, fechaInicioMin, ocurrencias, aeropuertos);
     }
 
     // =========================================================================

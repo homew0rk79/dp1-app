@@ -4,31 +4,23 @@ import com.tasfb2b.model.Envio;
 import com.tasfb2b.model.Ruta;
 import com.tasfb2b.model.Vuelo;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Genera la solución de partida para el algoritmo Tabu Search.
  *
- * Estrategia en dos fases por envío:
+ * Estrategia híbrida por envío:
  *
- *  FASE 1 — Secuencia de aeropuertos (BFS precomputado en GrafoVuelos):
- *    Obtiene la ruta con menor número de escalas entre origen y destino.
- *    Ejemplo: EBCI → SKBO → SPIM  (2 tramos, 1 escala)
+ *  PRIMARIO — BFS + greedy:
+ *    Ruta con mínimas escalas; distribuye carga naturalmente entre vuelos.
+ *    Funciona bien para el ~99% de envíos donde el vuelo directo es viable.
  *
- *  FASE 2 — Asignación de vuelos concretos (greedy por tiempo):
- *    Para cada tramo [A → B] de la secuencia, elige el vuelo que sale
- *    lo antes posible después de la llegada al aeropuerto A,
- *    respetando un margen mínimo de 30 min para el transbordo.
- *    Como los vuelos son diarios, si hoy no hay más salidas viables
- *    usa la del día siguiente.
- *
- * Por qué esta estrategia:
- *  - Con 330K+ envíos, un Dijkstra completo por envío sería muy lento.
- *  - La precomputación BFS (una sola vez para 870 pares) amortiza el costo.
- *  - La solución inicial no necesita ser óptima, solo válida y razonable.
- *    El Tabu Search se encargará de mejorarla.
+ *  FALLBACK — Dijkstra time-aware:
+ *    Se activa solo cuando BFS produce una ruta que viola el SLA del envío
+ *    (ej: vuelo directo con duración ~24h dentro del mismo continente).
+ *    Busca la ruta que minimiza el tiempo de llegada sin importar escalas.
+ *    Al aplicarse a muy pocos envíos, no genera la concentración de capacidad
+ *    que causaba problemas al usar Dijkstra para todos.
  */
 public class SolucionInicial {
 
@@ -51,7 +43,7 @@ public class SolucionInicial {
     public Solucion construir(List<Envio> envios) {
         Solucion solucion = new Solucion(capacidadMaxAeropuertos);
         int procesados = 0;
-        int sinRuta = 0;
+        int sinRuta    = 0;
 
         for (Envio envio : envios) {
             Ruta ruta = construirRuta(envio);
@@ -61,7 +53,7 @@ public class SolucionInicial {
 
             procesados++;
             if (procesados % 10_000 == 0) {
-                System.out.printf("[SolucionInicial] %d/%d envíos procesados (sin ruta: %d)%n",
+                System.out.printf("[SolucionInicial] %d/%d procesados (sin ruta: %d)%n",
                     procesados, envios.size(), sinRuta);
             }
         }
@@ -72,32 +64,43 @@ public class SolucionInicial {
     }
 
     /**
-     * Construye la ruta para un único envío.
-     *
-     * Pasos:
-     *  1. Consultar la secuencia de aeropuertos (BFS precomputado).
-     *  2. Para cada tramo, pedir a GrafoVuelos el primer vuelo disponible.
-     *  3. Acumular el tiempo de llegada para el siguiente tramo.
+     * Estrategia híbrida para un único envío:
+     *  1. Intenta BFS+greedy.
+     *  2. Si el resultado viola el SLA, prueba Dijkstra como fallback.
+     *  3. Retorna la ruta con menor tiempo de entrega.
      */
     public Ruta construirRuta(Envio envio) {
+        if (envio.getOrigen().equals(envio.getDestino())) return new Ruta(envio);
+
+        Ruta rutaBFS = construirRutaBFS(envio);
+
+        int plazo = envio.getPlazoMaximoMinutos();
+        if (plazo <= 0) return rutaBFS; // sin SLA definido, BFS es suficiente
+
+        int tiempoBFS = rutaBFS.isSinSolucion() ? Integer.MAX_VALUE : rutaBFS.calcularTiempoTotal();
+
+        // BFS cumple el SLA: no hace falta Dijkstra
+        if (tiempoBFS <= plazo) return rutaBFS;
+
+        // BFS viola el SLA: intentar Dijkstra
+        Ruta rutaDijkstra = construirRutaDijkstra(envio);
+
+        if (rutaDijkstra.isSinSolucion()) return rutaBFS;
+
+        int tiempoDijkstra = rutaDijkstra.calcularTiempoTotal();
+        return tiempoDijkstra < tiempoBFS ? rutaDijkstra : rutaBFS;
+    }
+
+    // -------------------------------------------------------------------------
+    // BFS + greedy (estrategia primaria)
+    // -------------------------------------------------------------------------
+
+    private Ruta construirRutaBFS(Envio envio) {
         Ruta ruta = new Ruta(envio);
 
-        // Caso trivial: origen = destino
-        if (envio.getOrigen().equals(envio.getDestino())) {
-            return ruta;
-        }
-
-        // FASE 1: secuencia de aeropuertos con menor número de escalas
         List<String> secuencia = grafo.getRutaCorta(envio.getOrigen(), envio.getDestino());
+        if (secuencia.isEmpty()) { ruta.setSinSolucion(true); return ruta; }
 
-        if (secuencia.isEmpty()) {
-            // No existe ningún camino en el grafo entre estos aeropuertos
-            ruta.setSinSolucion(true);
-            return ruta;
-        }
-
-        // FASE 2: asignar el primer vuelo disponible en cada tramo
-        // Tiempo inicial = minutos desde medianoche del día de registro
         int tiempoActual = envio.getMinutosRegistro();
 
         for (int i = 0; i < secuencia.size() - 1; i++) {
@@ -105,25 +108,73 @@ public class SolucionInicial {
             String hacia = secuencia.get(i + 1);
 
             Vuelo vuelo = grafo.primerVueloDisponible(desde, hacia, tiempoActual);
-
-            if (vuelo == null) {
-                // No hay vuelo directo en este tramo (no debería pasar si BFS
-                // fue correcto, pero lo manejamos defensivamente)
-                ruta.setSinSolucion(true);
-                return ruta;
-            }
+            if (vuelo == null) { ruta.setSinSolucion(true); return ruta; }
 
             ruta.agregarVuelo(vuelo);
-
-            // El tiempo de llegada al siguiente aeropuerto se calcula así:
-            //   salidaAbsoluta = primer momento en que el vuelo sale después de tiempoActual+30min
-            //   llegadaAbsoluta = salidaAbsoluta + duracion del vuelo
-            int salidaAbsoluta = GrafoVuelos.proximaSalidaAbsoluta(
-                tiempoActual, vuelo.getSalidaMinutos(), 30
-            );
-            tiempoActual = salidaAbsoluta + vuelo.getDuracionMinutos();
+            int salidaAbs = GrafoVuelos.proximaSalidaAbsoluta(tiempoActual, vuelo.getSalidaMinutos(), 30);
+            tiempoActual  = salidaAbs + vuelo.getDuracionMinutos();
         }
 
         return ruta;
+    }
+
+    // -------------------------------------------------------------------------
+    // Dijkstra time-aware (fallback para envíos que BFS no puede cumplir a tiempo)
+    // -------------------------------------------------------------------------
+
+    private Ruta construirRutaDijkstra(Envio envio) {
+        Ruta ruta = new Ruta(envio);
+
+        int tiempoInicio = envio.getMinutosRegistro();
+        int plazo        = envio.getPlazoMaximoMinutos();
+        int limiteTiempo = tiempoInicio + Math.max(plazo > 0 ? plazo * 2 : 0, 4320);
+
+        PriorityQueue<Estado> pq = new PriorityQueue<>(Comparator.comparingInt(e -> e.tiempo));
+        pq.add(new Estado(tiempoInicio, envio.getOrigen(), null, null));
+
+        Map<String, Integer> mejorTiempo = new HashMap<>();
+        mejorTiempo.put(envio.getOrigen(), tiempoInicio);
+
+        while (!pq.isEmpty()) {
+            Estado actual = pq.poll();
+
+            if (actual.aeropuerto.equals(envio.getDestino())) {
+                List<Vuelo> vuelos = new ArrayList<>();
+                for (Estado e = actual; e.vuelo != null; e = e.padre) vuelos.add(0, e.vuelo);
+                vuelos.forEach(ruta::agregarVuelo);
+                return ruta;
+            }
+
+            if (actual.tiempo > mejorTiempo.getOrDefault(actual.aeropuerto, Integer.MAX_VALUE)) continue;
+
+            for (Vuelo vuelo : grafo.getVuelosDesde(actual.aeropuerto)) {
+                int salidaAbs  = GrafoVuelos.proximaSalidaAbsoluta(actual.tiempo, vuelo.getSalidaMinutos(), 30);
+                int llegadaAbs = salidaAbs + vuelo.getDuracionMinutos();
+
+                if (llegadaAbs > limiteTiempo) continue;
+
+                if (llegadaAbs < mejorTiempo.getOrDefault(vuelo.getDestino(), Integer.MAX_VALUE)) {
+                    mejorTiempo.put(vuelo.getDestino(), llegadaAbs);
+                    pq.add(new Estado(llegadaAbs, vuelo.getDestino(), actual, vuelo));
+                }
+            }
+        }
+
+        ruta.setSinSolucion(true);
+        return ruta;
+    }
+
+    private static final class Estado {
+        final int    tiempo;
+        final String aeropuerto;
+        final Estado padre;
+        final Vuelo  vuelo;
+
+        Estado(int tiempo, String aeropuerto, Estado padre, Vuelo vuelo) {
+            this.tiempo     = tiempo;
+            this.aeropuerto = aeropuerto;
+            this.padre      = padre;
+            this.vuelo      = vuelo;
+        }
     }
 }

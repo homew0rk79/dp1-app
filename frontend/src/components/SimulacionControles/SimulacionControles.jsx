@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import styles from './SimulacionControles.module.css'
+import { FECHA_INICIO_SIMULACION_ALGORITMO } from '../../constants/restricciones'
 
 const PRESETS = [
   { label: '×30',  valor: 30 },
@@ -9,11 +10,16 @@ const PRESETS = [
   { label: '1d/s', valor: 1440 },
 ]
 
+const [ay, am, ad] = FECHA_INICIO_SIMULACION_ALGORITMO.split('-').map(Number)
+const BASE_ALGORITMO = new Date(ay, am - 1, ad)
+
 function formatTiempo(minutos) {
-  const dia = Math.floor(minutos / 1440) + 1
-  const hh  = String(Math.floor((minutos % 1440) / 60)).padStart(2, '0')
-  const mm  = String(Math.floor(minutos % 60)).padStart(2, '0')
-  return `Día ${dia} · ${hh}:${mm}`
+  const dt = new Date(BASE_ALGORITMO.getTime() + minutos * 60000)
+  const dd = String(dt.getDate()).padStart(2, '0')
+  const mm = String(dt.getMonth() + 1).padStart(2, '0')
+  const hh = String(dt.getHours()).padStart(2, '0')
+  const mi = String(dt.getMinutes()).padStart(2, '0')
+  return `${dd}/${mm}/${dt.getFullYear()} · ${hh}:${mi}`
 }
 
 function SimulacionControles({

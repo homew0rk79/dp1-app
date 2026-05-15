@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
+import useSimulacionStore from '../store/simulacionStore'
 
 /**
  * Conexión STOMP/WebSocket con el backend para recibir eventos
@@ -17,6 +18,14 @@ function usePlanificadorWS() {
   const [snapshot, setSnapshot]     = useState(null)
   const [completado, setCompletado] = useState(null)
   const clientRef = useRef(null)
+
+  const wsVersion = useSimulacionStore((s) => s.wsVersion)
+
+  useEffect(() => {
+    setProgreso(null)
+    setSnapshot(null)
+    setCompletado(null)
+  }, [wsVersion])
 
   useEffect(() => {
     const client = new Client({

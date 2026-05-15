@@ -20,7 +20,7 @@ import useSimulacionStore from '../../../store/simulacionStore'
 import { getColorSemaforo, COLORES_SEMAFORO } from '../../../utils/semaforo'
 import useConfiguracionStore from '../../../store/configuracionStore'
 import { ESCENARIOS, ETIQUETAS_ESCENARIO } from '../../../constants/escenarios'
-import { DURACIONES_PERIODO } from '../../../constants/restricciones'
+import { DURACIONES_PERIODO, FECHA_INICIO_DATOS, FECHA_FIN_DATOS } from '../../../constants/restricciones'
 import usePlanificadorWS from '../../../hooks/usePlanificadorWS'
 import { simulacionService } from '../../../services/simulacionService'
 import styles from './Sidebar.module.css'
@@ -151,7 +151,7 @@ function Sidebar() {
     try {
       await simulacionService.iniciar({
         escenario: escenarioActivo,
-        fechaInicio: '2026-01-02',
+        fechaInicio: parametros.fechaInicio,
         numDias: parametros.duracionPeriodo,
       })
       setEstado('corriendo')
@@ -204,24 +204,24 @@ function Sidebar() {
             </div>
           </section>
 
-          {/* Barra de progreso mientras corre el algoritmo */}
+          {/* Indicador de carga mientras corre el algoritmo */}
           {estadoEjecucion === 'corriendo' && progreso && (
             <section className={styles.section}>
-              <h3 className={styles.sectionTitle}>Progreso</h3>
-              <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginBottom: 4 }}>
-                {progreso.mensaje}
-              </div>
-              <div style={{ background: '#1e293b', borderRadius: 4, height: 6 }}>
-                <div style={{
-                  width: `${progreso.porcentaje}%`,
-                  background: '#3b82f6',
-                  height: '100%',
-                  borderRadius: 4,
-                  transition: 'width 0.5s ease',
-                }} />
-              </div>
-              <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: 3, textAlign: 'right' }}>
-                {progreso.porcentaje}%
+              <h3 className={styles.sectionTitle}>Procesando</h3>
+              <div className={styles.loadingPanel}>
+                <div className={styles.loadingDots}>
+                  <span className={styles.dot} />
+                  <span className={styles.dot} />
+                  <span className={styles.dot} />
+                </div>
+                <p className={styles.loadingMensaje}>{progreso.mensaje}</p>
+                <div className={styles.loadingBarra}>
+                  <div
+                    className={styles.loadingBarraFill}
+                    style={{ width: `${progreso.porcentaje}%` }}
+                  />
+                </div>
+                <span className={styles.loadingPct}>{progreso.porcentaje}%</span>
               </div>
             </section>
           )}
@@ -278,6 +278,22 @@ function Sidebar() {
                   ))}
                 </select>
               </div>
+
+              {/* Fecha de inicio (PERIODO y DIA_A_DIA) */}
+              {escenarioActivo !== ESCENARIOS.COLAPSO && escenarioActivo !== null && (
+                <div className={styles.simField}>
+                  <label className={styles.simLabel}>Fecha de inicio</label>
+                  <input
+                    type="date"
+                    className={styles.simSelect}
+                    min={FECHA_INICIO_DATOS}
+                    max={FECHA_FIN_DATOS}
+                    value={parametros.fechaInicio}
+                    onChange={(e) => setParametros({ fechaInicio: e.target.value })}
+                    disabled={enCurso}
+                  />
+                </div>
+              )}
 
               {/* Duración (solo PERIODO) */}
               {escenarioActivo === ESCENARIOS.PERIODO && (
