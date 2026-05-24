@@ -41,14 +41,25 @@ public class Movimiento {
 
     /**
      * Diferencia de costo entre la ruta nueva y la anterior.
-     * Negativo significa que la ruta nueva es mejor (menor tiempo).
+     * Incluye penalización por plazo de entrega (igual que Solucion.costoDe).
+     * No incluye cambios en capacidad de vuelos/aeropuertos (dependen del estado
+     * global de la solución y se reflejan en Solucion.getCostoTotal()).
+     * Negativo significa mejora.
      */
     private double calcularDelta() {
-        int costoAnterior = rutaAnterior.isSinSolucion()
-            ? 100_000 : rutaAnterior.calcularTiempoTotal();
-        int costoNuevo    = rutaNueva.isSinSolucion()
-            ? 100_000 : rutaNueva.calcularTiempoTotal();
-        return costoNuevo - costoAnterior;
+        return costoDe(rutaNueva) - costoDe(rutaAnterior);
+    }
+
+    private static double costoDe(Ruta r) {
+        if (r.isSinSolucion()) return 100_000.0;
+        int t = r.calcularTiempoTotal();
+        if (t == Integer.MAX_VALUE) return 100_000.0;
+        double costo = t;
+        int plazo = r.getEnvio().getPlazoMaximoMinutos();
+        if (plazo > 0 && t > plazo) {
+            costo += 1_000.0 * (t - plazo);
+        }
+        return costo;
     }
 
     /**

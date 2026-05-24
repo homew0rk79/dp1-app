@@ -16,18 +16,14 @@ import {
 import PanelMetrica from '../../common/PanelMetrica/PanelMetrica'
 import Semaforo from '../../common/Semaforo/Semaforo'
 import Badge from '../../common/Badge/Badge'
-import { AEROPUERTOS_MOCK } from '../../../mocks/aeropuertos'
 import useSimulacionStore from '../../../store/simulacionStore'
+import { getColorSemaforo, COLORES_SEMAFORO } from '../../../utils/semaforo'
+import useConfiguracionStore from '../../../store/configuracionStore'
 import { ESCENARIOS, ETIQUETAS_ESCENARIO } from '../../../constants/escenarios'
 import { DURACIONES_PERIODO } from '../../../constants/restricciones'
+import usePlanificadorWS from '../../../hooks/usePlanificadorWS'
+import { simulacionService } from '../../../services/simulacionService'
 import styles from './Sidebar.module.css'
-
-const KPIS = [
-  { icono: Luggage,       label: 'Maletas en tránsito', valor: '1,247', color: 'default' },
-  { icono: CheckCircle,   label: 'Entregas a tiempo',   valor: '94.2%', color: 'verde'   },
-  { icono: PlaneTakeoff,  label: 'Vuelos activos',      valor: '18',    color: 'default' },
-  { icono: AlertTriangle, label: 'Almacenes en alerta', valor: '3',     color: 'rojo'    },
-]
 
 function formatearTiempo(segundos) {
   const h = Math.floor(segundos / 3600)
@@ -40,6 +36,7 @@ function Sidebar() {
   const navigate = useNavigate()
   const [collapsed, setCollapsed] = useState(false)
   const intervalRef = useRef(null)
+  const rangosSemaforo = useConfiguracionStore((s) => s.rangosSemaforo)
 
   const {
     escenarioActivo,
@@ -47,6 +44,8 @@ function Sidebar() {
     colapsoDetectado,
     parametros,
     tiempoSegundos,
+    manifest,
+    tiempoAnimacion,
     setEscenario,
     setEstado,
     setColapso,
@@ -54,6 +53,89 @@ function Sidebar() {
     resetear,
     incrementarTiempo,
   } = useSimulacionStore()
+
+  const { progreso, snapshot, completado } = usePlanificadorWS()
+
+  // Sincronizar estado local con eventos del backend
+  useEffect(() => {
+    if (!progreso) return
+    if (progreso.estado === 'COMPLETADO') setEstado('finalizado')
+    if (progreso.estado === 'ERROR')      setEstado('finalizado')
+  }, [progreso, setEstado])
+
+  // Aeropuertos en tiempo real (desde snapshot WS) o lista vacía
+  const aeropuertosWS = snapshot?.aeropuertos ?? []
+
+  // Lookup manifest para calcular ocupaciones animadas por aeropuerto
+  const manifestLookup = manifest
+    ? Object.fromEntries(manifest.aeropuertos.map((a) => [a.codigo, a]))
+    : null
+
+  function getOcupacionPct(codigo, fallbackPct) {
+    if (!manifestLookup) return fallbackPct ?? 0
+    const aero = manifestLookup[codigo]
+    if (!aero) return fallbackPct ?? 0
+    const cap        = aero.capacidadMax || 1
+    const diaActual  = Math.floor(tiempoAnimacion / 1440)
+    const fraccion   = (tiempoAnimacion % 1440) / 1440
+    const m0 = aero.ocupacionPorDia?.[diaActual]   ?? aero.ocupacionPorDia?.[String(diaActual)]   ?? 0
+    const m1 = aero.ocupacionPorDia?.[diaActual+1] ?? aero.ocupacionPorDia?.[String(diaActual+1)] ?? m0
+    return Math.round((m0 + (m1 - m0) * fraccion) / cap * 1000) / 10
+  }
+
+  // KPIs animados desde el manifest (cuando hay animación activa)
+  const kpisAnimados = (() => {
+    if (!manifest) return null
+    const T   = tiempoAnimacion
+    const dia = Math.floor(T / 1440)
+    let maletasEnTransito = 0
+    let vuelosSaturados   = 0
+    for (const o of manifest.ocurrencias) {
+      if (o.salidaAbs <= T && T <= o.llegadaAbs) {
+        maletasEnTransito += o.maletas
+        if (o.maletas / (o.capacidadMax || 1) > 0.9) vuelosSaturados++
+      }
+    }
+    let aeropuertosSaturados = 0
+    for (const a of manifest.aeropuertos) {
+      const maletas = a.ocupacionPorDia?.[dia] ?? a.ocupacionPorDia?.[String(dia)] ?? 0
+      if (maletas / (a.capacidadMax || 1) > rangosSemaforo.ambar / 100) aeropuertosSaturados++
+    }
+    return { maletasEnTransito, vuelosSaturados, aeropuertosSaturados }
+  })()
+
+  const kpis = [
+    {
+      icono: Luggage,
+      label: kpisAnimados ? 'Maletas en tránsito' : 'Maletas planificadas',
+      valor: kpisAnimados
+        ? kpisAnimados.maletasEnTransito.toLocaleString()
+        : completado ? completado.totalEnvios.toLocaleString() : '—',
+      color: 'default',
+    },
+    {
+      icono: CheckCircle,
+      label: 'Entregas a tiempo',
+      valor: completado ? `${completado.porcentajeCumplimiento.toFixed(1)}%` : '—',
+      color: completado?.semaforo === 'VERDE' ? 'verde' : completado?.semaforo === 'AMBAR' ? 'ambar' : 'default',
+    },
+    {
+      icono: PlaneTakeoff,
+      label: 'Vuelos saturados',
+      valor: kpisAnimados
+        ? kpisAnimados.vuelosSaturados.toString()
+        : completado ? completado.vuelosSaturados.toString() : '—',
+      color: (kpisAnimados?.vuelosSaturados ?? completado?.vuelosSaturados ?? 0) > 0 ? 'rojo' : 'default',
+    },
+    {
+      icono: AlertTriangle,
+      label: 'Aeropuertos saturados',
+      valor: kpisAnimados
+        ? kpisAnimados.aeropuertosSaturados.toString()
+        : completado ? completado.aeropuertosSaturados.toString() : '—',
+      color: (kpisAnimados?.aeropuertosSaturados ?? completado?.aeropuertosSaturados ?? 0) > 0 ? 'rojo' : 'default',
+    },
+  ]
 
   useEffect(() => {
     if (estadoEjecucion === 'corriendo') {
@@ -64,10 +146,19 @@ function Sidebar() {
     return () => clearInterval(intervalRef.current)
   }, [estadoEjecucion, incrementarTiempo])
 
-  function handleIniciar() {
+  async function handleIniciar() {
     if (!escenarioActivo) return
-    setEstado('corriendo')
-    navigate('/visualizador')
+    try {
+      await simulacionService.iniciar({
+        escenario: escenarioActivo,
+        fechaInicio: '2026-01-02',
+        numDias: parametros.duracionPeriodo,
+      })
+      setEstado('corriendo')
+      navigate('/visualizador')
+    } catch (err) {
+      console.error('Error al iniciar simulación:', err)
+    }
   }
 
   function handleDetener() {
@@ -107,29 +198,64 @@ function Sidebar() {
           <section className={styles.section}>
             <h3 className={styles.sectionTitle}>Métricas generales</h3>
             <div className={styles.kpiList}>
-              {KPIS.map((kpi) => (
+              {kpis.map((kpi) => (
                 <PanelMetrica key={kpi.label} {...kpi} />
               ))}
             </div>
           </section>
 
-          {/* Lista de aeropuertos */}
+          {/* Barra de progreso mientras corre el algoritmo */}
+          {estadoEjecucion === 'corriendo' && progreso && (
+            <section className={styles.section}>
+              <h3 className={styles.sectionTitle}>Progreso</h3>
+              <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginBottom: 4 }}>
+                {progreso.mensaje}
+              </div>
+              <div style={{ background: '#1e293b', borderRadius: 4, height: 6 }}>
+                <div style={{
+                  width: `${progreso.porcentaje}%`,
+                  background: '#3b82f6',
+                  height: '100%',
+                  borderRadius: 4,
+                  transition: 'width 0.5s ease',
+                }} />
+              </div>
+              <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: 3, textAlign: 'right' }}>
+                {progreso.porcentaje}%
+              </div>
+            </section>
+          )}
+
+          {/* Lista de aeropuertos (real-time desde WS, vacío si no hay snapshot) */}
           <section className={`${styles.section} ${styles.sectionScroll}`}>
             <h3 className={styles.sectionTitle}>Estado de aeropuertos</h3>
-            <ul className={styles.aeropuertoList}>
-              {AEROPUERTOS_MOCK.map((a) => (
-                <li key={a.id} className={styles.aeropuertoItem}>
-                  <div className={styles.aeropuertoInfo}>
-                    <span className={styles.aeropuertoNombre}>{a.nombre}</span>
-                    <span className={styles.aeropuertoPais}>{a.continente}</span>
-                  </div>
-                  <div className={styles.aeropuertoOcupacion}>
-                    <span className={styles.ocupacionTexto}>{a.ocupacion}%</span>
-                    <Semaforo valor={a.ocupacion} />
-                  </div>
-                </li>
-              ))}
-            </ul>
+            {aeropuertosWS.length === 0 ? (
+              <p style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                Disponible al iniciar una simulación
+              </p>
+            ) : (
+              <ul className={styles.aeropuertoList}>
+                {aeropuertosWS.map((a) => {
+                  const pct   = getOcupacionPct(a.codigo, a.porcentajeOcupacion)
+                  const color = getColorSemaforo(pct, rangosSemaforo)
+                  const hex   = COLORES_SEMAFORO[color]
+                  return (
+                    <li key={a.codigo} className={styles.aeropuertoItem}>
+                      <div className={styles.aeropuertoInfo}>
+                        <span className={styles.aeropuertoNombre}>{a.ciudad}</span>
+                        <span className={styles.aeropuertoPais}>{a.continente}</span>
+                      </div>
+                      <div className={styles.aeropuertoOcupacion}>
+                        <span className={styles.ocupacionTexto} style={{ color: hex }}>
+                          {pct.toFixed(1)}%
+                        </span>
+                        <Semaforo valor={pct} />
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
           </section>
 
           {/* Panel de simulación */}

@@ -3,7 +3,7 @@ package algorithm;
 import model.Envio;
 import model.Ruta;
 
-import java.util.LinkedList;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 /**
@@ -50,21 +50,27 @@ public class TabuSearch {
     private final Vecindad    vecindad;
 
     // ── Estado interno ────────────────────────────────────────────────────────
-    // Cola FIFO: cuando supera 'tenenciaTabu', el primero (más viejo) se descarta
-    private final LinkedList<String> listaTabu;
+    // LinkedHashSet: mantiene orden de inserción (para saber qué expira primero)
+    // y ofrece contains() en O(1) en lugar de O(tenencia) del LinkedList original.
+    // Con tamanoMuestra grande (500K+) el saving es ~3 min sobre 200 iteraciones.
+    private final LinkedHashSet<String> listaTabu;
 
-    public TabuSearch(GrafoVuelos grafo, int maxIteraciones, int tenenciaTabu, int tamanoMuestra) {
+    public TabuSearch(GrafoVuelos grafo, int maxIteraciones, int tenenciaTabu, int tamanoMuestra, long semilla) {
         this.grafo           = grafo;
         this.maxIteraciones  = maxIteraciones;
         this.tenenciaTabu    = tenenciaTabu;
         this.tamanoMuestra   = tamanoMuestra;
-        this.vecindad        = new Vecindad(grafo);
-        this.listaTabu       = new LinkedList<>();
+        this.vecindad        = new Vecindad(grafo, semilla);
+        this.listaTabu       = new LinkedHashSet<>();
+    }
+
+    public TabuSearch(GrafoVuelos grafo, int maxIteraciones, int tenenciaTabu, int tamanoMuestra) {
+        this(grafo, maxIteraciones, tenenciaTabu, tamanoMuestra, 42L);
     }
 
     /** Constructor con parámetros por defecto razonables para este problema */
     public TabuSearch(GrafoVuelos grafo) {
-        this(grafo, 200, 30, 200);
+        this(grafo, 200, 30, 200, 42L);
     }
 
     // =========================================================================
@@ -83,9 +89,9 @@ public class TabuSearch {
         Solucion actual       = solucionInicial.clonar();
         Solucion mejorGlobal  = solucionInicial.clonar();
 
-        System.out.println("\n[TabuSearch] Iniciando...");
-        System.out.printf("[TabuSearch] Costo inicial: %.0f | Iter: %d | Muestra: %d | Tenencia: %d%n",
-            actual.getCostoTotal(), maxIteraciones, tamanoMuestra, tenenciaTabu);
+        System.out.printf("  Parametros: %d iteraciones | muestra de %,d envios por iter | tenencia tabu: %d%n",
+            maxIteraciones, tamanoMuestra, tenenciaTabu);
+        System.out.printf("  Costo de partida: %,.0f%n", actual.getCostoTotal());
 
         for (int iter = 1; iter <= maxIteraciones; iter++) {
 
@@ -130,9 +136,9 @@ public class TabuSearch {
             aplicarMovimiento(actual, elegido);
 
             // ─── d. Actualizar la lista tabú ──────────────────────────────────
-            listaTabu.addLast(elegido.getClaveTabu());
+            listaTabu.add(elegido.getClaveTabu());
             if (listaTabu.size() > tenenciaTabu) {
-                listaTabu.removeFirst(); // expira el movimiento más antiguo
+                listaTabu.remove(listaTabu.iterator().next()); // expira el más antiguo
             }
 
             // ─── e. Actualizar mejor global ───────────────────────────────────
@@ -140,27 +146,24 @@ public class TabuSearch {
                 mejorGlobal = actual.clonar();
             }
 
-            // ─── Progreso cada 10 iteraciones ─────────────────────────────────
             if (iter % 10 == 0 || iter == 1) {
                 System.out.printf(
-                    "[TabuSearch] Iter %3d | CostoActual: %9.0f | MejorGlobal: %9.0f | Tabú: %d/%d | Delta: %+.0f%n",
-                    iter,
+                    "    iter %3d/%d  |  costo: %,12.0f  |  mejor: %,12.0f  |  penalidad cap: %,10.0f  |  delta: %+.0f%n",
+                    iter, maxIteraciones,
                     actual.getCostoTotal(),
                     mejorGlobal.getCostoTotal(),
-                    listaTabu.size(),
-                    tenenciaTabu,
+                    actual.getPenaltyCapacidad(),
                     elegido.getDeltaCosto()
                 );
             }
         }
 
-        System.out.printf("%n[TabuSearch] Finalizado.%n");
-        System.out.printf("[TabuSearch] Costo inicial : %.0f min%n", solucionInicial.getCostoTotal());
-        System.out.printf("[TabuSearch] Mejor global  : %.0f min%n", mejorGlobal.getCostoTotal());
-        System.out.printf("[TabuSearch] Mejora total  : %.0f min (%.2f%%)%n",
-            solucionInicial.getCostoTotal() - mejorGlobal.getCostoTotal(),
-            (1.0 - mejorGlobal.getCostoTotal() / solucionInicial.getCostoTotal()) * 100
-        );
+        double mejora = solucionInicial.getCostoTotal() - mejorGlobal.getCostoTotal();
+        double pctMejora = mejora / solucionInicial.getCostoTotal() * 100;
+        System.out.printf("  Optimizacion finalizada.%n");
+        System.out.printf("    Costo inicial  : %,12.0f%n", solucionInicial.getCostoTotal());
+        System.out.printf("    Mejor hallado  : %,12.0f%n", mejorGlobal.getCostoTotal());
+        System.out.printf("    Mejora total   : %,12.0f  (%.2f%%)%n", mejora, pctMejora);
 
         return mejorGlobal;
     }

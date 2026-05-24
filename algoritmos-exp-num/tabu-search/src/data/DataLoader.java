@@ -8,6 +8,7 @@ import java.io.*;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.regex.*;
 
@@ -94,12 +95,29 @@ public class DataLoader {
                 String ciudad = partesCiudadPais[0].trim();
                 String pais   = partesCiudadPais.length > 1 ? partesCiudadPais[1].trim() : "";
 
-                aeropuertos.put(codigo, new Aeropuerto(codigo, ciudad, pais, gmt, capacidad));
+                String continente = determinarContinente(codigo);
+                aeropuertos.put(codigo, new Aeropuerto(codigo, ciudad, pais, gmt, capacidad, continente));
             }
         }
 
         System.out.println("[DataLoader] Aeropuertos cargados: " + aeropuertos.size());
         return aeropuertos;
+    }
+
+    /**
+     * Determina el continente a partir del prefijo ICAO.
+     * S/M = América del Sur/Central, K/C = América del Norte,
+     * E/L = Europa, O/U/V/W/R/Z/B = Asia.
+     */
+    private static String determinarContinente(String codigoIcao) {
+        if (codigoIcao == null || codigoIcao.isEmpty()) return "DESCONOCIDO";
+        switch (codigoIcao.charAt(0)) {
+            case 'S': case 'M': case 'T': case 'K': case 'C': case 'N': return "AMERICA";
+            case 'E': case 'L':                                          return "EUROPA";
+            case 'O': case 'U': case 'V': case 'W': case 'R': case 'Z': case 'B': return "ASIA";
+            case 'D': case 'F': case 'G': case 'H':                     return "AFRICA";
+            default: return "DESCONOCIDO";
+        }
     }
 
     /** Convierte "+2", "-5", "+3" → 2, -5, 3 */
@@ -201,6 +219,98 @@ public class DataLoader {
     /** Sobrecarga sin límite: carga todos los envíos */
     public List<Envio> cargarEnvios() throws IOException {
         return cargarEnvios(-1);
+    }
+
+    /**
+     * Carga hasta {@code limite} envíos por cada aeropuerto en {@code origenes}.
+     * Solo procesa los archivos cuyo código ICAO esté en la lista.
+     */
+    public List<Envio> cargarEnvios(List<String> origenes, int limite) throws IOException {
+        List<Envio> todos = new ArrayList<>();
+
+        File[] archivos = directorioEnvios.toFile().listFiles(
+            (dir, nombre) -> nombre.startsWith("_envios_") && nombre.endsWith("_.txt")
+        );
+
+        if (archivos == null || archivos.length == 0) {
+            System.err.println("[DataLoader] No se encontraron archivos de envíos en: " + directorioEnvios);
+            return todos;
+        }
+
+        for (File archivo : archivos) {
+            String codigoOrigen = extraerCodigoOrigen(archivo.getName());
+            if (codigoOrigen == null || !origenes.contains(codigoOrigen)) continue;
+
+            int cargados = cargarEnviosDeArchivo(archivo, codigoOrigen, todos, limite);
+            System.out.println("[DataLoader] " + archivo.getName() + " → " + cargados + " envíos");
+        }
+
+        System.out.println("[DataLoader] Total envíos cargados: " + todos.size());
+        return todos;
+    }
+
+    /**
+     * Carga solo los envíos cuya fecha de registro cae dentro de la ventana
+     * [fechaInicio, fechaInicio + numDias).  Útil para la simulación de período.
+     *
+     * Ejemplo — simulación de 5 días a partir del 2026-01-01:
+     *   loader.cargarEnviosPorPeriodo(LocalDate.of(2026, 1, 1), 5)
+     *
+     * El filtro escanea todos los archivos línea a línea sin cargar en RAM lo
+     * que no pertenece al período, por lo que el consumo de memoria es proporcional
+     * al tamaño del resultado, no al total del dataset.
+     */
+    public List<Envio> cargarEnviosPorPeriodo(LocalDate fechaInicio, int numDias) throws IOException {
+        LocalDate fechaFin = fechaInicio.plusDays(numDias);
+        List<Envio> todos = new ArrayList<>();
+
+        File[] archivos = directorioEnvios.toFile().listFiles(
+            (dir, nombre) -> nombre.startsWith("_envios_") && nombre.endsWith("_.txt")
+        );
+
+        if (archivos == null || archivos.length == 0) {
+            System.err.println("[DataLoader] No se encontraron archivos de envíos en: " + directorioEnvios);
+            return todos;
+        }
+
+        for (File archivo : archivos) {
+            String codigoOrigen = extraerCodigoOrigen(archivo.getName());
+            if (codigoOrigen == null) continue;
+
+            int cargados = cargarEnviosDeArchivoPorPeriodo(archivo, codigoOrigen, todos, fechaInicio, fechaFin);
+            System.out.printf("[DataLoader] %s → %d envíos (%s a %s)%n",
+                archivo.getName(), cargados, fechaInicio, fechaFin.minusDays(1));
+        }
+
+        System.out.println("[DataLoader] Total envíos en período: " + todos.size());
+        return todos;
+    }
+
+    private int cargarEnviosDeArchivoPorPeriodo(File archivo, String origen,
+                                                 List<Envio> destino,
+                                                 LocalDate desde, LocalDate hasta) throws IOException {
+        int contador = 0;
+
+        try (BufferedReader br = new BufferedReader(
+                new InputStreamReader(new FileInputStream(archivo), StandardCharsets.US_ASCII))) {
+
+            String linea;
+            while ((linea = br.readLine()) != null) {
+                linea = linea.trim();
+                if (linea.isEmpty()) continue;
+
+                Envio envio = parsearLineaEnvio(linea, origen);
+                if (envio == null) continue;
+
+                LocalDate fecha = envio.getFechaHoraRegistro().toLocalDate();
+                if (!fecha.isBefore(desde) && fecha.isBefore(hasta)) {
+                    destino.add(envio);
+                    contador++;
+                }
+            }
+        }
+
+        return contador;
     }
 
     /**

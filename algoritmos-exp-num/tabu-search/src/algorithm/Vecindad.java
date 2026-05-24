@@ -246,11 +246,21 @@ public class Vecindad {
     // Utilidades
     // -------------------------------------------------------------------------
 
-    /** Muestra aleatoria sin reemplazo de tamaño min(n, lista.size()) */
+    /**
+     * Muestra aleatoria sin reemplazo de tamaño min(n, lista.size()).
+     *
+     * Usa índices aleatorios en lugar de copiar+mezclar toda la lista.
+     * Con 9M envíos esto pasa de O(9M) a O(n) por iteración del TS.
+     */
     private List<Envio> muestrear(List<Envio> lista, int n) {
-        if (n >= lista.size()) return new ArrayList<>(lista);
-        List<Envio> copia = new ArrayList<>(lista);
-        Collections.shuffle(copia, rng);
-        return copia.subList(0, n);
+        int size = lista.size();
+        if (n >= size) return lista;
+        Set<Integer> vistos = new HashSet<>(n * 2);
+        List<Envio> resultado = new ArrayList<>(n);
+        while (resultado.size() < n) {
+            int idx = rng.nextInt(size);
+            if (vistos.add(idx)) resultado.add(lista.get(idx));
+        }
+        return resultado;
     }
 }
