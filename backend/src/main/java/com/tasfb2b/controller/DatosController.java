@@ -1,11 +1,14 @@
 package com.tasfb2b.controller;
 
 import com.tasfb2b.dto.AeropuertoDTO;
+import com.tasfb2b.dto.MaletaEnAeropuertoDTO;
 import com.tasfb2b.dto.VueloDTO;
 import com.tasfb2b.service.PlanificadorService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -36,5 +39,19 @@ public class DatosController {
     @GetMapping("/vuelos")
     public ResponseEntity<List<VueloDTO>> getVuelos() {
         return ResponseEntity.ok(service.getVuelos());
+    }
+
+    /**
+     * Detalle de envíos presentes en un aeropuerto en un momento concreto del periodo.
+     * Usado por el popup desplegable del visualizador.
+     *
+     * @param codigo    código ICAO del aeropuerto
+     * @param tiempoMin minuto absoluto desde el inicio del periodo (default 0)
+     */
+    @GetMapping("/aeropuertos/{codigo}/maletas")
+    public ResponseEntity<List<MaletaEnAeropuertoDTO>> getMaletasEnAeropuerto(
+            @PathVariable String codigo,
+            @RequestParam(defaultValue = "0") int tiempoMin) {
+        return ResponseEntity.ok(service.getMaletasEnAeropuerto(codigo, tiempoMin));
     }
 }
