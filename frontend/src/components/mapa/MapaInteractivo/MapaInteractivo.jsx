@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css'
 
 import LeyendaMapa from '../LeyendaMapa/LeyendaMapa'
 import CanvasVuelos from '../CanvasVuelos/CanvasVuelos'
+import DetalleMaletasAeropuerto from '../DetalleMaletasAeropuerto/DetalleMaletasAeropuerto'
 import SimulacionControles from '../../SimulacionControles/SimulacionControles'
 import { getColorSemaforo, COLORES_SEMAFORO } from '../../../utils/semaforo'
 import { formatearCapacidad } from '../../../utils/formatters'
@@ -132,7 +133,7 @@ function MapaInteractivo() {
                 weight:      2,
               }}
             >
-              <Popup className={styles.popupWrapper}>
+              <Popup className={styles.popupWrapper} maxWidth={360} minWidth={240}>
                 <div className={styles.popup}>
                   <h4 className={styles.popupTitulo}>
                     {aeropuerto.ciudad}
@@ -154,6 +155,19 @@ function MapaInteractivo() {
                       {pctOcup.toFixed(1)}%
                     </span>
                   </div>
+
+                  {/* Detalle desplegable de envíos en este aeropuerto */}
+                  {manifest && (
+                    <details className={styles.detalleDesplegable}>
+                      <summary className={styles.detalleSummary}>
+                        Ver detalle de maletas
+                      </summary>
+                      <DetalleMaletasAeropuerto
+                        codigo={aeropuerto.codigo}
+                        tiempoMin={Math.floor(tiempoDisplay)}
+                      />
+                    </details>
+                  )}
                 </div>
               </Popup>
             </CircleMarker>

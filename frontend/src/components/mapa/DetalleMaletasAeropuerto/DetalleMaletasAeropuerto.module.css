@@ -1,0 +1,132 @@
+.contenedor {
+  margin-top: 0.5rem;
+  font-size: 0.78rem;
+}
+
+.estado {
+  padding: 0.5rem 0;
+  color: var(--color-text-muted);
+  font-style: italic;
+  text-align: center;
+}
+
+.filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-bottom: 0.45rem;
+}
+
+.chip {
+  font-size: 0.72rem;
+  padding: 0.18rem 0.45rem;
+  border: 1px solid var(--color-border, #d0d4dc);
+  background: transparent;
+  color: var(--color-text-muted);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.chip:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.chipActivo {
+  background: var(--color-text);
+  color: white;
+  border-color: var(--color-text);
+}
+
+.chip_PENDIENTE_SALIDA.chipActivo { background: #d97706; border-color: #d97706; }
+.chip_EN_HUB.chipActivo           { background: #2563eb; border-color: #2563eb; }
+.chip_ENTREGADA.chipActivo        { background: #16a34a; border-color: #16a34a; }
+
+.totales {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  margin-bottom: 0.35rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+}
+
+.lista {
+  max-height: 240px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding-right: 0.2rem;
+}
+
+.lista::-webkit-scrollbar          { width: 5px; }
+.lista::-webkit-scrollbar-track    { background: transparent; }
+.lista::-webkit-scrollbar-thumb    { background: #c0c4cc; border-radius: 999px; }
+
+.item {
+  padding: 0.35rem 0.5rem;
+  background: rgba(0, 0, 0, 0.025);
+  border-radius: 4px;
+  border-left: 3px solid #94a3b8;
+}
+
+.borde_PENDIENTE_SALIDA { border-left-color: #d97706; }
+.borde_EN_HUB           { border-left-color: #2563eb; }
+.borde_ENTREGADA        { border-left-color: #16a34a; }
+
+.itemHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  font-size: 0.75rem;
+  color: var(--color-text);
+}
+
+.envioId {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.cantidad {
+  font-size: 0.7rem;
+  background: var(--color-text);
+  color: white;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+}
+
+.ruta {
+  font-size: 0.74rem;
+  color: var(--color-text);
+  margin-top: 0.15rem;
+}
+
+.flecha {
+  color: var(--color-text-muted);
+  margin: 0 0.2rem;
+}
+
+.tiempos {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  margin-top: 0.1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.verMas {
+  margin-top: 0.4rem;
+  padding: 0.3rem 0.5rem;
+  width: 100%;
+  background: transparent;
+  border: 1px dashed var(--color-border, #d0d4dc);
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.verMas:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--color-text);
+}
