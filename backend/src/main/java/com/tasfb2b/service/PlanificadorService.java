@@ -371,6 +371,88 @@ public class PlanificadorService {
     }
 
     // =========================================================================
+    // Detalle de envíos por aeropuerto (popup del visualizador)
+    // =========================================================================
+
+    /**
+     * Lista los envíos que están en un aeropuerto en un momento concreto.
+     * Estados posibles:
+     *   - PENDIENTE_SALIDA: el envío está en su aeropuerto origen, todavía no ha despegado.
+     *   - EN_HUB: el envío llegó a un aeropuerto intermedio y espera el siguiente vuelo.
+     *   - ENTREGADA: el envío ya llegó a su aeropuerto destino final.
+     *
+     * @param codigo    código ICAO del aeropuerto
+     * @param tiempoMin minuto absoluto desde el inicio del periodo
+     */
+    public List<MaletaEnAeropuertoDTO> getMaletasEnAeropuerto(String codigo, int tiempoMin) {
+        if (solucionActual == null || codigo == null) return Collections.emptyList();
+
+        List<MaletaEnAeropuertoDTO> resultado = new ArrayList<>();
+
+        for (Ruta ruta : solucionActual.getRutas()) {
+            if (ruta.isSinSolucion() || ruta.getVuelos().isEmpty()) continue;
+            Envio envio = ruta.getEnvio();
+
+            Map<String, int[]> intervalos = ruta.calcularIntervalosAlmacen();
+            int[] tramoEnAeropuerto = intervalos.get(codigo);
+
+            // Caso 1: el aeropuerto es origen o hub intermedio
+            if (tramoEnAeropuerto != null) {
+                int entrada = tramoEnAeropuerto[0];
+                int salida  = tramoEnAeropuerto[1];
+                if (tiempoMin >= entrada && tiempoMin < salida) {
+                    boolean esOrigen = envio.getOrigen().equals(codigo);
+                    MaletaEnAeropuertoDTO.Estado estado = esOrigen
+                            ? MaletaEnAeropuertoDTO.Estado.PENDIENTE_SALIDA
+                            : MaletaEnAeropuertoDTO.Estado.EN_HUB;
+                    resultado.add(construirDTO(envio, estado, entrada, salida, false));
+                }
+                continue;
+            }
+
+            // Caso 2: el aeropuerto es destino final → la maleta llegó cuando el último vuelo aterrizó
+            if (envio.getDestino().equals(codigo)) {
+                int llegadaFinal = calcularLlegadaFinal(ruta);
+                if (llegadaFinal != Integer.MAX_VALUE && tiempoMin >= llegadaFinal) {
+                    resultado.add(construirDTO(envio,
+                            MaletaEnAeropuertoDTO.Estado.ENTREGADA,
+                            llegadaFinal, -1, true));
+                }
+            }
+        }
+
+        return resultado;
+    }
+
+    private MaletaEnAeropuertoDTO construirDTO(Envio envio,
+                                                MaletaEnAeropuertoDTO.Estado estado,
+                                                int tiempoLlegada, int tiempoSalida,
+                                                boolean esDestinoFinal) {
+        return new MaletaEnAeropuertoDTO(
+                envio.getId(),
+                envio.getOrigen(),
+                envio.getDestino(),
+                getCiudad(envio.getOrigen()),
+                getCiudad(envio.getDestino()),
+                envio.getCantidad(),
+                estado,
+                tiempoLlegada,
+                tiempoSalida,
+                esDestinoFinal
+        );
+    }
+
+    private static int calcularLlegadaFinal(Ruta ruta) {
+        if (ruta.isSinSolucion() || ruta.getVuelos().isEmpty()) return Integer.MAX_VALUE;
+        int tiempoActual = ruta.getEnvio().getMinutosRegistro();
+        for (Vuelo v : ruta.getVuelos()) {
+            int salidaAbs = GrafoVuelos.proximaSalidaAbsoluta(tiempoActual, v.getSalidaMinutos(), 30);
+            tiempoActual = salidaAbs + v.getDuracionMinutos();
+        }
+        return tiempoActual;
+    }
+
+    // =========================================================================
     // RAN-02: Rutas y replanificación
     // =========================================================================
 
