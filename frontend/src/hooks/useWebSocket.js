@@ -21,7 +21,8 @@ function useWebSocket(url) {
     ws.onmessage = (event) => {
       try {
         setMensaje(JSON.parse(event.data))
-      } catch {
+      } catch (err) {
+        console.error('No se pudo parsear mensaje WebSocket como JSON:', err)
         setMensaje(event.data)
       }
     }

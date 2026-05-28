@@ -9,7 +9,7 @@ import SimulacionControles from '../../SimulacionControles/SimulacionControles'
 import { getColorSemaforo, COLORES_SEMAFORO } from '../../../utils/semaforo'
 import { formatearCapacidad } from '../../../utils/formatters'
 import useConfiguracionStore from '../../../store/configuracionStore'
-import usePlanificadorWS from '../../../hooks/usePlanificadorWS'
+import usePlanificadorStore from '../../../store/planificadorStore'
 import useAnimacionTimeline from '../../../hooks/useAnimacionTimeline'
 import { simulacionService } from '../../../services/simulacionService'
 import styles from './MapaInteractivo.module.css'
@@ -21,7 +21,9 @@ function MapaInteractivo() {
   // Ocupación durante el algoritmo (snapshot WS), usada antes de tener manifest
   const [ocupacionWS, setOcupacionWS] = useState({})
 
-  const { snapshot, completado } = usePlanificadorWS()
+  const snapshot = usePlanificadorStore((s) => s.snapshot)
+  const completado = usePlanificadorStore((s) => s.completado)
+  const progreso = usePlanificadorStore((s) => s.progreso)
 
   const {
     manifest,
@@ -42,12 +44,14 @@ function MapaInteractivo() {
   useEffect(() => {
     simulacionService.obtenerAeropuertos()
       .then(res => setAeropuertos(res.data))
-      .catch(() => {})
+      .catch((err) => {
+        console.error('No se pudieron cargar aeropuertos:', err)
+      })
   }, [])
 
   // Ocupación en tiempo real durante la ejecución del algoritmo
   useEffect(() => {
-    if (!snapshot) return
+    if (!snapshot) { setOcupacionWS({}); return }
     const nuevaOcupacion = {}
     snapshot.aeropuertos?.forEach(a => {
       nuevaOcupacion[a.codigo] = {
@@ -62,13 +66,25 @@ function MapaInteractivo() {
 
   // Al completar la planificación, cargar el manifest de animación
   useEffect(() => {
-    if (!completado) return
+    if (manifest) return undefined
+    if (!completado && progreso?.estado !== 'COMPLETADO') return undefined
+
+    let cancelado = false
+
     simulacionService.obtenerManifestAnimacion()
-      .then(res => {
-        if (res.data) cargarManifest(res.data)
+      .then((res) => {
+        if (!cancelado && res.data) cargarManifest(res.data)
       })
-      .catch(() => {})
-  }, [completado, cargarManifest])
+      .catch((err) => {
+        if (!cancelado) {
+          console.error('No se pudo cargar el manifest de animacion:', err)
+        }
+      })
+
+    return () => {
+      cancelado = true
+    }
+  }, [completado, progreso, manifest, cargarManifest])
 
   // Ocupación de aeropuertos: interpola linealmente entre días para suavizar la transición
   function getOcupacion(codigo) {

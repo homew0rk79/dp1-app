@@ -1,19 +1,22 @@
 import { create } from 'zustand'
-import { DURACIONES_PERIODO } from '../constants/restricciones'
+import { DURACIONES_PERIODO, FECHA_INICIO_DATOS } from '../constants/restricciones'
 
 const useSimulacionStore = create((set) => ({
   escenarioActivo: null,
-  estadoEjecucion: 'idle', // 'idle' | 'corriendo' | 'pausado' | 'finalizado'
+  estadoEjecucion: 'IDLE',
   colapsoDetectado: false,
   tiempoSegundos: 0,
+  wsVersion: 0,
   parametros: {
     duracionPeriodo: DURACIONES_PERIODO[1], // 5 días por defecto
+    fechaInicio: FECHA_INICIO_DATOS,
   },
 
   // Animación — persiste entre cambios de ruta
   manifest: null,
   tiempoAnimacion: 0,       // minuto simulado actual (actualizado por día, no por frame)
   velocidadAnimacion: 120,  // min simulados / segundo real
+  playingAnimacion: false,
 
   setEscenario: (escenario) => set({ escenarioActivo: escenario }),
   setEstado: (estado) => set({ estadoEjecucion: estado }),
@@ -21,18 +24,22 @@ const useSimulacionStore = create((set) => ({
   setParametros: (parametros) =>
     set((s) => ({ parametros: { ...s.parametros, ...parametros } })),
   incrementarTiempo: () => set((s) => ({ tiempoSegundos: s.tiempoSegundos + 1 })),
-  setManifest: (manifest) => set({ manifest, tiempoAnimacion: 0 }),
+  setManifest: (manifest) => set({ manifest, tiempoAnimacion: 0, playingAnimacion: false }),
+  clearManifest: () => set({ manifest: null, tiempoAnimacion: 0, playingAnimacion: false }),
   setTiempoAnimacion: (t) => set({ tiempoAnimacion: t }),
   setVelocidadAnimacion: (v) => set({ velocidadAnimacion: v }),
+  setPlayingAnimacion: (playing) => set({ playingAnimacion: playing }),
   resetear: () =>
-    set({
+    set((s) => ({
       escenarioActivo: null,
-      estadoEjecucion: 'idle',
+      estadoEjecucion: 'IDLE',
       colapsoDetectado: false,
       tiempoSegundos: 0,
       manifest: null,
       tiempoAnimacion: 0,
-    }),
+      playingAnimacion: false,
+      wsVersion: s.wsVersion + 1,
+    })),
 }))
 
 export default useSimulacionStore

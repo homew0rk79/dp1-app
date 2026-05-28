@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import useSimulacionStore from '../store/simulacionStore'
 
 /**
@@ -14,12 +14,14 @@ function useAnimacionTimeline() {
   const setManifest         = useSimulacionStore((s) => s.setManifest)
   const setTiempoAnimacion  = useSimulacionStore((s) => s.setTiempoAnimacion)
   const setVelocidadAnimacion = useSimulacionStore((s) => s.setVelocidadAnimacion)
+  const playing            = useSimulacionStore((s) => s.playingAnimacion)
+  const setPlayingAnimacion = useSimulacionStore((s) => s.setPlayingAnimacion)
+  const tiempoAnimacion    = useSimulacionStore((s) => s.tiempoAnimacion)
 
   // Leer valores iniciales del store una sola vez al montar (sin suscripción reactiva)
   const { tiempoAnimacion: initialTiempo, velocidadAnimacion: initialVelocidad } =
     useSimulacionStore.getState()
 
-  const [playing, setPlaying]           = useState(false)  // siempre pausa al volver
   const [tiempoDisplay, setTiempoDisplay] = useState(initialTiempo)
   const [velocidad, setVelocidadState]  = useState(initialVelocidad)
 
@@ -27,8 +29,15 @@ function useAnimacionTimeline() {
   const velocidadRef = useRef(initialVelocidad)
   const lastDiaRef   = useRef(Math.floor(initialTiempo / 60))
 
-  const play  = useCallback(() => setPlaying(true), [])
-  const pause = useCallback(() => setPlaying(false), [])
+  useEffect(() => {
+    if (Math.abs(tiempoRef.current - tiempoAnimacion) <= 1) return
+    tiempoRef.current = tiempoAnimacion
+    lastDiaRef.current = Math.floor(tiempoAnimacion / 1440)
+    setTiempoDisplay(tiempoAnimacion)
+  }, [tiempoAnimacion])
+
+  const play  = useCallback(() => setPlayingAnimacion(true), [setPlayingAnimacion])
+  const pause = useCallback(() => setPlayingAnimacion(false), [setPlayingAnimacion])
 
   const seekTo = useCallback((t) => {
     tiempoRef.current  = t
@@ -47,9 +56,9 @@ function useAnimacionTimeline() {
     tiempoRef.current  = 0
     lastDiaRef.current = 0
     setTiempoDisplay(0)
-    setPlaying(false)
+    setPlayingAnimacion(false)
     setManifest(data)
-  }, [setManifest])
+  }, [setManifest, setPlayingAnimacion])
 
   const onTick = useCallback((t) => {
     setTiempoDisplay(t)
@@ -60,9 +69,9 @@ function useAnimacionTimeline() {
       setTiempoAnimacion(t)
     }
     if (manifest && t >= manifest.duracionTotalMinutos) {
-      setPlaying(false)
+      setPlayingAnimacion(false)
     }
-  }, [manifest, setTiempoAnimacion])
+  }, [manifest, setPlayingAnimacion, setTiempoAnimacion])
 
   return {
     manifest,

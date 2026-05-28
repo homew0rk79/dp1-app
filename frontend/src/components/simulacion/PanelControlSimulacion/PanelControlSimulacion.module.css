@@ -45,28 +45,29 @@
   border: 1px solid transparent;
 }
 
-.estado--idle {
+.estado--IDLE {
   background: #f1f5f9;
   border-color: #e2e8f0;
   color: #475569;
 }
 
-.estado--corriendo {
+.estado--CARGANDO,
+.estado--PLANIFICANDO {
   background: #ecfdf5;
   border-color: #bbf7d0;
   color: #15803d;
 }
 
-.estado--pausado {
-  background: #fff7ed;
-  border-color: #fed7aa;
-  color: #c2410c;
-}
-
-.estado--finalizado {
+.estado--COMPLETADO {
   background: #eff6ff;
   border-color: #bfdbfe;
   color: #1d4ed8;
+}
+
+.estado--ERROR {
+  background: #fee2e2;
+  border-color: #fecaca;
+  color: #b91c1c;
 }
 
 .controles {

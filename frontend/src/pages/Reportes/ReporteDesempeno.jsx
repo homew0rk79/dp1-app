@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   TrendingUp,
   PackageX,
@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import GraficoBarras from '../../components/reportes/GraficoBarras/GraficoBarras'
 import GraficoLinea from '../../components/reportes/GraficoLinea/GraficoLinea'
+import { reportesService } from '../../services/reportesService'
 import styles from './ReportesPage.module.css'
 
 const MOCK_DESEMPENO = {
@@ -119,7 +120,21 @@ function KpiCard({ titulo, valor, sub, icono: Icono, variante = '' }) {
 }
 
 function ReporteDesempeno({ escenario }) {
-  const datos = MOCK_DESEMPENO[escenario] ?? MOCK_DESEMPENO.DIA_A_DIA
+  const [datosReales, setDatosReales] = useState(null)
+
+  useEffect(() => {
+    let activo = true
+    reportesService.getDesempeno()
+      .then(({ data }) => {
+        if (activo && data) setDatosReales(data)
+      })
+      .catch((error) => console.error('No se pudo cargar reporte de desempeno:', error))
+    return () => {
+      activo = false
+    }
+  }, [])
+
+  const datos = datosReales ?? MOCK_DESEMPENO[escenario] ?? MOCK_DESEMPENO.DIA_A_DIA
   const tasa = useMemo(
     () => ((datos.aTiempo / datos.totalEnvios) * 100).toFixed(1),
     [datos]

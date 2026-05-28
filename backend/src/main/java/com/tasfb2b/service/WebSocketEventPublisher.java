@@ -25,6 +25,10 @@ public class WebSocketEventPublisher {
             new ProgresoEventDTO(porcentaje, mensaje, estado, costoActual));
     }
 
+    public void publicarProgreso(ProgresoEventDTO progreso) {
+        messaging.convertAndSend(TOPIC_PROGRESO, progreso);
+    }
+
     /** Snapshot completo: estado de aeropuertos + carga de rutas */
     public void publicarSnapshot(SnapshotEventDTO snapshot) {
         messaging.convertAndSend(TOPIC_SNAPSHOT, snapshot);

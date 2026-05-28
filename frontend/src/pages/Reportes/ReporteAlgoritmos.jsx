@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react'
 import { Cpu, Zap, Target } from 'lucide-react'
 import GraficoBarras from '../../components/reportes/GraficoBarras/GraficoBarras'
+import { reportesService } from '../../services/reportesService'
 import styles from './ReportesPage.module.css'
 
 const MOCK_DESEMPENO = {
@@ -75,7 +77,21 @@ function MetricaCard({ icono: Icono, label, valor }) {
 }
 
 function ReporteAlgoritmos({ escenario }) {
-  const datos = MOCK_DESEMPENO[escenario] ?? MOCK_DESEMPENO.DIA_A_DIA
+  const [datosReales, setDatosReales] = useState(null)
+
+  useEffect(() => {
+    let activo = true
+    reportesService.getAlgoritmos()
+      .then(({ data }) => {
+        if (activo && data) setDatosReales(data)
+      })
+      .catch((error) => console.error('No se pudo cargar reporte de algoritmos:', error))
+    return () => {
+      activo = false
+    }
+  }, [])
+
+  const datos = datosReales ?? MOCK_DESEMPENO[escenario] ?? MOCK_DESEMPENO.DIA_A_DIA
   const { filas } = datos
 
   const promCumplimiento = promedio(filas, 'cumplimiento')

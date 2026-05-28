@@ -1,4 +1,4 @@
-import { Play, Pause, Square } from 'lucide-react'
+import { Play, Square } from 'lucide-react'
 import styles from './PanelControlSimulacion.module.css'
 
 function formatearTiempo(segundos) {
@@ -8,23 +8,23 @@ function formatearTiempo(segundos) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
-function PanelControlSimulacion({ estado, tiempoSegundos, onIniciar, onPausar, onDetener }) {
-  const esIdle = estado === 'idle' || estado === 'finalizado'
-  const corriendo = estado === 'corriendo'
-  const pausado = estado === 'pausado'
+function PanelControlSimulacion({ estado, tiempoSegundos, onIniciar, onDetener }) {
+  const esIdle = estado === 'IDLE' || estado === 'COMPLETADO' || estado === 'ERROR'
+  const enCurso = estado === 'CARGANDO' || estado === 'PLANIFICANDO'
 
   return (
     <div className={styles.panel}>
       <div className={styles.tiempoBloque}>
         <span className={styles.tiempoLabel}>Tiempo simulado transcurrido</span>
-        <span className={`${styles.tiempoValor} ${corriendo ? styles.tiempoActivo : ''}`}>
+        <span className={`${styles.tiempoValor} ${enCurso ? styles.tiempoActivo : ''}`}>
           {formatearTiempo(tiempoSegundos)}
         </span>
         <span className={`${styles.estadoBadge} ${styles[`estado--${estado}`]}`}>
-          {estado === 'idle' && 'En espera'}
-          {estado === 'corriendo' && 'En ejecución'}
-          {estado === 'pausado' && 'Pausado'}
-          {estado === 'finalizado' && 'Finalizado'}
+          {estado === 'IDLE' && 'En espera'}
+          {estado === 'CARGANDO' && 'Cargando'}
+          {estado === 'PLANIFICANDO' && 'En ejecucion'}
+          {estado === 'COMPLETADO' && 'Completado'}
+          {estado === 'ERROR' && 'Error'}
         </span>
       </div>
 
@@ -36,30 +36,11 @@ function PanelControlSimulacion({ estado, tiempoSegundos, onIniciar, onPausar, o
           </button>
         )}
 
-        {corriendo && (
-          <>
-            <button className={styles.botonPausar} onClick={onPausar} type="button">
-              <Pause size={18} />
-              <span>Pausar</span>
-            </button>
-            <button className={styles.botonDetener} onClick={onDetener} type="button">
-              <Square size={18} />
-              <span>Detener</span>
-            </button>
-          </>
-        )}
-
-        {pausado && (
-          <>
-            <button className={styles.botonIniciar} onClick={onIniciar} type="button">
-              <Play size={20} />
-              <span>Reanudar</span>
-            </button>
-            <button className={styles.botonDetener} onClick={onDetener} type="button">
-              <Square size={18} />
-              <span>Detener</span>
-            </button>
-          </>
+        {enCurso && (
+          <button className={styles.botonDetener} onClick={onDetener} type="button">
+            <Square size={18} />
+            <span>Detener</span>
+          </button>
         )}
       </div>
     </div>

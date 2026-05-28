@@ -279,9 +279,10 @@ public class Solucion {
     }
 
     public double getPorcentajeCumplimientoPlazo() {
-        int conRuta = contarEnviosConRuta();
-        if (conRuta == 0) return 0.0;
-        return 100.0 * (conRuta - contarViolacionesPlazo()) / conRuta;
+        int total = getTotalEnvios();
+        if (total == 0) return 0.0;
+        int entregadosATiempo = contarEnviosConRuta() - contarViolacionesPlazo();
+        return 100.0 * entregadosATiempo / total;
     }
 
     public double getEscalasPromedio() {

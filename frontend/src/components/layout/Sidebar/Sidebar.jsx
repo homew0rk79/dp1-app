@@ -6,7 +6,6 @@ import {
   PlaneTakeoff,
   AlertTriangle,
   Play,
-  Pause,
   Square,
   RotateCcw,
   ChevronLeft,
@@ -21,7 +20,7 @@ import { getColorSemaforo, COLORES_SEMAFORO } from '../../../utils/semaforo'
 import useConfiguracionStore from '../../../store/configuracionStore'
 import { ESCENARIOS, ETIQUETAS_ESCENARIO } from '../../../constants/escenarios'
 import { DURACIONES_PERIODO } from '../../../constants/restricciones'
-import usePlanificadorWS from '../../../hooks/usePlanificadorWS'
+import usePlanificadorStore from '../../../store/planificadorStore'
 import { simulacionService } from '../../../services/simulacionService'
 import styles from './Sidebar.module.css'
 
@@ -46,21 +45,27 @@ function Sidebar() {
     tiempoSegundos,
     manifest,
     tiempoAnimacion,
+    playingAnimacion,
     setEscenario,
     setEstado,
     setColapso,
     setParametros,
     resetear,
     incrementarTiempo,
+    clearManifest,
+    setTiempoAnimacion,
+    setPlayingAnimacion,
   } = useSimulacionStore()
 
-  const { progreso, snapshot, completado } = usePlanificadorWS()
+  const progreso = usePlanificadorStore((s) => s.progreso)
+  const snapshot = usePlanificadorStore((s) => s.snapshot)
+  const completado = usePlanificadorStore((s) => s.completado)
+  const resetPlanificador = usePlanificadorStore((s) => s.resetPlanificador)
 
   // Sincronizar estado local con eventos del backend
   useEffect(() => {
     if (!progreso) return
-    if (progreso.estado === 'COMPLETADO') setEstado('finalizado')
-    if (progreso.estado === 'ERROR')      setEstado('finalizado')
+    if (progreso.estado) setEstado(progreso.estado)
   }, [progreso, setEstado])
 
   // Aeropuertos en tiempo real (desde snapshot WS) o lista vacía
@@ -138,7 +143,7 @@ function Sidebar() {
   ]
 
   useEffect(() => {
-    if (estadoEjecucion === 'corriendo') {
+    if (estadoEjecucion === 'CARGANDO' || estadoEjecucion === 'PLANIFICANDO') {
       intervalRef.current = setInterval(incrementarTiempo, 1000)
     } else {
       clearInterval(intervalRef.current)
@@ -148,31 +153,74 @@ function Sidebar() {
 
   async function handleIniciar() {
     if (!escenarioActivo) return
+    if (manifest) {
+      if (tiempoAnimacion >= manifest.duracionTotalMinutos) {
+        setTiempoAnimacion(0)
+      }
+      setPlayingAnimacion(true)
+      navigate('/visualizador')
+      return
+    }
+
     try {
+      clearInterval(intervalRef.current)
+      resetPlanificador()
+      clearManifest()
+      setColapso(false)
+      setEstado('CARGANDO')
       await simulacionService.iniciar({
         escenario: escenarioActivo,
-        fechaInicio: '2026-01-02',
+        fechaInicio: parametros.fechaInicio,
         numDias: parametros.duracionPeriodo,
       })
-      setEstado('corriendo')
       navigate('/visualizador')
     } catch (err) {
+      try {
+        const estadoRes = await simulacionService.obtenerEstado()
+        setEstado(estadoRes.data?.estado ?? 'ERROR')
+      } catch (estadoErr) {
+        console.error('No se pudo sincronizar el estado del backend:', estadoErr)
+        setEstado('ERROR')
+      }
       console.error('Error al iniciar simulación:', err)
     }
   }
 
-  function handleDetener() {
+  async function handleDetener() {
     clearInterval(intervalRef.current)
-    setEstado('finalizado')
-    setColapso(false)
+    try {
+      const estadoRes = await simulacionService.obtenerEstado()
+      setEstado(estadoRes.data?.estado ?? 'ERROR')
+    } catch (err) {
+      console.error('No se pudo sincronizar el estado del backend:', err)
+      setEstado('ERROR')
+    }
   }
 
-  const esIdle    = estadoEjecucion === 'idle' || estadoEjecucion === 'finalizado'
-  const corriendo = estadoEjecucion === 'corriendo'
-  const pausado   = estadoEjecucion === 'pausado'
-  const enCurso   = corriendo || pausado
+  function handleNuevaSimulacion() {
+    clearInterval(intervalRef.current)
+    resetPlanificador()
+    resetear()
+  }
 
-  const badgeEscenario = enCurso ? 'verde' : escenarioActivo ? 'info' : 'info'
+  function handleSeleccionEscenario(valor) {
+    if (enCurso) return
+    resetPlanificador()
+    clearManifest()
+    setColapso(false)
+    setEstado('IDLE')
+    setEscenario(valor || null)
+  }
+
+  const cargando = estadoEjecucion === 'CARGANDO'
+  const planificando = estadoEjecucion === 'PLANIFICANDO'
+  const completadoEstado = estadoEjecucion === 'COMPLETADO'
+  const errorEstado = estadoEjecucion === 'ERROR'
+  const puedeIniciar = estadoEjecucion === 'IDLE' || errorEstado || Boolean(manifest)
+  const enCurso = cargando || planificando
+  const simulacionEnCurso = Boolean(manifest && playingAnimacion)
+
+  const badgeEscenario = enCurso ? 'verde' : errorEstado ? 'rojo' : 'info'
 
   return (
     <aside className={`${styles.sidebar} ${collapsed ? styles.collapsed : ''}`}>
@@ -205,23 +253,23 @@ function Sidebar() {
           </section>
 
           {/* Barra de progreso mientras corre el algoritmo */}
-          {estadoEjecucion === 'corriendo' && progreso && (
+          {enCurso && progreso && (
             <section className={styles.section}>
-              <h3 className={styles.sectionTitle}>Progreso</h3>
-              <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginBottom: 4 }}>
-                {progreso.mensaje}
-              </div>
-              <div style={{ background: '#1e293b', borderRadius: 4, height: 6 }}>
-                <div style={{
-                  width: `${progreso.porcentaje}%`,
-                  background: '#3b82f6',
-                  height: '100%',
-                  borderRadius: 4,
-                  transition: 'width 0.5s ease',
-                }} />
-              </div>
-              <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: 3, textAlign: 'right' }}>
-                {progreso.porcentaje}%
+              <h3 className={styles.sectionTitle}>Procesando</h3>
+              <div className={styles.loadingPanel}>
+                <div className={styles.loadingDots}>
+                  <span className={styles.dot} />
+                  <span className={styles.dot} />
+                  <span className={styles.dot} />
+                </div>
+                <p className={styles.loadingMensaje}>{progreso.mensaje}</p>
+                <div className={styles.loadingBarra}>
+                  <div
+                    className={styles.loadingBarraFill}
+                    style={{ width: `${progreso.porcentaje}%` }}
+                  />
+                </div>
+                <span className={styles.loadingPct}>{progreso.porcentaje}%</span>
               </div>
             </section>
           )}
@@ -269,7 +317,7 @@ function Sidebar() {
                 <select
                   className={styles.simSelect}
                   value={escenarioActivo ?? ''}
-                  onChange={(e) => !enCurso && setEscenario(e.target.value || null)}
+                  onChange={(e) => handleSeleccionEscenario(e.target.value)}
                   disabled={enCurso}
                 >
                   <option value="">— Seleccionar —</option>
@@ -278,6 +326,22 @@ function Sidebar() {
                   ))}
                 </select>
               </div>
+
+              {/* Fecha de inicio (PERIODO y DIA_A_DIA) */}
+              {escenarioActivo !== ESCENARIOS.COLAPSO && escenarioActivo !== null && (
+                <div className={styles.simField}>
+                  <label className={styles.simLabel}>Fecha de inicio</label>
+                  <input
+                    type="date"
+                    className={styles.simSelect}
+                    min={FECHA_INICIO_DATOS}
+                    max={FECHA_FIN_DATOS}
+                    value={parametros.fechaInicio}
+                    onChange={(e) => setParametros({ fechaInicio: e.target.value })}
+                    disabled={enCurso}
+                  />
+                </div>
+              )}
 
               {/* Duración (solo PERIODO) */}
               {escenarioActivo === ESCENARIOS.PERIODO && (
@@ -299,50 +363,42 @@ function Sidebar() {
               {/* Estado y tiempo */}
               <div className={styles.simEstado}>
                 <span className={`${styles.simEstadoBadge} ${styles[`simEstado--${estadoEjecucion}`]}`}>
-                  {estadoEjecucion === 'idle'       && 'En espera'}
-                  {estadoEjecucion === 'corriendo'  && 'En ejecución'}
-                  {estadoEjecucion === 'pausado'    && 'Pausado'}
-                  {estadoEjecucion === 'finalizado' && 'Finalizado'}
+                  {estadoEjecucion === 'IDLE' && 'En espera'}
+                  {estadoEjecucion === 'CARGANDO' && 'Cargando'}
+                  {estadoEjecucion === 'PLANIFICANDO' && 'En ejecucion'}
+                  {estadoEjecucion === 'COMPLETADO' && 'Completado'}
+                  {estadoEjecucion === 'ERROR' && 'Error'}
                 </span>
-                {estadoEjecucion !== 'idle' && (
+                {estadoEjecucion !== 'IDLE' && (
                   <span className={styles.simTiempo}>{formatearTiempo(tiempoSegundos ?? 0)}</span>
                 )}
               </div>
 
+              {simulacionEnCurso && (
+                <div className={styles.simEnCurso}>
+                  Simulación en curso...
+                </div>
+              )}
+
               {/* Controles */}
               <div className={styles.simControles}>
-                {esIdle && (
+                {puedeIniciar && (
                   <button
                     className={styles.simBtnIniciar}
                     onClick={handleIniciar}
-                    disabled={!escenarioActivo}
+                    disabled={!escenarioActivo || simulacionEnCurso}
                     type="button"
                   >
                     <Play size={13} strokeWidth={2.5} /> Iniciar
                   </button>
                 )}
-                {corriendo && (
-                  <>
-                    <button className={styles.simBtnSecundario} onClick={() => setEstado('pausado')} type="button">
-                      <Pause size={13} /> Pausar
-                    </button>
-                    <button className={styles.simBtnPeligro} onClick={handleDetener} type="button">
-                      <Square size={13} /> Detener
-                    </button>
-                  </>
+                {enCurso && (
+                  <button className={styles.simBtnPeligro} onClick={handleDetener} type="button">
+                    <Square size={13} /> Detener
+                  </button>
                 )}
-                {pausado && (
-                  <>
-                    <button className={styles.simBtnIniciar} onClick={() => setEstado('corriendo')} type="button">
-                      <Play size={13} strokeWidth={2.5} /> Reanudar
-                    </button>
-                    <button className={styles.simBtnPeligro} onClick={handleDetener} type="button">
-                      <Square size={13} /> Detener
-                    </button>
-                  </>
-                )}
-                {estadoEjecucion === 'finalizado' && (
-                  <button className={styles.simBtnSecundario} onClick={resetear} type="button">
+                {(completadoEstado || errorEstado) && (
+                  <button className={styles.simBtnSecundario} onClick={handleNuevaSimulacion} type="button">
                     <RotateCcw size={13} /> Nueva simulación
                   </button>
                 )}

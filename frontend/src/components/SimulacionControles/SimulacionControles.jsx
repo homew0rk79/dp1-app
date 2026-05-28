@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import styles from './SimulacionControles.module.css'
+import { FECHA_INICIO_SIMULACION_ALGORITMO } from '../../constants/restricciones'
 
 const PRESETS = [
   { label: '×30',  valor: 30 },
@@ -9,10 +10,16 @@ const PRESETS = [
   { label: '1d/s', valor: 1440 },
 ]
 
-function formatTiempo(minutos) {
-  const dia = Math.floor(minutos / 1440) + 1
-  const hh  = String(Math.floor((minutos % 1440) / 60)).padStart(2, '0')
-  const mm  = String(Math.floor(minutos % 60)).padStart(2, '0')
+function formatTiempo(minutos, duracionTotalMinutos) {
+  const limite = Number.isFinite(duracionTotalMinutos) && duracionTotalMinutos > 0
+    ? Math.max(0, duracionTotalMinutos % 1440 === 0
+      ? duracionTotalMinutos - 1
+      : duracionTotalMinutos)
+    : minutos
+  const tiempo = Math.max(0, Math.min(Math.floor(minutos), limite))
+  const dia = Math.floor(tiempo / 1440) + 1
+  const hh  = String(Math.floor((tiempo % 1440) / 60)).padStart(2, '0')
+  const mm  = String(Math.floor(tiempo % 60)).padStart(2, '0')
   return `Día ${dia} · ${hh}:${mm}`
 }
 
@@ -54,7 +61,9 @@ function SimulacionControles({
           {playing ? '⏸' : '▶'}
         </button>
 
-        <span className={styles.tiempo}>{formatTiempo(tiempoDisplay)}</span>
+        <span className={styles.tiempo}>
+          {formatTiempo(tiempoDisplay, manifest.duracionTotalMinutos)}
+        </span>
 
         <input
           type="range"

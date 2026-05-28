@@ -22,8 +22,9 @@ public class RutasController {
 
     @GetMapping("/rutas")
     public List<RutaResumenDTO> getRutas(
-            @RequestParam(defaultValue = "300") int limite) {
-        return service.getRutasResumen(limite);
+            @RequestParam(defaultValue = "300") int limite,
+            @RequestParam(required = false) Long simulacionId) {
+        return service.getRutasResumen(limite, simulacionId);
     }
 
     @GetMapping("/rutas/{id}")
