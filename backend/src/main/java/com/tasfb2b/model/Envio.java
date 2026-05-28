@@ -1,9 +1,19 @@
 package com.tasfb2b.model;
 
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
+@Entity
+@Table(name = "envio")
+@Getter
+@Setter
+@NoArgsConstructor
 public class Envio {
 
     /*
@@ -14,13 +24,15 @@ public class Envio {
      * El aeropuerto origen NO está en la línea: viene del nombre del archivo.
      * Ej: "_envios_EBCI_.txt" → origen = "EBCI"
      */
-
-    private final String id;                  // "000000001"
-    private final String origen;              // "EBCI"  (del nombre del archivo)
-    private final String destino;             // "SUAA"
-    private final LocalDateTime fechaHoraRegistro; // momento en que se registró el envío
-    private final int cantidad;               // número de maletas (1–999)
-    private final String idCliente;           // "0032535"
+    @Id
+    @Column(name = "id_envio")
+    private String id;                  // ID global: origen + "-" + id original
+    private String idOriginal;          // "000000001"
+    private String origen;              // "EBCI"  (del nombre del archivo)
+    private String destino;             // "SUAA"
+    private LocalDateTime fechaHoraRegistro; // momento en que se registró el envío
+    private int cantidad;               // número de maletas (1–999)
+    private String idCliente;           // "0032535"
 
     // Estado durante la ejecución del algoritmo
     private boolean entregado;
@@ -40,7 +52,8 @@ public class Envio {
                  String fechaStr, String hhStr, String mmStr,
                  String cantidadStr, String idCliente) {
 
-        this.id = id;
+        this.idOriginal = id;
+        this.id = origen + "-" + id;
         this.origen = origen;
         this.destino = destino;
         this.idCliente = idCliente;

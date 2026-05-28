@@ -1,8 +1,10 @@
+import { useEffect, useState } from 'react'
 import { Plane, Warehouse } from 'lucide-react'
 import GraficoBarras from '../../components/reportes/GraficoBarras/GraficoBarras'
 import styles from './ReportesPage.module.css'
 import { getColorSemaforo } from '../../utils/semaforo'
 import useConfiguracionStore from '../../store/configuracionStore'
+import { reportesService } from '../../services/reportesService'
 
 const MOCK_OCUPACION = {
   DIA_A_DIA: {
@@ -62,7 +64,8 @@ const MOCK_OCUPACION = {
 }
 
 function pct(actual, max) {
-  return Math.round((actual / max) * 100)
+  if (!max) return 0
+  return Math.min(100, Math.round((actual / max) * 100))
 }
 
 function BarraOcupacion({ pct: p, color }) {
@@ -81,7 +84,21 @@ function BarraOcupacion({ pct: p, color }) {
 
 function ReporteOcupacion({ escenario }) {
   const rangosSemaforo = useConfiguracionStore((s) => s.rangosSemaforo)
-  const datos = MOCK_OCUPACION[escenario] ?? MOCK_OCUPACION.DIA_A_DIA
+  const [datosReales, setDatosReales] = useState(null)
+
+  useEffect(() => {
+    let activo = true
+    reportesService.getOcupacion()
+      .then(({ data }) => {
+        if (activo && data) setDatosReales(data)
+      })
+      .catch((error) => console.error('No se pudo cargar reporte de ocupacion:', error))
+    return () => {
+      activo = false
+    }
+  }, [])
+
+  const datos = datosReales ?? MOCK_OCUPACION[escenario] ?? MOCK_OCUPACION.DIA_A_DIA
 
   const datosGraficoVuelos = datos.vuelos.map((v) => ({
     etiqueta: v.id,

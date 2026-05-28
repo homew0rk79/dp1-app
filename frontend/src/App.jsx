@@ -6,10 +6,12 @@ import GestionRutasPage from './pages/GestionRutas/GestionRutasPage'
 import DetalleRuta from './pages/GestionRutas/DetalleRuta'
 import ReportesPage from './pages/Reportes/ReportesPage'
 import ConfiguracionPage from './pages/Configuracion/ConfiguracionPage'
+import PlanificadorWSListener from './components/PlanificadorWSListener'
 
 function App() {
   return (
     <BrowserRouter>
+      <PlanificadorWSListener />
       <Layout>
         <Routes>
           <Route path="/" element={<Navigate to="/visualizador" replace />} />

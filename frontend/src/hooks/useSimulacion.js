@@ -22,17 +22,7 @@ function useSimulacion() {
       escenario: escenarioActivo,
       ...parametros,
     })
-    setEstado('corriendo')
-  }
-
-  const pausar = async () => {
-    await simulacionService.pausar()
-    setEstado('pausado')
-  }
-
-  const detener = async () => {
-    await simulacionService.detener()
-    setEstado('finalizado')
+    setEstado('CARGANDO')
   }
 
   return {
@@ -44,8 +34,6 @@ function useSimulacion() {
     setParametros,
     setColapso,
     iniciar,
-    pausar,
-    detener,
     resetear,
   }
 }

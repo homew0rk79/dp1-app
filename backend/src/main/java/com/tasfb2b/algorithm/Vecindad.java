@@ -110,6 +110,7 @@ public class Vecindad {
         // Construir la nueva ruta: mismo hub sequence, primer vuelo diferente
         Ruta rutaNueva = construirRutaConPrimerVuelo(envio, rutaActual, siguiente);
         if (rutaNueva == null) return null;
+        if (!rutaNueva.cumplePlazoMaximo()) return null;
 
         return new Movimiento(claveEnvio, rutaActual, rutaNueva);
     }
@@ -213,6 +214,7 @@ public class Vecindad {
         Ruta rutaNueva = new Ruta(envio);
         rutaNueva.agregarVuelo(v1);
         rutaNueva.agregarVuelo(v2);
+        if (!rutaNueva.cumplePlazoMaximo()) return null;
 
         return new Movimiento(claveEnvio, rutaActual, rutaNueva);
     }

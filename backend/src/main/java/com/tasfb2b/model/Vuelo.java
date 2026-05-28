@@ -1,12 +1,25 @@
 package com.tasfb2b.model;
 
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "vuelo")
+@Getter
+@Setter
+@NoArgsConstructor
 public class Vuelo {
 
-    private final String origen;          // Código ICAO origen
-    private final String destino;         // Código ICAO destino
-    private final int salidaMinutos;      // Hora de salida en minutos desde medianoche
-    private final int llegadaMinutos;     // Hora de llegada en minutos desde medianoche
-    private final int capacidadMax;       // Máximo de maletas que admite el vuelo
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String origen;          // Código ICAO origen
+    private String destino;         // Código ICAO destino
+    private int salidaMinutos;      // Hora de salida en minutos desde medianoche
+    private int llegadaMinutos;     // Hora de llegada en minutos desde medianoche
+    private int capacidadMax;       // Máximo de maletas que admite el vuelo
 
     // Ocupación dinámica: maletas ya asignadas a este vuelo
     private int ocupacion;

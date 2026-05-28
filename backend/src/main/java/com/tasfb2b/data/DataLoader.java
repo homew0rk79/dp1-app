@@ -9,6 +9,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.regex.*;
 
@@ -21,6 +22,8 @@ import java.util.regex.*;
  *                    XXXXXXXXX-AAAAMMDD-HH-MM-DEST-CCC-IIIIIII
  */
 public class DataLoader {
+
+    private static final DateTimeFormatter FMT_FECHA = DateTimeFormatter.BASIC_ISO_DATE;
 
     private final Path rutaAeropuertos;
     private final Path rutaVuelos;
@@ -310,10 +313,47 @@ public class DataLoader {
         return todos;
     }
 
+    public long contarEnviosPorPeriodo(LocalDate fechaInicio, int numDias) throws IOException {
+        String desde = fechaInicio.format(FMT_FECHA);
+        String hasta = fechaInicio.plusDays(numDias).format(FMT_FECHA);
+        long total = 0;
+
+        File[] archivos = directorioEnvios.toFile().listFiles(
+            (dir, nombre) -> nombre.startsWith("_envios_") && nombre.endsWith("_.txt")
+        );
+
+        if (archivos == null || archivos.length == 0) {
+            System.err.println("[DataLoader] No se encontraron archivos de envios en: " + directorioEnvios);
+            return total;
+        }
+
+        for (File archivo : archivos) {
+            try (BufferedReader br = new BufferedReader(
+                    new InputStreamReader(new FileInputStream(archivo), StandardCharsets.US_ASCII))) {
+
+                String linea;
+                while ((linea = br.readLine()) != null) {
+                    linea = linea.trim();
+                    if (linea.length() < 18) continue;
+
+                    String fecha = linea.substring(10, 18);
+                    if (fecha.compareTo(hasta) >= 0) break;
+                    if (fecha.compareTo(desde) >= 0 && fecha.compareTo(hasta) < 0) {
+                        total++;
+                    }
+                }
+            }
+        }
+
+        return total;
+    }
+
     private int cargarEnviosDeArchivoPorPeriodo(File archivo, String origen,
                                                  List<Envio> destino,
                                                  LocalDate desde, LocalDate hasta) throws IOException {
         int contador = 0;
+        String desdeStr = desde.format(FMT_FECHA);
+        String hastaStr = hasta.format(FMT_FECHA);
 
         try (BufferedReader br = new BufferedReader(
                 new InputStreamReader(new FileInputStream(archivo), StandardCharsets.US_ASCII))) {
@@ -322,6 +362,11 @@ public class DataLoader {
             while ((linea = br.readLine()) != null) {
                 linea = linea.trim();
                 if (linea.isEmpty()) continue;
+
+                if (linea.length() < 18) continue;
+                String fechaLinea = linea.substring(10, 18);
+                if (fechaLinea.compareTo(hastaStr) >= 0) break;
+                if (fechaLinea.compareTo(desdeStr) < 0) continue;
 
                 Envio envio = parsearLineaEnvio(linea, origen);
                 if (envio == null) continue;

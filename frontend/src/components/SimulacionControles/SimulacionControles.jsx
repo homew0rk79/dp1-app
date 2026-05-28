@@ -10,16 +10,17 @@ const PRESETS = [
   { label: '1d/s', valor: 1440 },
 ]
 
-const [ay, am, ad] = FECHA_INICIO_SIMULACION_ALGORITMO.split('-').map(Number)
-const BASE_ALGORITMO = new Date(ay, am - 1, ad)
-
-function formatTiempo(minutos) {
-  const dt = new Date(BASE_ALGORITMO.getTime() + minutos * 60000)
-  const dd = String(dt.getDate()).padStart(2, '0')
-  const mm = String(dt.getMonth() + 1).padStart(2, '0')
-  const hh = String(dt.getHours()).padStart(2, '0')
-  const mi = String(dt.getMinutes()).padStart(2, '0')
-  return `${dd}/${mm}/${dt.getFullYear()} · ${hh}:${mi}`
+function formatTiempo(minutos, duracionTotalMinutos) {
+  const limite = Number.isFinite(duracionTotalMinutos) && duracionTotalMinutos > 0
+    ? Math.max(0, duracionTotalMinutos % 1440 === 0
+      ? duracionTotalMinutos - 1
+      : duracionTotalMinutos)
+    : minutos
+  const tiempo = Math.max(0, Math.min(Math.floor(minutos), limite))
+  const dia = Math.floor(tiempo / 1440) + 1
+  const hh  = String(Math.floor((tiempo % 1440) / 60)).padStart(2, '0')
+  const mm  = String(Math.floor(tiempo % 60)).padStart(2, '0')
+  return `Día ${dia} · ${hh}:${mm}`
 }
 
 function SimulacionControles({
@@ -60,7 +61,9 @@ function SimulacionControles({
           {playing ? '⏸' : '▶'}
         </button>
 
-        <span className={styles.tiempo}>{formatTiempo(tiempoDisplay)}</span>
+        <span className={styles.tiempo}>
+          {formatTiempo(tiempoDisplay, manifest.duracionTotalMinutos)}
+        </span>
 
         <input
           type="range"

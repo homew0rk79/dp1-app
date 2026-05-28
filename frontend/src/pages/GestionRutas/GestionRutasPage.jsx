@@ -22,7 +22,7 @@ import Semaforo from '../../components/common/Semaforo/Semaforo'
 import Badge from '../../components/common/Badge/Badge'
 import { obtenerRutas, obtenerDetalleRuta } from '../../services/rutasService'
 import useConfiguracionStore from '../../store/configuracionStore'
-import usePlanificadorWS from '../../hooks/usePlanificadorWS'
+import usePlanificadorStore from '../../store/planificadorStore'
 import { getColorSemaforo } from '../../utils/semaforo'
 import styles from './GestionRutasModule.module.css'
 
@@ -78,7 +78,7 @@ function varianteBarra(cumplimiento) {
 function GestionRutasPage() {
   const navigate = useNavigate()
   const rangosSemaforo = useConfiguracionStore((s) => s.rangosSemaforo)
-  const { snapshot, completado } = usePlanificadorWS()
+  const snapshot = usePlanificadorStore((s) => s.snapshot)
   const [rutas, setRutas] = useState([])
   const [cargando, setCargando] = useState(true)
   const [detalle, setDetalle] = useState(null)

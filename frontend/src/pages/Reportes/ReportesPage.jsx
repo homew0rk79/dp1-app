@@ -1,9 +1,10 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Download, TrendingUp, Plane, Cpu, Activity } from 'lucide-react'
 import { ESCENARIOS, ETIQUETAS_ESCENARIO } from '../../constants/escenarios'
 import ReporteDesempeno from './ReporteDesempeno'
 import ReporteOcupacion from './ReporteOcupacion'
 import ReporteAlgoritmos from './ReporteAlgoritmos'
+import { reportesService } from '../../services/reportesService'
 import styles from './ReportesPage.module.css'
 
 const TABS = [
@@ -50,8 +51,21 @@ function KpiCard({ titulo, valor, sub, icono: Icono, variante = '' }) {
 function ReportesPage() {
   const [escenario, setEscenario] = useState(ESCENARIOS.DIA_A_DIA)
   const [tabActiva, setTabActiva] = useState('desempeno')
+  const [resumenReal, setResumenReal] = useState(null)
 
-  const resumen = useMemo(() => MOCK_RESUMEN[escenario], [escenario])
+  useEffect(() => {
+    let activo = true
+    reportesService.getResumen()
+      .then(({ data }) => {
+        if (activo && data) setResumenReal(data)
+      })
+      .catch((error) => console.error('No se pudo cargar resumen real de reportes:', error))
+    return () => {
+      activo = false
+    }
+  }, [])
+
+  const resumen = useMemo(() => resumenReal ?? MOCK_RESUMEN[escenario], [escenario, resumenReal])
   const cumplColor = resumen.cumplimiento >= 85 ? 'verde' : resumen.cumplimiento >= 60 ? 'ambar' : 'rojo'
 
   return (

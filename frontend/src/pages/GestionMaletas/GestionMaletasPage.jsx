@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Search,
   Plus,
@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 
 import { ESTADOS_ENVIO } from '../../constants/estados'
+import { maletasService } from '../../services/maletasService'
 import styles from './GestionMaletasModule.module.css'
 
 const ENVIOS_INICIALES = [
@@ -454,6 +455,36 @@ function GestionMaletasPage() {
   const [modalMode, setModalMode] = useState(null) // 'crear' | 'editar' | 'eliminar'
   const [formData, setFormData] = useState(FORM_VACIO)
   const [envioEliminar, setEnvioEliminar] = useState(null)
+  const [cargandoDatos, setCargandoDatos] = useState(true)
+  const [origenDatos, setOrigenDatos] = useState('mock')
+
+  useEffect(() => {
+    let activo = true
+
+    async function cargarEnviosReales() {
+      try {
+        const { data } = await maletasService.listar()
+        if (!activo) return
+        if (Array.isArray(data) && data.length > 0) {
+          setEnvios(data)
+          setSelected(data[0])
+          setOrigenDatos('backend')
+        } else {
+          setOrigenDatos('sin-resultados')
+        }
+      } catch (error) {
+        console.error('No se pudieron cargar envios reales desde backend:', error)
+        if (activo) setOrigenDatos('error')
+      } finally {
+        if (activo) setCargandoDatos(false)
+      }
+    }
+
+    cargarEnviosReales()
+    return () => {
+      activo = false
+    }
+  }, [])
 
   const aerolineas = useMemo(
     () => ['Todas', ...new Set(envios.map((e) => e.aerolinea))],
@@ -631,7 +662,11 @@ function GestionMaletasPage() {
             <div className={styles.headerTextos}>
               <h1 className={styles.titulo}>Gestión Operativa de Maletas</h1>
               <p className={styles.subtitulo}>
-                Registro, monitoreo y seguimiento de envíos B2B dentro de la red Tasf.B2B.
+                {cargandoDatos
+                  ? 'Cargando envios reales desde backend...'
+                  : origenDatos === 'backend'
+                  ? 'Registro, monitoreo y seguimiento de envios planificados desde backend.'
+                  : 'Registro, monitoreo y seguimiento de envios B2B dentro de la red Tasf.B2B.'}
               </p>
             </div>
 

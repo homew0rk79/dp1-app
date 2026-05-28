@@ -1,6 +1,7 @@
 import api from './api'
 
 export const reportesService = {
+  getResumen: () => api.get('/reportes/resumen'),
   getDesempeno: () => api.get('/reportes/desempeno'),
   getOcupacion: () => api.get('/reportes/ocupacion'),
   getAlgoritmos: () => api.get('/reportes/algoritmos'),

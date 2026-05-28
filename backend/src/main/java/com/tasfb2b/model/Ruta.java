@@ -1,10 +1,20 @@
 package com.tasfb2b.model;
 
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+@Entity
+@Table(name = "ruta")
+@Getter
+@Setter
+@NoArgsConstructor
 public class Ruta {
 
     /*
@@ -18,8 +28,29 @@ public class Ruta {
      * tiempoTotal incluye tanto los vuelos como las esperas en escalas.
      */
 
-    private final Envio envio;
-    private final List<Vuelo> vuelos;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_simulacion")
+    private Simulacion simulacion;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_envio")
+    private Envio envio;
+
+    @Transient
+    private List<Vuelo> vuelos;
+
+    private String idEnvioOriginal;
+    private String origen;
+    private String destino;
+    private Integer cantidad = 0;
+    private Integer tiempoTotalMinutos = 0;
+    private Integer plazoMaximoMinutos = 0;
+    private String cumplimiento;
+    private String estado;
 
     // true si no se encontró ningún camino viable para este envío
     private boolean sinSolucion;
@@ -28,6 +59,7 @@ public class Ruta {
         this.envio = envio;
         this.vuelos = new ArrayList<>();
         this.sinSolucion = false;
+        sincronizarDatosPersistentes();
     }
 
     // Constructor de copia (necesario para clonar soluciones en Tabu Search)
@@ -44,7 +76,13 @@ public class Ruta {
     // Calcula el tiempo total de entrega en minutos usando tiempos absolutos.
     // tiempoActual arranca en el minuto absoluto de registro y avanza con cada vuelo.
     public int calcularTiempoTotal() {
-        if (sinSolucion || vuelos.isEmpty()) return Integer.MAX_VALUE;
+        if (sinSolucion) return Integer.MAX_VALUE;
+        if (vuelos == null) {
+            return tiempoTotalMinutos != null && tiempoTotalMinutos > 0
+                ? tiempoTotalMinutos
+                : Integer.MAX_VALUE;
+        }
+        if (vuelos.isEmpty()) return Integer.MAX_VALUE;
 
         int tiempoActual = envio.getMinutosRegistro(); // absoluto desde 2026-01-01
         int tiempoInicio = tiempoActual;
@@ -55,6 +93,25 @@ public class Ruta {
             tiempoActual = salidaAbsoluta + vuelo.getDuracionMinutos();
         }
         return tiempoActual - tiempoInicio;
+    }
+
+    public int calcularLlegadaFinalAbs() {
+        if (sinSolucion || vuelos == null || vuelos.isEmpty()) return Integer.MAX_VALUE;
+
+        int tiempoActual = envio.getMinutosRegistro();
+        for (Vuelo vuelo : vuelos) {
+            int salidaAbsoluta = proximaSalidaAbsolutaLocal(
+                tiempoActual, vuelo.getSalidaMinutos(), 30);
+            tiempoActual = salidaAbsoluta + vuelo.getDuracionMinutos();
+        }
+        return tiempoActual;
+    }
+
+    public boolean cumplePlazoMaximo() {
+        if (sinSolucion) return false;
+        int t = calcularTiempoTotal();
+        int plazo = envio != null ? envio.getPlazoMaximoMinutos() : 0;
+        return t != Integer.MAX_VALUE && plazo > 0 && t <= plazo;
     }
 
     // Verifica que la secuencia de vuelos sea coherente:
@@ -76,6 +133,7 @@ public class Ruta {
 
     // Número de escalas intermedias (0 = vuelo directo)
     public int getNumEscalas() {
+        if (vuelos == null) return 0;
         return Math.max(0, vuelos.size() - 1);
     }
 
@@ -91,7 +149,7 @@ public class Ruta {
      */
     public Map<String, int[]> calcularIntervalosAlmacen() {
         Map<String, int[]> intervalos = new LinkedHashMap<>();
-        if (sinSolucion || vuelos.isEmpty()) return intervalos;
+        if (sinSolucion || vuelos == null || vuelos.isEmpty()) return intervalos;
 
         int tiempoActual = envio.getMinutosRegistro();
 
@@ -119,6 +177,26 @@ public class Ruta {
     public List<Vuelo> getVuelos()  { return vuelos; }
     public boolean isSinSolucion()  { return sinSolucion; }
     public void setSinSolucion(boolean sinSolucion) { this.sinSolucion = sinSolucion; }
+
+    public void sincronizarDatosPersistentes() {
+        if (envio == null) return;
+        this.idEnvioOriginal = envio.getIdOriginal();
+        this.origen = envio.getOrigen();
+        this.destino = envio.getDestino();
+        this.cantidad = envio.getCantidad();
+        this.plazoMaximoMinutos = envio.getPlazoMaximoMinutos();
+        this.tiempoTotalMinutos = sinSolucion ? Integer.MAX_VALUE : calcularTiempoTotal();
+        this.estado = sinSolucion ? "sin_ruta" : "en_transito";
+        if (sinSolucion || tiempoTotalMinutos == Integer.MAX_VALUE) {
+            this.cumplimiento = "rojo";
+        } else if (plazoMaximoMinutos == null || plazoMaximoMinutos <= 0 || tiempoTotalMinutos <= plazoMaximoMinutos) {
+            this.cumplimiento = "verde";
+        } else if (tiempoTotalMinutos <= plazoMaximoMinutos + 240) {
+            this.cumplimiento = "ambar";
+        } else {
+            this.cumplimiento = "rojo";
+        }
+    }
 
     @Override
     public String toString() {

@@ -115,6 +115,10 @@ public class SolucionInicial {
             tiempoActual  = salidaAbs + vuelo.getDuracionMinutos();
         }
 
+        if (!ruta.cumplePlazoMaximo()) {
+            ruta.setSinSolucion(true);
+        }
+
         return ruta;
     }
 

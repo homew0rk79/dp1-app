@@ -1,15 +1,27 @@
 package com.tasfb2b.model;
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
+@Entity
+@Table(name = "aeropuerto")
+@Getter
+@Setter
+@NoArgsConstructor
 public class Aeropuerto {
 
-    private final String codigo;      // Código ICAO: "SKBO", "EHAM", etc.
-    private final String ciudad;
-    private final String pais;
-    private final String continente;  // "AMERICA", "EUROPA", "ASIA"
-    private final int gmt;            // Huso horario: -5, +2, etc.
-    private final int capacidadMax;   // Máximo de maletas que puede almacenar simultáneamente
-    private final double lat;         // Latitud decimal (positivo = N, negativo = S)
-    private final double lng;         // Longitud decimal (positivo = E, negativo = W)
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id; 
+    private String codigo;      // Código ICAO: "SKBO", "EHAM", etc.
+    private String ciudad;
+    private String pais;
+    private String continente;  // "AMERICA", "EUROPA", "ASIA"
+    private int gmt;            // Huso horario: -5, +2, etc.
+    private int capacidadMax;   // Máximo de maletas que puede almacenar simultáneamente
+    private double lat;         // Latitud decimal (positivo = N, negativo = S)
+    private double lng;         // Longitud decimal (positivo = E, negativo = W)
 
     // Ocupación dinámica: cambia durante la simulación/algoritmo
     private int ocupacionActual;
