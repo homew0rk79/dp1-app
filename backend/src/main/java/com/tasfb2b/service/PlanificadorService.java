@@ -1019,9 +1019,10 @@ public class PlanificadorService {
                 continue;
             }
 
+            // Caso 2: el aeropuerto es destino final → visible solo durante las 24h siguientes a la entrega
             if (envio.getDestino().equals(codigo)) {
                 int llegadaFinal = calcularLlegadaFinal(ruta);
-                if (llegadaFinal != Integer.MAX_VALUE && tiempoMin >= llegadaFinal) {
+                if (llegadaFinal != Integer.MAX_VALUE && tiempoMin >= llegadaFinal && tiempoMin - llegadaFinal <= 1440) {
                     resultado.add(construirDTO(envio,
                             MaletaEnAeropuertoDTO.Estado.ENTREGADA,
                             llegadaFinal, -1, true));

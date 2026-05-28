@@ -174,15 +174,10 @@ function MapaInteractivo() {
 
                   {/* Detalle desplegable de envíos en este aeropuerto */}
                   {manifest && (
-                    <details className={styles.detalleDesplegable}>
-                      <summary className={styles.detalleSummary}>
-                        Ver detalle de maletas
-                      </summary>
-                      <DetalleMaletasAeropuerto
-                        codigo={aeropuerto.codigo}
-                        tiempoMin={Math.floor(tiempoDisplay)}
-                      />
-                    </details>
+                    <DetalleMaletasAeropuerto
+                      codigo={aeropuerto.codigo}
+                      tiempoMin={Math.floor(tiempoDisplay)}
+                    />
                   )}
                 </div>
               </Popup>
