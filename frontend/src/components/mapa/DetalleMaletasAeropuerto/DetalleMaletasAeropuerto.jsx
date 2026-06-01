@@ -99,10 +99,10 @@ function DetalleMaletasAeropuerto({ codigo, tiempoMin = 0 }) {
             </div>
             <div className={styles.tiempos}>
               {m.estado === 'ENTREGADA'
-                ? <>Llegó {formatearMinutosAbs(m.tiempoLlegadaAeropuerto)}</>
+                ? <>Hora de llegada: {formatearMinutosAbs(m.tiempoLlegadaAeropuerto)}</>
                 : <>
-                    Aquí desde {formatearMinutosAbs(m.tiempoLlegadaAeropuerto)}
-                    {' · sale '}{formatearMinutosAbs(m.tiempoSalidaAeropuerto)}
+                    Hora de llegada: {formatearMinutosAbs(m.tiempoLlegadaAeropuerto)}
+                    {' · Hora de salida: '}{formatearMinutosAbs(m.tiempoSalidaAeropuerto)}
                   </>
               }
             </div>
