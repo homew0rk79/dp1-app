@@ -5,6 +5,7 @@ import com.tasfb2b.repository.VueloRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class VueloDbService {
@@ -21,5 +22,9 @@ public class VueloDbService {
 
     public Vuelo guardar(Vuelo vuelo) {
         return vueloRepository.save(vuelo);
+    }
+
+    public Optional<Vuelo> buscarPorRuta(String origen, String destino, int salidaMinutos) {
+        return vueloRepository.findFirstByOrigenAndDestinoAndSalidaMinutos(origen, destino, salidaMinutos);
     }
 }

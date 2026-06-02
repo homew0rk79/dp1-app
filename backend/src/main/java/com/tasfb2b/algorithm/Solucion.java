@@ -28,6 +28,7 @@ public class Solucion {
     private static final double PENALIZACION_PLAZO         =   1_000.0; // por minuto sobre el plazo
     private static final double PENALIZACION_VUELO         =   1_000.0; // por maleta sobre capacidad
     private static final double PENALIZACION_AEROPUERTO    =     500.0; // por maleta sobre capacidad (por día)
+    private static final double PENALIZACION_AEROPUERTO_SOFT =   150.0; // por maleta sobre el 80% de capacidad (por día)
 
     // ── Asignaciones ─────────────────────────────────────────────────────────
     private final Map<String, Ruta> asignaciones;
@@ -182,9 +183,16 @@ public class Solucion {
                 int ocupDespues = ocupAntes + signo * cantidad;
 
                 if (capMax != Integer.MAX_VALUE) {
+                    // Hard penalty: por encima de capacidad
                     int excesAntes   = Math.max(0, ocupAntes   - capMax);
                     int excesDespues = Math.max(0, ocupDespues - capMax);
                     penaltyCapacidad += (double)(excesDespues - excesAntes) * PENALIZACION_AEROPUERTO;
+
+                    // Soft penalty: graduado desde el 80% para incentivar distribución
+                    double umbral      = capMax * 0.80;
+                    double softAntes   = Math.max(0.0, ocupAntes   - umbral);
+                    double softDespues = Math.max(0.0, ocupDespues - umbral);
+                    penaltyCapacidad  += (softDespues - softAntes) * PENALIZACION_AEROPUERTO_SOFT;
                 }
 
                 diasAeropuerto.put(d, Math.max(0, ocupDespues));
@@ -383,10 +391,30 @@ public class Solucion {
         return result;
     }
 
+    /**
+     * Aeropuertos donde la ocupación máxima de algún día supera umbral × capacidadMax.
+     * Ej: umbral=0.80 → aeropuertos al 80%+. Usado por Vecindad para sesgar la muestra.
+     */
+    public Set<String> getAeropuertosSobreCarga(double umbral) {
+        Set<String> resultado = new HashSet<>();
+        for (Map.Entry<String, Map<Integer, Integer>> e : ocupacionDiariaAeropuerto.entrySet()) {
+            int cap = capacidadMaxAeropuertos.getOrDefault(e.getKey(), Integer.MAX_VALUE);
+            if (cap == Integer.MAX_VALUE) continue;
+            boolean sobreCarga = e.getValue().values().stream()
+                .anyMatch(ocup -> ocup > cap * umbral);
+            if (sobreCarga) resultado.add(e.getKey());
+        }
+        return resultado;
+    }
+
     // ── Acceso a mapas internos (solo lectura) ────────────────────────────────
 
     public Map<String, Integer> getOcupacionVuelos() {
         return Collections.unmodifiableMap(ocupacionVuelos);
+    }
+
+    public Map<String, Integer> getCapacidadMaxVuelos() {
+        return Collections.unmodifiableMap(capacidadMaxVuelos);
     }
 
     public Map<String, Map<Integer, Integer>> getOcupacionDiariaAeropuerto() {

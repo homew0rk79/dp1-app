@@ -5,12 +5,14 @@ const usePlanificadorStore = create((set) => ({
   progreso: null,
   snapshot: null,
   completado: null,
+  colapso: null,
   error: null,
 
   setConectado: (conectado) => set({ conectado }),
   setProgreso: (progreso) => set({ progreso }),
   setSnapshot: (snapshot) => set({ snapshot }),
   setCompletado: (completado) => set({ completado }),
+  setColapso: (colapso) => set({ colapso }),
   setError: (error) => set({ error }),
 
   resetPlanificador: () =>
@@ -18,6 +20,7 @@ const usePlanificadorStore = create((set) => ({
       progreso: null,
       snapshot: null,
       completado: null,
+      colapso: null,
       error: null,
     }),
 }))

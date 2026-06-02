@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import useMaletasAeropuerto from '../../../hooks/useMaletasAeropuerto'
+import { FECHA_INICIO_SIMULACION_ALGORITMO } from '../../../constants/restricciones'
 import styles from './DetalleMaletasAeropuerto.module.css'
 
 const PAGE_SIZE = 15
@@ -14,10 +15,14 @@ const ORDEN_ESTADO = ['PENDIENTE_SALIDA', 'EN_HUB', 'ENTREGADA']
 
 function formatearMinutosAbs(min) {
   if (min == null || min < 0) return '—'
-  const dia  = Math.floor(min / 1440) + 1
-  const hh   = Math.floor((min % 1440) / 60).toString().padStart(2, '0')
-  const mm   = (min % 60).toString().padStart(2, '0')
-  return `D${dia} ${hh}:${mm}`
+  const base  = new Date(`${FECHA_INICIO_SIMULACION_ALGORITMO}T00:00:00Z`)
+  const fecha = new Date(base.getTime() + min * 60000)
+  const dd    = fecha.getUTCDate().toString().padStart(2, '0')
+  const mo    = (fecha.getUTCMonth() + 1).toString().padStart(2, '0')
+  const yyyy  = fecha.getUTCFullYear()
+  const hh    = fecha.getUTCHours().toString().padStart(2, '0')
+  const mm    = fecha.getUTCMinutes().toString().padStart(2, '0')
+  return `${dd}/${mo}/${yyyy} ${hh}:${mm}`
 }
 
 function DetalleMaletasAeropuerto({ codigo, tiempoMin = 0 }) {

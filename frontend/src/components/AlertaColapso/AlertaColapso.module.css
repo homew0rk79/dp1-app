@@ -1,0 +1,109 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.panel {
+  background: #141428;
+  border: 1px solid #e74c3c;
+  border-radius: 12px;
+  padding: 2rem;
+  max-width: 480px;
+  width: 90%;
+  box-shadow: 0 0 48px rgba(231, 76, 60, 0.25);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.icono {
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+.titulo {
+  color: #e74c3c;
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.body {
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.badge {
+  display: inline-block;
+  background: #e74c3c;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  width: fit-content;
+}
+
+.descripcion {
+  color: #ddd;
+  font-size: 0.93rem;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.fecha {
+  color: #777;
+  font-size: 0.82rem;
+  margin: 0;
+}
+
+.acciones {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.btnContinuar {
+  flex: 1;
+  padding: 0.7rem 1rem;
+  background: #e74c3c;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btnContinuar:hover {
+  background: #c0392b;
+}
+
+.btnCerrar {
+  padding: 0.7rem 1.1rem;
+  background: transparent;
+  color: #888;
+  border: 1px solid #3a3a4a;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.btnCerrar:hover {
+  color: #ccc;
+  border-color: #666;
+}

@@ -22,4 +22,12 @@ public class TramoRutaDbService {
     public TramoRuta guardar(TramoRuta tramoRuta) {
         return tramoRutaRepository.save(tramoRuta);
     }
+
+    public List<TramoRuta> listarPorRuta(Long rutaId) {
+        return tramoRutaRepository.findByRutaIdOrderByOrdenAsc(rutaId);
+    }
+
+    public List<TramoRuta> listarPorSimulacion(Long simulacionId) {
+        return tramoRutaRepository.findByRutaSimulacionId(simulacionId);
+    }
 }

@@ -60,8 +60,11 @@ public class Vecindad {
                                                int tamanoMuestra) {
         List<Movimiento> candidatos = new ArrayList<>();
 
-        // Muestra aleatoria sin reemplazo
-        List<Envio> muestra = muestrear(todosEnvios, tamanoMuestra);
+        // Muestra sesgada: 60% desde aeropuertos sobrecargados, 40% aleatorio
+        Set<String> saturados = solucion.getAeropuertosSobreCarga(0.80);
+        List<Envio> muestra = saturados.isEmpty()
+            ? muestrear(todosEnvios, tamanoMuestra)
+            : muestrearConSesgo(todosEnvios, tamanoMuestra, solucion, saturados);
 
         for (Envio envio : muestra) {
             Ruta rutaActual = solucion.getRuta(envio);
@@ -247,6 +250,52 @@ public class Vecindad {
     // -------------------------------------------------------------------------
     // Utilidades
     // -------------------------------------------------------------------------
+
+    /**
+     * Muestra sesgada: nPrioritario envíos de aeropuertos sobrecargados + resto aleatorio.
+     * Garantiza que TabuSearch atienda la redistribución de carga en cada iteración.
+     */
+    private List<Envio> muestrearConSesgo(List<Envio> lista, int n,
+                                           Solucion solucion,
+                                           Set<String> saturados) {
+        int size = lista.size();
+        if (n >= size) return lista;
+
+        // Índices de envíos que pasan por aeropuertos saturados
+        List<Integer> idxSaturados = new ArrayList<>();
+        for (int i = 0; i < size; i++) {
+            Ruta ruta = solucion.getRuta(lista.get(i));
+            if (ruta == null || ruta.isSinSolucion() || ruta.getVuelos() == null) continue;
+            for (Vuelo v : ruta.getVuelos()) {
+                if (saturados.contains(v.getOrigen())) {
+                    idxSaturados.add(i);
+                    break;
+                }
+            }
+        }
+
+        int nPrioritario = Math.min(n * 6 / 10, idxSaturados.size());
+        int nAleatorio   = n - nPrioritario;
+
+        Set<Integer> seleccionados = new LinkedHashSet<>(n * 2);
+
+        // Prioritarios: shuffle y tomar los primeros nPrioritario
+        Collections.shuffle(idxSaturados, rng);
+        for (int i = 0; i < nPrioritario; i++) {
+            seleccionados.add(idxSaturados.get(i));
+        }
+
+        // Aleatorios para completar la muestra
+        int intentos = 0;
+        while (seleccionados.size() < n && intentos < n * 5) {
+            seleccionados.add(rng.nextInt(size));
+            intentos++;
+        }
+
+        List<Envio> resultado = new ArrayList<>(seleccionados.size());
+        for (int idx : seleccionados) resultado.add(lista.get(idx));
+        return resultado;
+    }
 
     /**
      * Muestra aleatoria sin reemplazo de tamaño min(n, lista.size()).

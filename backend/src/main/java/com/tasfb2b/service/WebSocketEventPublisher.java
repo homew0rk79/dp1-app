@@ -1,5 +1,6 @@
 package com.tasfb2b.service;
 
+import com.tasfb2b.dto.ColapsoEventDTO;
 import com.tasfb2b.dto.MetricasDTO;
 import com.tasfb2b.dto.ProgresoEventDTO;
 import com.tasfb2b.dto.SnapshotEventDTO;
@@ -9,9 +10,10 @@ import org.springframework.stereotype.Service;
 @Service
 public class WebSocketEventPublisher {
 
-    private static final String TOPIC_PROGRESO  = "/topic/planificacion/progreso";
-    private static final String TOPIC_SNAPSHOT  = "/topic/planificacion/snapshot";
+    private static final String TOPIC_PROGRESO   = "/topic/planificacion/progreso";
+    private static final String TOPIC_SNAPSHOT   = "/topic/planificacion/snapshot";
     private static final String TOPIC_COMPLETADO = "/topic/planificacion/completado";
+    private static final String TOPIC_COLAPSO    = "/topic/planificacion/colapso";
 
     private final SimpMessagingTemplate messaging;
 
@@ -37,5 +39,10 @@ public class WebSocketEventPublisher {
     /** Planificación completada: métricas finales */
     public void publicarCompletado(MetricasDTO metricas) {
         messaging.convertAndSend(TOPIC_COMPLETADO, metricas);
+    }
+
+    /** Colapso detectado: tipo, entidad afectada y descripción */
+    public void publicarColapso(ColapsoEventDTO evento) {
+        messaging.convertAndSend(TOPIC_COLAPSO, evento);
     }
 }

@@ -10,12 +10,21 @@ import { getColorSemaforo, COLORES_SEMAFORO } from '../../../utils/semaforo'
 import { formatearCapacidad } from '../../../utils/formatters'
 import useConfiguracionStore from '../../../store/configuracionStore'
 import usePlanificadorStore from '../../../store/planificadorStore'
+import useSimulacionStore from '../../../store/simulacionStore'
 import useAnimacionTimeline from '../../../hooks/useAnimacionTimeline'
 import { simulacionService } from '../../../services/simulacionService'
+import { FECHA_INICIO_SIMULACION_ALGORITMO } from '../../../constants/restricciones'
 import styles from './MapaInteractivo.module.css'
 
 function MapaInteractivo() {
   const rangosSemaforo = useConfiguracionStore((s) => s.rangosSemaforo)
+  const fechaInicio = useSimulacionStore((s) => s.parametros.fechaInicio)
+
+  const offsetMinutos = (() => {
+    const base = new Date(FECHA_INICIO_SIMULACION_ALGORITMO)
+    const inicio = new Date(fechaInicio || FECHA_INICIO_SIMULACION_ALGORITMO)
+    return Math.round((inicio - base) / 60000)
+  })()
 
   const [aeropuertos, setAeropuertos] = useState([])
   // Ocupación durante el algoritmo (snapshot WS), usada antes de tener manifest
@@ -176,7 +185,7 @@ function MapaInteractivo() {
                   {manifest && (
                     <DetalleMaletasAeropuerto
                       codigo={aeropuerto.codigo}
-                      tiempoMin={Math.floor(tiempoDisplay)}
+                      tiempoMin={Math.floor(tiempoDisplay) + offsetMinutos}
                     />
                   )}
                 </div>

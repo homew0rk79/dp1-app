@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import styles from './SimulacionControles.module.css'
-import { FECHA_INICIO_SIMULACION_ALGORITMO } from '../../constants/restricciones'
+import useSimulacionStore from '../../store/simulacionStore'
 
 const PRESETS = [
   { label: '×30',  valor: 30 },
@@ -10,7 +10,7 @@ const PRESETS = [
   { label: '1d/s', valor: 1440 },
 ]
 
-function formatTiempo(minutos, duracionTotalMinutos) {
+function formatTiempo(minutos, duracionTotalMinutos, fechaInicioStr) {
   const limite = Number.isFinite(duracionTotalMinutos) && duracionTotalMinutos > 0
     ? Math.max(0, duracionTotalMinutos % 1440 === 0
       ? duracionTotalMinutos - 1
@@ -20,7 +20,17 @@ function formatTiempo(minutos, duracionTotalMinutos) {
   const dia = Math.floor(tiempo / 1440) + 1
   const hh  = String(Math.floor((tiempo % 1440) / 60)).padStart(2, '0')
   const mm  = String(Math.floor(tiempo % 60)).padStart(2, '0')
-  return `Día ${dia} · ${hh}:${mm}`
+
+  let fechaStr = ''
+  if (fechaInicioStr) {
+    const [y, mo, d] = fechaInicioStr.split('-').map(Number)
+    const fecha = new Date(y, mo - 1, d + dia - 1)
+    const dd = String(fecha.getDate()).padStart(2, '0')
+    const mes = String(fecha.getMonth() + 1).padStart(2, '0')
+    fechaStr = ` (${dd}/${mes}/${fecha.getFullYear()})`
+  }
+
+  return `Día ${dia}${fechaStr} · ${hh}:${mm}`
 }
 
 function SimulacionControles({
@@ -34,6 +44,7 @@ function SimulacionControles({
   onVelocidad,
 }) {
   const [duracionMin, setDuracionMin] = useState('')
+  const fechaInicio = useSimulacionStore((s) => s.parametros.fechaInicio)
 
   if (!manifest) return null
 
@@ -62,7 +73,7 @@ function SimulacionControles({
         </button>
 
         <span className={styles.tiempo}>
-          {formatTiempo(tiempoDisplay, manifest.duracionTotalMinutos)}
+          {formatTiempo(tiempoDisplay, manifest.duracionTotalMinutos, fechaInicio)}
         </span>
 
         <input
