@@ -21,7 +21,12 @@
       "Bash(Select-Object Name, PSIsContainer)",
       "mcp__plugin_engram_engram__mem_context",
       "mcp__plugin_engram_engram__mem_search",
-      "mcp__plugin_engram_engram__mem_save"
+      "mcp__plugin_engram_engram__mem_save",
+      "Bash(git log *)",
+      "Bash(git fetch *)",
+      "Bash(git stash *)",
+      "Bash(Get-ChildItem *)",
+      "mcp__plugin_engram_engram__mem_get_observation"
     ]
   }
 }

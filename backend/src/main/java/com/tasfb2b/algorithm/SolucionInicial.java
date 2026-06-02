@@ -11,16 +11,14 @@ import java.util.*;
  *
  * Estrategia híbrida por envío:
  *
- *  PRIMARIO — BFS + greedy:
- *    Ruta con mínimas escalas; distribuye carga naturalmente entre vuelos.
- *    Funciona bien para el ~99% de envíos donde el vuelo directo es viable.
+ *  PRIMARIO — BFS con conciencia de capacidad:
+ *    Dijkstra sobre aeropuertos donde el costo = saltos + penalización por carga.
+ *    Penaliza aeropuertos intermedios con >60% de ocupación, prefiriendo rutas
+ *    por aeropuertos menos cargados. Al superar ~110% el desvío vale la pena.
  *
  *  FALLBACK — Dijkstra time-aware:
- *    Se activa solo cuando BFS produce una ruta que viola el SLA del envío
- *    (ej: vuelo directo con duración ~24h dentro del mismo continente).
+ *    Se activa solo cuando el BFS produce una ruta que viola el SLA del envío.
  *    Busca la ruta que minimiza el tiempo de llegada sin importar escalas.
- *    Al aplicarse a muy pocos envíos, no genera la concentración de capacidad
- *    que causaba problemas al usar Dijkstra para todos.
  */
 public class SolucionInicial {
 
@@ -38,7 +36,7 @@ public class SolucionInicial {
 
     /**
      * Construye la solución inicial para todos los envíos dados.
-     * Imprime progreso cada 10.000 envíos para dar visibilidad.
+     * Cada envío se rutea con conciencia de la ocupación acumulada hasta ese momento.
      */
     public Solucion construir(List<Envio> envios) {
         Solucion solucion = new Solucion(capacidadMaxAeropuertos);
@@ -46,7 +44,8 @@ public class SolucionInicial {
         int sinRuta    = 0;
 
         for (Envio envio : envios) {
-            Ruta ruta = construirRuta(envio);
+            Map<String, Integer> ocupacion = solucion.getOcupacionMaximaPorAeropuerto();
+            Ruta ruta = construirRutaConOcupacion(envio, ocupacion);
             solucion.agregarRuta(ruta);
 
             if (ruta.isSinSolucion()) sinRuta++;
@@ -64,10 +63,8 @@ public class SolucionInicial {
     }
 
     /**
-     * Estrategia híbrida para un único envío:
-     *  1. Intenta BFS+greedy.
-     *  2. Si el resultado viola el SLA, prueba Dijkstra como fallback.
-     *  3. Retorna la ruta con menor tiempo de entrega.
+     * API pública — BFS sin conciencia de capacidad.
+     * Mantiene compatibilidad con TabuSearch y otros usos externos.
      */
     public Ruta construirRuta(Envio envio) {
         if (envio.getOrigen().equals(envio.getDestino())) return new Ruta(envio);
@@ -75,16 +72,12 @@ public class SolucionInicial {
         Ruta rutaBFS = construirRutaBFS(envio);
 
         int plazo = envio.getPlazoMaximoMinutos();
-        if (plazo <= 0) return rutaBFS; // sin SLA definido, BFS es suficiente
+        if (plazo <= 0) return rutaBFS;
 
         int tiempoBFS = rutaBFS.isSinSolucion() ? Integer.MAX_VALUE : rutaBFS.calcularTiempoTotal();
-
-        // BFS cumple el SLA: no hace falta Dijkstra
         if (tiempoBFS <= plazo) return rutaBFS;
 
-        // BFS viola el SLA: intentar Dijkstra
         Ruta rutaDijkstra = construirRutaDijkstra(envio);
-
         if (rutaDijkstra.isSinSolucion()) return rutaBFS;
 
         int tiempoDijkstra = rutaDijkstra.calcularTiempoTotal();
@@ -92,7 +85,103 @@ public class SolucionInicial {
     }
 
     // -------------------------------------------------------------------------
-    // BFS + greedy (estrategia primaria)
+    // Construcción con conciencia de capacidad (uso interno en construir())
+    // -------------------------------------------------------------------------
+
+    private Ruta construirRutaConOcupacion(Envio envio, Map<String, Integer> ocupacion) {
+        if (envio.getOrigen().equals(envio.getDestino())) return new Ruta(envio);
+
+        Ruta rutaBFS = construirRutaBFSConCapacidad(envio, ocupacion);
+
+        int plazo = envio.getPlazoMaximoMinutos();
+        if (plazo <= 0) return rutaBFS;
+
+        int tiempoBFS = rutaBFS.isSinSolucion() ? Integer.MAX_VALUE : rutaBFS.calcularTiempoTotal();
+        if (tiempoBFS <= plazo) return rutaBFS;
+
+        Ruta rutaDijkstra = construirRutaDijkstra(envio);
+        if (rutaDijkstra.isSinSolucion()) return rutaBFS;
+
+        int tiempoDijkstra = rutaDijkstra.calcularTiempoTotal();
+        return tiempoDijkstra < tiempoBFS ? rutaDijkstra : rutaBFS;
+    }
+
+    private Ruta construirRutaBFSConCapacidad(Envio envio, Map<String, Integer> ocupacion) {
+        Ruta ruta = new Ruta(envio);
+
+        List<String> secuencia = getRutaCapacidadAware(
+                envio.getOrigen(), envio.getDestino(), ocupacion);
+        if (secuencia.isEmpty()) { ruta.setSinSolucion(true); return ruta; }
+
+        int tiempoActual = envio.getMinutosRegistro();
+
+        for (int i = 0; i < secuencia.size() - 1; i++) {
+            String desde = secuencia.get(i);
+            String hacia = secuencia.get(i + 1);
+
+            Vuelo vuelo = grafo.primerVueloDisponible(desde, hacia, tiempoActual);
+            if (vuelo == null) { ruta.setSinSolucion(true); return ruta; }
+
+            ruta.agregarVuelo(vuelo);
+            int salidaAbs = GrafoVuelos.proximaSalidaAbsoluta(tiempoActual, vuelo.getSalidaMinutos(), 30);
+            tiempoActual  = salidaAbs + vuelo.getDuracionMinutos();
+        }
+
+        return ruta;
+    }
+
+    /**
+     * Dijkstra sobre el grafo de aeropuertos con penalización por carga.
+     * Costo por arco = 1000 (salto base) + penalidad(aeropuerto destino).
+     * Penalidad crece linealmente desde 60% de ocupación:
+     *   - Al 110% equivale a un salto extra → el desvío empieza a valer la pena.
+     *   - Al 160% equivale a dos saltos → aeropuerto prácticamente evitado.
+     */
+    private List<String> getRutaCapacidadAware(String origen, String destino,
+                                                Map<String, Integer> ocupacion) {
+        PriorityQueue<NodoRuta> pq = new PriorityQueue<>(Comparator.comparingDouble(n -> n.costo));
+        Map<String, Double> visitado = new HashMap<>();
+
+        pq.add(new NodoRuta(0.0, origen, null));
+        visitado.put(origen, 0.0);
+
+        while (!pq.isEmpty()) {
+            NodoRuta actual = pq.poll();
+
+            if (actual.aeropuerto.equals(destino)) {
+                List<String> ruta = new ArrayList<>();
+                for (NodoRuta n = actual; n != null; n = n.padre) ruta.add(0, n.aeropuerto);
+                return ruta;
+            }
+
+            if (actual.costo > visitado.getOrDefault(actual.aeropuerto, Double.MAX_VALUE)) continue;
+
+            for (Vuelo v : grafo.getVuelosDesde(actual.aeropuerto)) {
+                String siguiente  = v.getDestino();
+                double penalidad  = calcularPenalidadCapacidad(siguiente, ocupacion);
+                double nuevoCosto = actual.costo + 1000.0 + penalidad;
+
+                if (nuevoCosto < visitado.getOrDefault(siguiente, Double.MAX_VALUE)) {
+                    visitado.put(siguiente, nuevoCosto);
+                    pq.add(new NodoRuta(nuevoCosto, siguiente, actual));
+                }
+            }
+        }
+
+        return Collections.emptyList();
+    }
+
+    private double calcularPenalidadCapacidad(String aeropuerto, Map<String, Integer> ocupacion) {
+        int capMax = capacidadMaxAeropuertos.getOrDefault(aeropuerto, Integer.MAX_VALUE);
+        if (capMax == Integer.MAX_VALUE || capMax == 0) return 0.0;
+        int ocup = ocupacion.getOrDefault(aeropuerto, 0);
+        double ratio = (double) ocup / capMax;
+        if (ratio < 0.60) return 0.0;
+        return (ratio - 0.60) * 2000.0;
+    }
+
+    // -------------------------------------------------------------------------
+    // BFS básico (sin capacidad — para API pública / TabuSearch)
     // -------------------------------------------------------------------------
 
     private Ruta construirRutaBFS(Envio envio) {
@@ -113,10 +202,6 @@ public class SolucionInicial {
             ruta.agregarVuelo(vuelo);
             int salidaAbs = GrafoVuelos.proximaSalidaAbsoluta(tiempoActual, vuelo.getSalidaMinutos(), 30);
             tiempoActual  = salidaAbs + vuelo.getDuracionMinutos();
-        }
-
-        if (!ruta.cumplePlazoMaximo()) {
-            ruta.setSinSolucion(true);
         }
 
         return ruta;
@@ -166,6 +251,22 @@ public class SolucionInicial {
 
         ruta.setSinSolucion(true);
         return ruta;
+    }
+
+    // -------------------------------------------------------------------------
+    // Clases internas
+    // -------------------------------------------------------------------------
+
+    private static final class NodoRuta {
+        final double   costo;
+        final String   aeropuerto;
+        final NodoRuta padre;
+
+        NodoRuta(double costo, String aeropuerto, NodoRuta padre) {
+            this.costo      = costo;
+            this.aeropuerto = aeropuerto;
+            this.padre      = padre;
+        }
     }
 
     private static final class Estado {

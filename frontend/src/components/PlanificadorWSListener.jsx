@@ -14,6 +14,7 @@ function PlanificadorWSListener() {
       setProgreso,
       setSnapshot,
       setCompletado,
+      setColapso,
       setError,
     } = usePlanificadorStore.getState()
 
@@ -38,6 +39,9 @@ function PlanificadorWSListener() {
         })
         client.subscribe('/topic/planificacion/completado', (msg) => {
           parseMessage(msg, setCompletado, 'completado')
+        })
+        client.subscribe('/topic/planificacion/colapso', (msg) => {
+          parseMessage(msg, setColapso, 'colapso')
         })
       },
       onDisconnect: () => setConectado(false),

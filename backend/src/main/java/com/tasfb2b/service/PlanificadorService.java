@@ -89,6 +89,8 @@ public class PlanificadorService {
     private final TransactionTemplate transactionTemplate;
     private volatile Long simulacionActualId = null;
     private volatile int replanificacionesEjecutadas = 0;
+    private volatile boolean ejecutandoColapso = false;
+    private volatile boolean pausadoEnColapso  = false;
 
     public PlanificadorService(
             WebSocketEventPublisher wsPublisher,
@@ -184,6 +186,8 @@ public class PlanificadorService {
         solucionActual = null;
         statsActual = new PlanificacionStats();
         replanificacionesEjecutadas = 0;
+        ejecutandoColapso = false; // detiene loop anterior si estaba pausado
+        pausadoEnColapso  = false;
         LocalDate fechaInicio = parsearFecha(fechaInicioStr);
         Thread t = new Thread(() -> ejecutar(escenario, fechaInicio, numDias), "planificador");
         t.setDaemon(true);
@@ -195,6 +199,11 @@ public class PlanificadorService {
     // =========================================================================
 
     private void ejecutar(String escenario, LocalDate fechaInicio, int numDias) {
+        if ("COLAPSO".equalsIgnoreCase(escenario)) {
+            ejecutarColapso();
+            return;
+        }
+
         Simulacion simulacion = null;
         PlanificacionStats stats = new PlanificacionStats();
         statsActual = stats;
@@ -279,6 +288,11 @@ public class PlanificadorService {
             }
 
             solucionActual = mejor;
+
+            // Detectar y publicar colapso para DIA_A_DIA y PERIODO
+            detectarPrimerColapsoNuevo(mejor, aeropuertos, fechaBase, new HashSet<>())
+                .ifPresent(wsPublisher::publicarColapso);
+
             long inicioPersistencia = System.nanoTime();
             try {
                 guardarRutasEnDb(mejor, simulacion);
@@ -314,6 +328,182 @@ public class PlanificadorService {
             setEstado(Estado.ERROR, progreso, "Error: " + ex.getMessage(), 0);
             ex.printStackTrace();
         }
+    }
+
+    // =========================================================================
+    // Escenario COLAPSO — loop día a día
+    // =========================================================================
+
+    public void continuarColapso() {
+        pausadoEnColapso = false;
+    }
+
+    private void ejecutarColapso() {
+        Simulacion simulacion = null;
+        try {
+            simulacion = simulacionRepository.save(
+                new Simulacion("COLAPSO", PRIMER_DIA_DATOS, 0));
+            simulacionActualId = simulacion.getId();
+            setEstado(Estado.CARGANDO, 5, "Cargando aeropuertos y vuelos...", 0);
+
+            asegurarAeropuertosYVuelosEnDb();
+            Map<String, Aeropuerto> aeropuertos = aeropuertoRepository.findAll().stream()
+                .collect(Collectors.toMap(Aeropuerto::getCodigo, a -> a, (a, b) -> a, LinkedHashMap::new));
+            List<Vuelo> vuelos = vueloRepository.findAll();
+            aeropuertosCargados = aeropuertos;
+            vuelosCargados      = vuelos;
+
+            Map<String, Integer> capAeropuertos = new HashMap<>();
+            aeropuertos.forEach((k, v) -> capAeropuertos.put(k, v.getCapacidadMax()));
+
+            GrafoVuelos grafo = new GrafoVuelos(vuelos);
+            List<Envio> enviosAcumulados = new ArrayList<>();
+            Set<String> yaReportados = new HashSet<>();
+            LocalDate fechaActual = PRIMER_DIA_DATOS;
+            int dia = 0;
+            ejecutandoColapso = true;
+
+            while (ejecutandoColapso) {
+                List<Envio> enviosDia = cargarEnviosDbPorPeriodo(fechaActual, 1);
+                if (enviosDia.isEmpty()) {
+                    setEstado(Estado.COMPLETADO, 100, "Sin más datos — simulación finalizada", 0);
+                    break;
+                }
+
+                for (Envio e : enviosDia) {
+                    Aeropuerto orig = aeropuertos.get(e.getOrigen());
+                    Aeropuerto dest = aeropuertos.get(e.getDestino());
+                    if (orig != null && dest != null) {
+                        boolean mismoC = orig.getContinente().equals(dest.getContinente());
+                        e.setPlazoMaximoMinutos(mismoC ? 1440 : 2880);
+                    }
+                }
+                enviosAcumulados.addAll(enviosDia);
+                dia++;
+
+                setEstado(Estado.PLANIFICANDO, Math.min(10 + dia * 3, 90),
+                    "COLAPSO — " + fechaActual + " | " + enviosAcumulados.size() + " envíos acumulados", 0);
+
+                SolucionInicial si = new SolucionInicial(grafo, capAeropuertos);
+                Solucion inicial = si.construir(enviosAcumulados);
+                publicarSnapshot(inicial, aeropuertos, 0);
+
+                TabuSearch ts = new TabuSearch(grafo, iteraciones, tenencia, muestra);
+                Solucion mejor = ts.ejecutar(inicial, enviosAcumulados, (iter, s) ->
+                    publicarSnapshot(s, aeropuertos, iter));
+
+                solucionActual = mejor;
+                publicarSnapshot(mejor, aeropuertos, -1);
+
+                final LocalDate fechaDia = fechaActual;
+                Optional<ColapsoEventDTO> colapsoOpt =
+                    detectarPrimerColapsoNuevo(mejor, aeropuertos, fechaDia, yaReportados);
+
+                if (colapsoOpt.isPresent()) {
+                    ColapsoEventDTO evento = colapsoOpt.get();
+                    yaReportados.add(evento.getTipo() + ":" + evento.getEntidad());
+                    wsPublisher.publicarColapso(evento);
+                    setEstado(Estado.COMPLETADO, 100,
+                        "Colapso detectado (" + evento.getTipo() + ") en " + fechaDia,
+                        mejor.getCostoTotal());
+
+                    pausadoEnColapso = true;
+                    while (pausadoEnColapso && ejecutandoColapso) {
+                        try { Thread.sleep(300); } catch (InterruptedException ex) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                    }
+                    if (!ejecutandoColapso) break;
+                    setEstado(Estado.PLANIFICANDO, 10, "Continuando simulación...", 0);
+                }
+
+                fechaActual = fechaActual.plusDays(1);
+            }
+
+            if (solucionActual != null && simulacion != null) {
+                guardarMetricasEnSimulacion(simulacion, solucionActual);
+                simulacion.setEstado(Estado.COMPLETADO.name());
+                simulacion.setFechaActualizacion(LocalDateTime.now());
+                simulacionRepository.save(simulacion);
+            }
+            wsPublisher.publicarCompletado(getMetricas());
+
+        } catch (Exception ex) {
+            if (simulacion != null) {
+                simulacion.setEstado(Estado.ERROR.name());
+                simulacion.setFechaActualizacion(LocalDateTime.now());
+                simulacionRepository.save(simulacion);
+            }
+            setEstado(Estado.ERROR, progreso, "Error en COLAPSO: " + ex.getMessage(), 0);
+            ex.printStackTrace();
+        } finally {
+            ejecutandoColapso = false;
+            pausadoEnColapso  = false;
+        }
+    }
+
+    private Optional<ColapsoEventDTO> detectarPrimerColapsoNuevo(
+            Solucion solucion,
+            Map<String, Aeropuerto> aeropuertos,
+            LocalDate fecha,
+            Set<String> yaReportados) {
+
+        // 1. Aeropuertos sobre capacidad
+        for (Map.Entry<String, Map<Integer, Integer>> e : solucion.getOcupacionDiariaAeropuerto().entrySet()) {
+            String codigo = e.getKey();
+            if (yaReportados.contains("AEROPUERTO:" + codigo)) continue;
+            Aeropuerto a = aeropuertos.get(codigo);
+            if (a == null) continue;
+            int cap = a.getCapacidadMax();
+            int maxOcup = e.getValue().values().stream().mapToInt(Integer::intValue).max().orElse(0);
+            if (maxOcup > cap) {
+                int pct = cap > 0 ? Math.round(maxOcup * 100f / cap) : 0;
+                return Optional.of(new ColapsoEventDTO(
+                    "AEROPUERTO", codigo,
+                    String.format("Aeropuerto %s (%s) superó capacidad: %d%% — %d/%d maletas",
+                        codigo, a.getCiudad(), pct, maxOcup, cap),
+                    fecha.toString()
+                ));
+            }
+        }
+
+        // 2. Vuelos sobre capacidad
+        Map<String, Integer> ocupVuelos = solucion.getOcupacionVuelos();
+        Map<String, Integer> capVuelos  = solucion.getCapacidadMaxVuelos();
+        for (Map.Entry<String, Integer> e : ocupVuelos.entrySet()) {
+            String key = e.getKey();
+            if (yaReportados.contains("VUELO:" + key)) continue;
+            Integer cap = capVuelos.get(key);
+            if (cap == null || cap == 0) continue;
+            if (e.getValue() > cap) {
+                String[] parts = key.split("-");
+                String desc = parts.length >= 2
+                    ? String.format("Vuelo %s→%s superó capacidad: %d/%d maletas", parts[0], parts[1], e.getValue(), cap)
+                    : String.format("Vuelo %s superó capacidad: %d/%d maletas", key, e.getValue(), cap);
+                return Optional.of(new ColapsoEventDTO("VUELO", key, desc, fecha.toString()));
+            }
+        }
+
+        // 3. Primer envío que viola SLA
+        for (Ruta ruta : solucion.getRutas()) {
+            if (ruta.isSinSolucion() || ruta.getEnvio() == null) continue;
+            String clave = "SLA:" + ruta.getEnvio().getId();
+            if (yaReportados.contains(clave)) continue;
+            int t = ruta.calcularTiempoTotal();
+            int plazo = ruta.getEnvio().getPlazoMaximoMinutos();
+            if (plazo > 0 && t != Integer.MAX_VALUE && t > plazo) {
+                return Optional.of(new ColapsoEventDTO(
+                    "SLA", ruta.getEnvio().getId(),
+                    String.format("Envío %s superó plazo: %d min (máx %d) — %s→%s",
+                        ruta.getEnvio().getId(), t, plazo,
+                        ruta.getEnvio().getOrigen(), ruta.getEnvio().getDestino()),
+                    fecha.toString()
+                ));
+            }
+        }
+
+        return Optional.empty();
     }
 
     private List<Envio> cargarEnviosSegunEscenario(String escenario,
@@ -384,38 +574,41 @@ public class PlanificadorService {
     private void guardarRutasEnDb(Solucion solucion, Simulacion simulacion) {
         if (solucion == null || simulacion == null) return;
 
+        // Pre-cargar vuelos en memoria para evitar N selects durante el loop
+        Map<String, Vuelo> vuelosPorClave = vueloRepository.findAll().stream()
+            .collect(Collectors.toMap(
+                v -> v.getOrigen() + "|" + v.getDestino() + "|" + v.getSalidaMinutos(),
+                v -> v,
+                (a, b) -> a
+            ));
+
         transactionTemplate.executeWithoutResult(status -> {
             Set<String> enviosGuardados = new HashSet<>();
+            List<TramoRuta> tramosAGuardar = new ArrayList<>();
 
             for (Ruta ruta : solucion.getRutas()) {
-
                 if (ruta.getEnvio() == null) continue;
-
                 String idEnvio = ruta.getEnvio().getId();
-
                 if (enviosGuardados.contains(idEnvio)) continue;
-
                 enviosGuardados.add(idEnvio);
 
                 ruta.setSimulacion(simulacion);
                 ruta.sincronizarDatosPersistentes();
                 Ruta rutaGuardada = rutaRepository.save(ruta);
 
-                int orden = 1;
                 if (ruta.getVuelos() == null) continue;
 
+                int orden = 1;
                 int tiempoActual = ruta.getEnvio().getMinutosRegistro();
                 for (Vuelo vuelo : ruta.getVuelos()) {
                     int salidaAbs = GrafoVuelos.proximaSalidaAbsoluta(
                         tiempoActual, vuelo.getSalidaMinutos(), 30);
                     int llegadaAbs = salidaAbs + vuelo.getDuracionMinutos();
-                    Vuelo vueloDb = vueloRepository
-                        .findFirstByOrigenAndDestinoAndSalidaMinutos(
-                            vuelo.getOrigen(), vuelo.getDestino(), vuelo.getSalidaMinutos())
-                        .orElse(vuelo);
+
+                    String clave = vuelo.getOrigen() + "|" + vuelo.getDestino() + "|" + vuelo.getSalidaMinutos();
+                    Vuelo vueloDb = vuelosPorClave.getOrDefault(clave, vuelo);
 
                     TramoRuta tramo = new TramoRuta();
-
                     tramo.setRuta(rutaGuardada);
                     tramo.setVuelo(vueloDb);
                     tramo.setIdRuta(rutaGuardada.getId());
@@ -428,10 +621,12 @@ public class PlanificadorService {
                     tramo.setCapacidadReservada(ruta.getEnvio().getCantidad());
                     tramo.setEstado("PROGRAMADO");
 
-                    tramoRutaRepository.save(tramo);
+                    tramosAGuardar.add(tramo);
                     tiempoActual = llegadaAbs;
                 }
             }
+
+            tramoRutaRepository.saveAll(tramosAGuardar);
         });
     }
 
@@ -889,7 +1084,7 @@ public class PlanificadorService {
                     diaInicio, duracionVentana)))
             .collect(Collectors.toList());
 
-        return new AnimacionManifestDTO(duracionManifest(maxLlegada, duracionVentana), ocurrencias, aeropuertos);
+        return new AnimacionManifestDTO(duracionManifest(maxLlegada, duracionVentana), 0, ocurrencias, aeropuertos);
     }
 
     private Optional<AnimacionManifestDTO> getAnimacionManifestPersistida() {
@@ -943,6 +1138,7 @@ public class PlanificadorService {
 
         return Optional.of(new AnimacionManifestDTO(
             duracionManifest(maxLlegada, duracionVentana),
+            0,
             ocurrencias,
             aeropuertos
         ));
@@ -1019,9 +1215,10 @@ public class PlanificadorService {
                 continue;
             }
 
+            // Caso 2: el aeropuerto es destino final → visible solo durante las 24h siguientes a la entrega
             if (envio.getDestino().equals(codigo)) {
                 int llegadaFinal = calcularLlegadaFinal(ruta);
-                if (llegadaFinal != Integer.MAX_VALUE && tiempoMin >= llegadaFinal) {
+                if (llegadaFinal != Integer.MAX_VALUE && tiempoMin >= llegadaFinal && tiempoMin - llegadaFinal <= 1440) {
                     resultado.add(construirDTO(envio,
                             MaletaEnAeropuertoDTO.Estado.ENTREGADA,
                             llegadaFinal, -1, true));

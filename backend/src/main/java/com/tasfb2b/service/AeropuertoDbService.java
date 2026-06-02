@@ -5,6 +5,7 @@ import com.tasfb2b.repository.AeropuertoRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class AeropuertoDbService {
@@ -21,5 +22,9 @@ public class AeropuertoDbService {
 
     public Aeropuerto guardar(Aeropuerto aeropuerto) {
         return aeropuertoRepository.save(aeropuerto);
+    }
+
+    public Optional<Aeropuerto> buscarPorCodigo(String codigo) {
+        return aeropuertoRepository.findByCodigo(codigo);
     }
 }

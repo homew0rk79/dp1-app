@@ -7,11 +7,13 @@ import DetalleRuta from './pages/GestionRutas/DetalleRuta'
 import ReportesPage from './pages/Reportes/ReportesPage'
 import ConfiguracionPage from './pages/Configuracion/ConfiguracionPage'
 import PlanificadorWSListener from './components/PlanificadorWSListener'
+import AlertaColapso from './components/AlertaColapso/AlertaColapso'
 
 function App() {
   return (
     <BrowserRouter>
       <PlanificadorWSListener />
+      <AlertaColapso />
       <Layout>
         <Routes>
           <Route path="/" element={<Navigate to="/visualizador" replace />} />
