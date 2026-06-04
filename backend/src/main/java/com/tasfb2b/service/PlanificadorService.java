@@ -4,10 +4,8 @@ import com.tasfb2b.algorithm.GrafoVuelos;
 import com.tasfb2b.algorithm.Solucion;
 import com.tasfb2b.algorithm.SolucionInicial;
 import com.tasfb2b.algorithm.TabuSearch;
-import com.tasfb2b.data.DataLoader;
 import com.tasfb2b.dto.*;
 import com.tasfb2b.model.*;
-import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -112,12 +110,9 @@ public class PlanificadorService {
         this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
-    /** Carga aeropuertos y vuelos al arrancar el servidor para que el mapa los muestre de inmediato. */
-    @PostConstruct
+    /** Cachea datos ya persistidos para que el mapa pueda mostrarlos sin leer archivos locales. */
     public void cargarDatosIniciales() {
         try {
-            long inicioCarga = System.nanoTime();
-            asegurarAeropuertosYVuelosEnDb();
             aeropuertosCargados = aeropuertoRepository.findAll().stream()
                 .collect(Collectors.toMap(Aeropuerto::getCodigo, a -> a, (a, b) -> a, LinkedHashMap::new));
             vuelosCargados = vueloRepository.findAll();
@@ -217,10 +212,10 @@ public class PlanificadorService {
             setEstado(Estado.CARGANDO, 5, "Cargando aeropuertos y vuelos...", 0);
 
             long inicioCarga = System.nanoTime();
-            asegurarAeropuertosYVuelosEnDb();
             Map<String, Aeropuerto> aeropuertos = aeropuertoRepository.findAll().stream()
                 .collect(Collectors.toMap(Aeropuerto::getCodigo, a -> a, (a, b) -> a, LinkedHashMap::new));
             List<Vuelo> vuelos = vueloRepository.findAll();
+            validarDatosBaseCargados(aeropuertos, vuelos);
             aeropuertosCargados = aeropuertos;
             vuelosCargados = vuelos;
             stats.aeropuertosProcesados = aeropuertos.size();
@@ -231,8 +226,8 @@ public class PlanificadorService {
             List<Envio> envios = cargarEnviosSegunEscenario(escenario, fechaBase, dias);
             if (envios.isEmpty()) {
                 throw new IllegalStateException(
-                    "No hay envios en PostgreSQL para " + escenario + " desde " + fechaBase
-                        + " por " + dias + " dia(s). Cargue envios o seleccione un periodo con datos.");
+                    "Falta subir archivo .txt de envios para " + escenario + " desde " + fechaBase
+                        + " por " + dias + " dia(s). Suba los archivos _envios_XXXX_.txt desde Configuracion.");
             }
             stats.totalEnvios = envios.size();
             stats.maletasSimuladas = envios.stream().mapToInt(Envio::getCantidad).sum();
@@ -346,10 +341,10 @@ public class PlanificadorService {
             simulacionActualId = simulacion.getId();
             setEstado(Estado.CARGANDO, 5, "Cargando aeropuertos y vuelos...", 0);
 
-            asegurarAeropuertosYVuelosEnDb();
             Map<String, Aeropuerto> aeropuertos = aeropuertoRepository.findAll().stream()
                 .collect(Collectors.toMap(Aeropuerto::getCodigo, a -> a, (a, b) -> a, LinkedHashMap::new));
             List<Vuelo> vuelos = vueloRepository.findAll();
+            validarDatosBaseCargados(aeropuertos, vuelos);
             aeropuertosCargados = aeropuertos;
             vuelosCargados      = vuelos;
 
@@ -366,7 +361,8 @@ public class PlanificadorService {
             while (ejecutandoColapso) {
                 List<Envio> enviosDia = cargarEnviosDbPorPeriodo(fechaActual, 1);
                 if (enviosDia.isEmpty()) {
-                    setEstado(Estado.COMPLETADO, 100, "Sin más datos — simulación finalizada", 0);
+                    setEstado(Estado.ERROR, 100,
+                        "Falta subir archivo .txt de envios para la fecha " + fechaActual, 0);
                     break;
                 }
 
@@ -630,36 +626,14 @@ public class PlanificadorService {
         });
     }
 
-    private void asegurarAeropuertosYVuelosEnDb() throws Exception {
-        DataLoader loader = new DataLoader(rutaAeropuertos, rutaVuelos, directorioEnvios);
-        if (aeropuertoRepository.count() == 0) {
-            aeropuertoRepository.saveAll(loader.cargarAeropuertos().values());
+    private void validarDatosBaseCargados(Map<String, Aeropuerto> aeropuertos, List<Vuelo> vuelos) {
+        if (aeropuertos == null || aeropuertos.isEmpty()) {
+            throw new IllegalStateException(
+                "Falta subir archivo .txt de aeropuertos. Vaya a Configuracion > Carga manual de datos.");
         }
-        if (vueloRepository.count() == 0) {
-            vueloRepository.saveAll(loader.cargarVuelos());
-        }
-    }
-
-    private void asegurarEnviosEnDb(LocalDate fechaInicio, int numDias) throws Exception {
-        DataLoader loader = new DataLoader(rutaAeropuertos, rutaVuelos, directorioEnvios);
-        List<Envio> envios = (fechaInicio != null && numDias > 0)
-            ? loader.cargarEnviosPorPeriodo(fechaInicio, numDias)
-            : loader.cargarEnvios(-1);
-        envioRepository.saveAll(envios);
-    }
-
-    private void asegurarTodosLosEnviosEnDb() throws Exception {
-        DataLoader loader = new DataLoader(rutaAeropuertos, rutaVuelos, directorioEnvios);
-        List<Envio> enviosArchivo = loader.cargarEnvios(-1);
-        long enviosGlobalesEnDb = envioRepository.countByIdOriginalIsNotNull();
-
-        if (enviosGlobalesEnDb < enviosArchivo.size()) {
-            envioRepository.saveAll(enviosArchivo);
-            System.out.println("[PlanificadorService] Envios completos sincronizados en PostgreSQL: "
-                + enviosArchivo.size());
-        } else {
-            System.out.println("[PlanificadorService] Envios completos ya disponibles en PostgreSQL: "
-                + enviosGlobalesEnDb);
+        if (vuelos == null || vuelos.isEmpty()) {
+            throw new IllegalStateException(
+                "Falta subir archivo .txt de vuelos. Vaya a Configuracion > Carga manual de datos.");
         }
     }
 
@@ -667,30 +641,8 @@ public class PlanificadorService {
         LocalDate fecha = fechaInicio != null ? fechaInicio : LocalDate.of(2026, 1, 2);
         LocalDateTime desde = fecha.atStartOfDay();
         LocalDateTime hasta = fecha.plusDays(numDias).atStartOfDay();
-        long enDbAntes = envioRepository
-            .countByFechaHoraRegistroGreaterThanEqualAndFechaHoraRegistroLessThan(desde, hasta);
-
-        DataLoader loader = new DataLoader(rutaAeropuertos, rutaVuelos, directorioEnvios);
-        long esperadosArchivo = loader.contarEnviosPorPeriodo(fecha, numDias);
-
-        if (esperadosArchivo == 0) {
-            return Collections.emptyList();
-        }
-
-        if (enDbAntes == esperadosArchivo) {
-            System.out.printf(
-                "[PlanificadorService] Periodo %s a %s validado contra archivos: %,d envios. Usando PostgreSQL sin parseo completo.%n",
-                desde, hasta, esperadosArchivo);
-            return envioRepository
-                .findByFechaHoraRegistroGreaterThanEqualAndFechaHoraRegistroLessThan(desde, hasta);
-        }
-
-        System.out.printf(
-            "[PlanificadorService] Periodo %s a %s incompleto en PostgreSQL: %,d en DB vs %,d en archivos. Sincronizando fuente real.%n",
-            desde, hasta, enDbAntes, esperadosArchivo);
-
-        List<Envio> enviosArchivo = loader.cargarEnviosPorPeriodo(fecha, numDias);
-        return envioRepository.saveAll(enviosArchivo);
+        return envioRepository
+            .findByFechaHoraRegistroGreaterThanEqualAndFechaHoraRegistroLessThan(desde, hasta);
     }
 
     private void guardarMetricasEnSimulacion(Simulacion simulacion, Solucion solucion) {

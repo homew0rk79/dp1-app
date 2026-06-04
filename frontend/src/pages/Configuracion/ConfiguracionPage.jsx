@@ -15,8 +15,11 @@ import {
   Database,
   CheckCircle2,
   AlertTriangle,
+  Upload,
+  FileText,
 } from 'lucide-react'
 
+import { configuracionService } from '../../services/configuracionService'
 import styles from './ConfiguracionPage.module.css'
 
 function SectionCard({ icono, titulo, subtitulo, children }) {
@@ -50,6 +53,91 @@ function KpiMini({ titulo, valor, estado = 'neutral' }) {
       <span className={styles.kpiMiniTitulo}>{titulo}</span>
       <strong className={styles.kpiMiniValor}>{valor}</strong>
     </article>
+  )
+}
+
+function ResultadoCarga({ resultado }) {
+  if (!resultado) return null
+  if (resultado.error) {
+    return <div className={`${styles.uploadResult} ${styles.uploadResultError}`}>{resultado.error}</div>
+  }
+  return (
+    <div className={styles.uploadResult}>
+      <strong>{resultado.mensaje}</strong>
+      <span>{resultado.procesados ?? 0} procesados</span>
+      <span>{resultado.insertados ?? 0} insertados</span>
+      <span>{resultado.actualizados ?? 0} actualizados</span>
+    </div>
+  )
+}
+
+function CargaArchivoCard({
+  titulo,
+  descripcion,
+  multiple = false,
+  accept = '.txt',
+  onUpload,
+  ejemplo,
+}) {
+  const [files, setFiles] = useState([])
+  const [cargando, setCargando] = useState(false)
+  const [resultado, setResultado] = useState(null)
+
+  const nombres = files.length > 0
+    ? files.map((file) => file.name).join(', ')
+    : 'Ningun archivo seleccionado'
+
+  async function subir() {
+    if (files.length === 0 || cargando) return
+    setCargando(true)
+    setResultado(null)
+    try {
+      const payload = multiple ? files : files[0]
+      const { data } = await onUpload(payload)
+      setResultado(data)
+    } catch (error) {
+      setResultado({
+        error: error.response?.data?.error || 'No se pudo cargar el archivo. Revisa el formato y la conexion con backend.',
+      })
+    } finally {
+      setCargando(false)
+    }
+  }
+
+  return (
+    <div className={styles.uploadItem}>
+      <div className={styles.uploadInfo}>
+        <div className={styles.uploadTitleRow}>
+          <FileText size={16} />
+          <h3>{titulo}</h3>
+        </div>
+        <p>{descripcion}</p>
+        <span>{ejemplo}</span>
+      </div>
+
+      <label className={styles.uploadDrop}>
+        <input
+          type="file"
+          accept={accept}
+          multiple={multiple}
+          onChange={(e) => setFiles(Array.from(e.target.files || []))}
+        />
+        <Upload size={18} />
+        <span>{nombres}</span>
+      </label>
+
+      <button
+        className={styles.botonPrimario}
+        type="button"
+        onClick={subir}
+        disabled={files.length === 0 || cargando}
+      >
+        <Upload size={15} />
+        <span>{cargando ? 'Cargando...' : 'Subir a PostgreSQL'}</span>
+      </button>
+
+      <ResultadoCarga resultado={resultado} />
+    </div>
   )
 }
 
@@ -395,6 +483,36 @@ function ConfiguracionPage() {
                   />
                   <span>Habilitar carga masiva de datos</span>
                 </label>
+              </div>
+            </SectionCard>
+
+            <SectionCard
+              icono={<Database size={18} />}
+              titulo="Carga manual de datos"
+              subtitulo="Sube archivos .txt y persiste aeropuertos, vuelos y envios directamente en PostgreSQL."
+            >
+              <div className={styles.uploadGrid}>
+                <CargaArchivoCard
+                  titulo="Aeropuertos"
+                  descripcion="Carga el catalogo con codigo ICAO, ciudad, pais, abreviatura, GMT, capacidad y coordenadas."
+                  ejemplo={'Ejemplo: 01 SKBO Bogota Colombia bogo -5 430 Latitude: 04° 42\' 05" N Longitude: 74° 08\' 49" W'}
+                  onUpload={configuracionService.subirAeropuertos}
+                />
+
+                <CargaArchivoCard
+                  titulo="Planes de vuelo"
+                  descripcion="Carga rutas de vuelo con origen, destino, horario de salida/llegada y capacidad."
+                  ejemplo="Formato: ORIG-DEST-HH:MM-HH:MM-CCCC. Ejemplo: SKBO-SEQM-03:34-04:21-0300"
+                  onUpload={configuracionService.subirVuelos}
+                />
+
+                <CargaArchivoCard
+                  titulo="Envios"
+                  descripcion="Carga uno o varios archivos. El origen no viene en la linea: debe venir en el nombre del archivo."
+                  ejemplo="Archivo: _envios_LKPR_.txt. Linea: 000000001-20260102-00-46-LKPR-002-0029281"
+                  multiple
+                  onUpload={configuracionService.subirEnvios}
+                />
               </div>
             </SectionCard>
           </form>
