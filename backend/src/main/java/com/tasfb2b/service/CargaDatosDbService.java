@@ -87,20 +87,14 @@ public class CargaDatosDbService {
     }
 
     public void cargarEnvios() throws IOException {
-        DataLoader loader = new DataLoader(
-                rutaAeropuertos,
-                rutaVuelos,
-                rutaEnvios
-        );
-
-        List<Envio> envios = loader.cargarEnvios(-1);
-        long enviosGlobalesEnDb = envioRepository.countByIdOriginalIsNotNull();
-
-        if (enviosGlobalesEnDb >= envios.size()) {
-            System.out.println("Envios completos ya existen en PostgreSQL: " + enviosGlobalesEnDb);
+        long enviosEnDb = envioRepository.countByIdOriginalIsNotNull();
+        if (enviosEnDb > 0) {
+            System.out.println("Envios ya existen en PostgreSQL: " + enviosEnDb);
             return;
         }
 
+        DataLoader loader = new DataLoader(rutaAeropuertos, rutaVuelos, rutaEnvios);
+        List<Envio> envios = loader.cargarEnvios(-1);
         envioRepository.saveAll(envios);
 
         System.out.println("Envios guardados en PostgreSQL: " + envios.size());

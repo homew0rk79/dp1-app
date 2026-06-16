@@ -9,5 +9,7 @@ export const simulacionService = {
   obtenerManifestAnimacion: () => api.get('/planificacion/animacion'),
   obtenerMaletasEnAeropuerto: (codigo, tiempoMin = 0) =>
     api.get(`/aeropuertos/${codigo}/maletas`, { params: { tiempoMin } }),
+  obtenerOcupacionActual: (tiempoMin = 0) =>
+    api.get('/aeropuertos/ocupacion-actual', { params: { tiempoMin } }),
   continuarColapso: () => api.post('/planificacion/continuar-colapso'),
 }

@@ -30,13 +30,19 @@ public class Movimiento {
     private final Ruta   rutaNueva;
     private final double deltaCosto;
     private final String claveTabu;
+    private final int    tipo; // 1=próximo vuelo, 2=hub alternativo, 3=salida temprana
 
-    public Movimiento(String claveEnvio, Ruta rutaAnterior, Ruta rutaNueva) {
+    public Movimiento(String claveEnvio, Ruta rutaAnterior, Ruta rutaNueva, int tipo) {
         this.claveEnvio    = claveEnvio;
         this.rutaAnterior  = rutaAnterior;
         this.rutaNueva     = rutaNueva;
+        this.tipo          = tipo;
         this.deltaCosto    = calcularDelta();
         this.claveTabu     = claveEnvio + ":" + firmaRuta(rutaAnterior);
+    }
+
+    public Movimiento(String claveEnvio, Ruta rutaAnterior, Ruta rutaNueva) {
+        this(claveEnvio, rutaAnterior, rutaNueva, 0);
     }
 
     /**
@@ -87,6 +93,7 @@ public class Movimiento {
     public Ruta    getRutaNueva()    { return rutaNueva; }
     public double  getDeltaCosto()   { return deltaCosto; }
     public String  getClaveTabu()    { return claveTabu; }
+    public int     getTipo()         { return tipo; }
 
     @Override
     public String toString() {

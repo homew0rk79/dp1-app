@@ -63,13 +63,4 @@ public class PlanificadorController {
         return ResponseEntity.ok(manifest);
     }
 
-    /**
-     * Reanuda el loop de COLAPSO después de que el usuario acepta continuar
-     * simulando tras la alerta de colapso detectado.
-     */
-    @PostMapping("/continuar-colapso")
-    public ResponseEntity<Void> continuarColapso() {
-        service.continuarColapso();
-        return ResponseEntity.ok().build();
-    }
 }

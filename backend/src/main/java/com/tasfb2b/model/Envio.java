@@ -10,7 +10,11 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 @Entity
-@Table(name = "envio")
+@Table(name = "envio", indexes = {
+    @Index(name = "idx_envio_fecha", columnList = "fechaHoraRegistro"),
+    @Index(name = "idx_envio_origen", columnList = "origen"),
+    @Index(name = "idx_envio_destino", columnList = "destino")
+})
 @Getter
 @Setter
 @NoArgsConstructor

@@ -23,6 +23,13 @@ import java.util.*;
  *    como hacia SPIM. Esto redistribuye carga entre vuelos.
  *    Si la ruta ya tiene escalas, probamos una escala diferente.
  *
+ *  TIPO 3 — SALIDA TEMPRANA (aeropuerto saturado):
+ *    Solo actúa cuando el origen del envío está sobre el umbral del 80%.
+ *    Busca el vuelo saliente más temprano desde ese aeropuerto (a cualquier
+ *    destino), y desde ahí la primera conexión disponible al destino final.
+ *    El objetivo es sacar las maletas del almacén saturado lo antes posible
+ *    sin violar el plazo de entrega (cumplePlazoMaximo sigue siendo el filtro).
+ *
  * Por qué muestrear en vez de evaluar todos los envíos:
  *    Con 330K envíos, evaluar la vecindad completa en cada iteración
  *    sería demasiado lento. Tomamos una muestra aleatoria de tamaño
@@ -35,9 +42,12 @@ public class Vecindad {
     private final GrafoVuelos grafo;
     private final Random rng;
 
-    // Hubs candidatos como escala: aeropuertos con muchas conexiones
-    // (se calculan automáticamente del grafo en el constructor)
     private List<String> hubsPrincipales;
+
+    // Contadores acumulados entre todas las iteraciones del Tabu Search
+    private int generados1 = 0;
+    private int generados2 = 0;
+    private int generados3 = 0;
 
     public Vecindad(GrafoVuelos grafo, long semilla) {
         this.grafo = grafo;
@@ -74,11 +84,17 @@ public class Vecindad {
 
             // Tipo 1: próximo vuelo en el primer tramo
             Movimiento mov1 = generarProximoVuelo(envio, rutaActual, claveEnvio);
-            if (mov1 != null) candidatos.add(mov1);
+            if (mov1 != null) { candidatos.add(mov1); generados1++; }
 
             // Tipo 2: hub alternativo
             Movimiento mov2 = generarHubAlternativo(envio, rutaActual, claveEnvio);
-            if (mov2 != null) candidatos.add(mov2);
+            if (mov2 != null) { candidatos.add(mov2); generados2++; }
+
+            // Tipo 3: salida temprana desde aeropuerto saturado
+            if (!saturados.isEmpty()) {
+                Movimiento mov3 = generarSalidaTemprana(envio, rutaActual, claveEnvio, saturados);
+                if (mov3 != null) { candidatos.add(mov3); generados3++; }
+            }
         }
 
         return candidatos;
@@ -115,7 +131,7 @@ public class Vecindad {
         if (rutaNueva == null) return null;
         if (!rutaNueva.cumplePlazoMaximo()) return null;
 
-        return new Movimiento(claveEnvio, rutaActual, rutaNueva);
+        return new Movimiento(claveEnvio, rutaActual, rutaNueva, 1);
     }
 
     /**
@@ -219,7 +235,7 @@ public class Vecindad {
         rutaNueva.agregarVuelo(v2);
         if (!rutaNueva.cumplePlazoMaximo()) return null;
 
-        return new Movimiento(claveEnvio, rutaActual, rutaNueva);
+        return new Movimiento(claveEnvio, rutaActual, rutaNueva, 2);
     }
 
     /**
@@ -245,6 +261,61 @@ public class Vecindad {
             if (tieneConexion) hubs.add(candidato);
         }
         return hubs;
+    }
+
+    // -------------------------------------------------------------------------
+    // Tipo 3: Salida temprana desde aeropuerto saturado
+    // -------------------------------------------------------------------------
+
+    /**
+     * Solo actúa cuando el origen del envío está saturado (≥80% capacidad).
+     * Busca el vuelo saliente más temprano desde ese aeropuerto —a cualquier
+     * destino— que parta antes que el vuelo actual, y desde ahí la primera
+     * conexión disponible al destino final. Garantiza cumplePlazoMaximo().
+     */
+    private Movimiento generarSalidaTemprana(Envio envio, Ruta rutaActual,
+                                              String claveEnvio, Set<String> saturados) {
+        String origen = envio.getOrigen();
+        if (!saturados.contains(origen)) return null;
+        if (rutaActual.isSinSolucion() || rutaActual.getVuelos().isEmpty()) return null;
+
+        String destino = envio.getDestino();
+        int tiempoActual = envio.getMinutosRegistro();
+
+        Vuelo vueloActual = rutaActual.getVuelos().get(0);
+        int salidaActualAbs = GrafoVuelos.proximaSalidaAbsoluta(
+            tiempoActual, vueloActual.getSalidaMinutos(), 30);
+
+        // Vuelo saliente más temprano que parta ANTES que el vuelo actual
+        Vuelo mejorPrimero = null;
+        int mejorSalidaAbs = salidaActualAbs; // umbral: solo interesa algo más temprano
+
+        for (Vuelo v : grafo.getVuelosDesde(origen)) {
+            int salidaAbs = GrafoVuelos.proximaSalidaAbsoluta(tiempoActual, v.getSalidaMinutos(), 30);
+            if (salidaAbs >= mejorSalidaAbs) continue;
+            mejorSalidaAbs = salidaAbs;
+            mejorPrimero = v;
+        }
+
+        if (mejorPrimero == null) return null;
+
+        Ruta rutaNueva = new Ruta(envio);
+        rutaNueva.agregarVuelo(mejorPrimero);
+        int llegada = mejorSalidaAbs + mejorPrimero.getDuracionMinutos();
+
+        if (!mejorPrimero.getDestino().equals(destino)) {
+            Vuelo conexion = grafo.primerVueloDisponible(mejorPrimero.getDestino(), destino, llegada);
+            if (conexion == null) return null;
+            rutaNueva.agregarVuelo(conexion);
+        }
+
+        if (!rutaNueva.cumplePlazoMaximo()) return null;
+
+        return new Movimiento(claveEnvio, rutaActual, rutaNueva, 3);
+    }
+
+    public String getResumenGenerados() {
+        return String.format("T1: %,d  T2: %,d  T3: %,d", generados1, generados2, generados3);
     }
 
     // -------------------------------------------------------------------------

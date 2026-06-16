@@ -1,0 +1,153 @@
+.contenedor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-height: 0;
+}
+
+.controles {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.searchWrap {
+  position: relative;
+  flex: 1;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 7px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 0.3rem 0.5rem 0.3rem 1.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.75rem;
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.searchInput:focus {
+  border-color: var(--color-accent);
+}
+
+.sortBtn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.sortBtn:hover {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.sortActivo {
+  background: var(--color-accent);
+  color: #fff;
+  border-color: var(--color-accent);
+}
+
+.sortActivo:hover {
+  background: var(--color-accent-hover);
+  color: #fff;
+}
+
+.vacio {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  padding: 0.25rem 0;
+}
+
+.lista {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.42rem 0.5rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.12s;
+  gap: 0.4rem;
+}
+
+.item:hover {
+  background: var(--color-bg);
+}
+
+.itemSeleccionado {
+  background: #eff6ff;
+  outline: 1px solid #bfdbfe;
+}
+
+.itemSeleccionado:hover {
+  background: #dbeafe;
+}
+
+.tramo {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.codigo {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-text);
+  font-family: ui-monospace, monospace;
+}
+
+.flecha {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.ocupacion {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.maletas {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.pct {
+  font-size: 0.76rem;
+  font-weight: 700;
+  min-width: 38px;
+  text-align: right;
+}

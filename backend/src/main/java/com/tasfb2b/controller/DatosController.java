@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
@@ -53,5 +54,15 @@ public class DatosController {
             @PathVariable String codigo,
             @RequestParam(defaultValue = "0") int tiempoMin) {
         return ResponseEntity.ok(service.getMaletasEnAeropuerto(codigo, tiempoMin));
+    }
+
+    /**
+     * Ocupación real de todos los aeropuertos en el minuto exacto consultado.
+     * Retorna { "UMMS": 12, "KJFK": 45, ... } con maletas físicamente presentes.
+     */
+    @GetMapping("/aeropuertos/ocupacion-actual")
+    public ResponseEntity<Map<String, Integer>> getOcupacionActual(
+            @RequestParam(defaultValue = "0") int tiempoMin) {
+        return ResponseEntity.ok(service.getOcupacionActual(tiempoMin));
     }
 }
