@@ -76,9 +76,8 @@
   border-color: var(--color-text);
 }
 
-.chip_PENDIENTE_SALIDA.chipActivo { background: #d97706; border-color: #d97706; }
-.chip_EN_HUB.chipActivo           { background: #2563eb; border-color: #2563eb; }
-.chip_ENTREGADA.chipActivo        { background: #16a34a; border-color: #16a34a; }
+.chip_AHORA.chipActivo    { background: #2563eb; border-color: #2563eb; }
+.chip_ENTREGADA.chipActivo { background: #6b7280; border-color: #6b7280; }
 
 .totales {
   font-size: 0.72rem;
@@ -86,6 +85,17 @@
   margin-bottom: 0.35rem;
   padding-bottom: 0.35rem;
   border-bottom: 1px solid var(--color-border, #e5e7eb);
+  line-height: 1.5;
+}
+
+.totalesAhora {
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.totalesEntregadas {
+  color: #9ca3af;
+  font-style: italic;
 }
 
 .lista {
@@ -108,9 +118,14 @@
   border-left: 3px solid #94a3b8;
 }
 
+.itemEntregado {
+  opacity: 0.55;
+  background: rgba(0, 0, 0, 0.012);
+}
+
 .borde_PENDIENTE_SALIDA { border-left-color: #d97706; }
 .borde_EN_HUB           { border-left-color: #2563eb; }
-.borde_ENTREGADA        { border-left-color: #16a34a; }
+.borde_ENTREGADA        { border-left-color: #9ca3af; }
 
 .itemHeader {
   display: flex;
@@ -121,13 +136,38 @@
   color: var(--color-text);
 }
 
+.itemHeaderIzq {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
 .envioId {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.badgeAhora {
+  font-size: 0.62rem;
+  font-weight: 700;
+  background: #2563eb;
+  color: white;
+  border-radius: 4px;
+  padding: 0.05rem 0.3rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .cantidad {
   font-size: 0.7rem;
   background: var(--color-text);
+  color: white;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+}
+
+.cantidadEntregado {
+  font-size: 0.7rem;
+  background: #9ca3af;
   color: white;
   padding: 0.05rem 0.4rem;
   border-radius: 999px;
@@ -149,6 +189,20 @@
   color: var(--color-text-muted);
   margin-top: 0.1rem;
   font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.badgeNoAlmacen {
+  font-size: 0.65rem;
+  background: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  padding: 0.05rem 0.3rem;
+  white-space: nowrap;
 }
 
 .verMas {

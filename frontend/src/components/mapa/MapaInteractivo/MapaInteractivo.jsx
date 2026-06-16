@@ -1,16 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 
 import LeyendaMapa from '../LeyendaMapa/LeyendaMapa'
 import CanvasVuelos from '../CanvasVuelos/CanvasVuelos'
 import DetalleMaletasAeropuerto from '../DetalleMaletasAeropuerto/DetalleMaletasAeropuerto'
+import MapController from './MapController'
 import SimulacionControles from '../../SimulacionControles/SimulacionControles'
 import { getColorSemaforo, COLORES_SEMAFORO } from '../../../utils/semaforo'
 import { formatearCapacidad } from '../../../utils/formatters'
 import useConfiguracionStore from '../../../store/configuracionStore'
 import usePlanificadorStore from '../../../store/planificadorStore'
 import useSimulacionStore from '../../../store/simulacionStore'
+import useSeleccionStore from '../../../store/seleccionStore'
 import useAnimacionTimeline from '../../../hooks/useAnimacionTimeline'
 import { simulacionService } from '../../../services/simulacionService'
 import { FECHA_INICIO_SIMULACION_ALGORITMO } from '../../../constants/restricciones'
@@ -19,6 +21,9 @@ import styles from './MapaInteractivo.module.css'
 function MapaInteractivo() {
   const rangosSemaforo = useConfiguracionStore((s) => s.rangosSemaforo)
   const fechaInicio = useSimulacionStore((s) => s.parametros.fechaInicio)
+
+  const aeropuertoSeleccionado = useSeleccionStore((s) => s.aeropuertoSeleccionado)
+  const setAeropuertoSeleccionado = useSeleccionStore((s) => s.setAeropuertoSeleccionado)
 
   const offsetMinutos = (() => {
     const base = new Date(FECHA_INICIO_SIMULACION_ALGORITMO)
@@ -29,6 +34,9 @@ function MapaInteractivo() {
   const [aeropuertos, setAeropuertos] = useState([])
   // Ocupación durante el algoritmo (snapshot WS), usada antes de tener manifest
   const [ocupacionWS, setOcupacionWS] = useState({})
+  // Ocupación real al minuto exacto de la animación (actualizada c/hora simulada)
+  const [ocupacionRealtime, setOcupacionRealtime] = useState({})
+  const ultimaHoraRef = useRef(-1)
 
   const snapshot = usePlanificadorStore((s) => s.snapshot)
   const completado = usePlanificadorStore((s) => s.completado)
@@ -95,19 +103,32 @@ function MapaInteractivo() {
     }
   }, [completado, progreso, manifest, cargarManifest])
 
-  // Ocupación de aeropuertos: interpola linealmente entre días para suavizar la transición
+  // Actualiza la ocupación real cada hora simulada para evitar sobrecarga de requests
+  useEffect(() => {
+    if (!manifest) {
+      ultimaHoraRef.current = -1
+      setOcupacionRealtime({})
+      return
+    }
+    const horaSimulada = Math.floor(tiempoDisplay / 60)
+    if (horaSimulada === ultimaHoraRef.current) return
+    ultimaHoraRef.current = horaSimulada
+
+    const tiempoMin = Math.floor(tiempoDisplay) + offsetMinutos
+    simulacionService.obtenerOcupacionActual(tiempoMin)
+      .then(res => setOcupacionRealtime(res.data ?? {}))
+      .catch(() => {})
+  }, [tiempoDisplay, manifest, offsetMinutos])
+
+  // Ocupación en tiempo real al minuto exacto de la animación
   function getOcupacion(codigo) {
     if (manifest) {
-      const aero = manifest.aeropuertos.find(a => a.codigo === codigo)
-      const cap  = aero?.capacidadMax ?? 1
-      const diaActual  = Math.floor(tiempoDisplay / 1440)
-      const fraccion   = (tiempoDisplay % 1440) / 1440
-      const m0 = aero?.ocupacionPorDia?.[diaActual]   ?? aero?.ocupacionPorDia?.[String(diaActual)]   ?? 0
-      const m1 = aero?.ocupacionPorDia?.[diaActual+1] ?? aero?.ocupacionPorDia?.[String(diaActual+1)] ?? m0
-      const maletas = m0 + (m1 - m0) * fraccion
+      const aero    = manifest.aeropuertos.find(a => a.codigo === codigo)
+      const cap     = aero?.capacidadMax ?? 1
+      const maletas = ocupacionRealtime[codigo] ?? 0
       return {
         ocupacion:        Math.round((maletas / cap) * 1000) / 10,
-        ocupacionMaletas: Math.round(maletas),
+        ocupacionMaletas: maletas,
         capacidadMax:     cap,
       }
     }
@@ -128,6 +149,9 @@ function MapaInteractivo() {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         />
 
+        {/* Controlador de mapa: reacciona a selección externa (flyTo) */}
+        <MapController aeropuertos={aeropuertos} />
+
         {/* Animación canvas — solo activo cuando hay manifest */}
         {manifest && (
           <CanvasVuelos
@@ -145,17 +169,23 @@ function MapaInteractivo() {
           const pctOcup   = estado?.ocupacion ?? 0
           const color     = getColorSemaforo(pctOcup, rangosSemaforo)
           const colorHex  = COLORES_SEMAFORO[color]
+          const seleccionado = aeropuertoSeleccionado === aeropuerto.codigo
 
           return (
             <CircleMarker
               key={aeropuerto.codigo}
               center={[aeropuerto.lat, aeropuerto.lng]}
-              radius={10}
+              radius={seleccionado ? 13 : 10}
               pathOptions={{
                 fillColor:   colorHex,
                 fillOpacity: 0.9,
-                color:       'white',
-                weight:      2,
+                color:       seleccionado ? '#1d4ed8' : 'white',
+                weight:      seleccionado ? 3 : 2,
+              }}
+              eventHandlers={{
+                click: () => setAeropuertoSeleccionado(
+                  seleccionado ? null : aeropuerto.codigo
+                ),
               }}
             >
               <Popup className={styles.popupWrapper} maxWidth={360} minWidth={240}>

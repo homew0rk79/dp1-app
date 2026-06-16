@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="es"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Checklist de Evaluación – Equipo 6F</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #181c27;
+    --surface2: #1e2335;
+    --border: #2a3050;
+    --text: #e8eaf0;
+    --text-muted: #7a849e;
+    --accent: #4f8ef7;
+    --green: #22c55e;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --optional: #a78bfa;
+    --tag-bg: #1a2240;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+    padding: 24px 16px 60px;
+  }
+  header {
+    max-width: 900px;
+    margin: 0 auto 28px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 16px;
+  }
+  header h1 {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: .3px;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+  header p { color: var(--text-muted); font-size: 13px; }
+
+  .legend {
+    max-width: 900px;
+    margin: 0 auto 24px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--text-muted);
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .dot-req  { background: var(--green); }
+  .dot-opt  { background: var(--optional); }
+  .dot-no   { background: var(--border); }
+
+  .progress-bar-wrap {
+    max-width: 900px;
+    margin: 0 auto 28px;
+    background: var(--surface2);
+    border-radius: 6px;
+    padding: 14px 18px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .progress-label { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+  .bar-bg {
+    flex: 1; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden;
+  }
+  .bar-fill { height: 100%; background: var(--accent); border-radius: 4px; transition: width .3s; }
+  .progress-count { font-size: 13px; font-weight: 600; color: var(--accent); white-space: nowrap; }
+
+  .section {
+    max-width: 900px;
+    margin: 0 auto 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .section-header {
+    padding: 12px 18px;
+    display: flex; align-items: center; gap: 10px;
+    cursor: pointer;
+    user-select: none;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+  }
+  .section-header:hover { background: #222844; }
+  .section-letter {
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 700;
+    font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .section-title { font-size: 14px; font-weight: 600; flex: 1; }
+  .section-badge {
+    font-size: 11px; color: var(--text-muted);
+    background: var(--tag-bg);
+    padding: 2px 8px; border-radius: 12px;
+  }
+  .section-toggle { color: var(--text-muted); font-size: 12px; transition: transform .2s; }
+  .section-toggle.open { transform: rotate(180deg); }
+
+  .section-body { padding: 6px 0; }
+
+  .item {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 8px 18px;
+    border-bottom: 1px solid var(--border);
+    transition: background .12s;
+    cursor: pointer;
+  }
+  .item:last-child { border-bottom: none; }
+  .item:hover { background: #1a1f30; }
+  .item.checked { background: #14221a; }
+  .item.checked .item-text { color: var(--text-muted); text-decoration: line-through; text-decoration-color: #3a4a3a; }
+
+  .checkbox {
+    width: 18px; height: 18px; border-radius: 4px;
+    border: 2px solid var(--border);
+    flex-shrink: 0; margin-top: 1px;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .12s, border-color .12s;
+  }
+  .item.required .checkbox { border-color: var(--green); }
+  .item.optional .checkbox { border-color: var(--optional); }
+  .item.checked .checkbox { background: var(--green); border-color: var(--green); }
+  .item.checked .checkbox::after { content: '✓'; color: #fff; font-size: 11px; font-weight: 700; }
+
+  .item-content { flex: 1; }
+  .item-id {
+    font-size: 11px; color: var(--text-muted); font-family: monospace;
+    background: var(--tag-bg); padding: 1px 5px; border-radius: 3px;
+    margin-right: 6px; display: inline-block;
+  }
+  .item-text { font-size: 13px; }
+
+  .badge-req {
+    font-size: 10px; background: #14311e; color: var(--green);
+    border: 1px solid #1e4a2c; padding: 1px 6px; border-radius: 10px;
+    margin-left: 6px; vertical-align: middle; white-space: nowrap;
+  }
+  .badge-opt {
+    font-size: 10px; background: #1e1635; color: var(--optional);
+    border: 1px solid #2e2050; padding: 1px 6px; border-radius: 10px;
+    margin-left: 6px; vertical-align: middle; white-space: nowrap;
+  }
+  .badge-team4 {
+    font-size: 10px; background: #1a2535; color: var(--accent);
+    border: 1px solid #2a3a55; padding: 1px 6px; border-radius: 10px;
+    margin-left: 4px; vertical-align: middle; white-space: nowrap;
+  }
+
+  .note-box {
+    max-width: 900px; margin: 0 auto 20px;
+    padding: 12px 16px;
+    background: #1a2535;
+    border: 1px solid #2a3a55;
+    border-left: 3px solid var(--accent);
+    border-radius: 8px;
+    font-size: 12px; color: var(--text-muted);
+  }
+  .note-box strong { color: var(--accent); }
+
+  @media (max-width: 600px) {
+    .item { padding: 8px 12px; }
+    .section-header { padding: 10px 12px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Checklist de Evaluación de Software — Equipo 6F</h1>
+  <p>Tasf.B2B · Curso 1INF54 · Sección 0983 · Prof. Fernández Sánchez · 4 integrantes</p>
+</header>
+
+<div class="note-box">
+  <strong>⚠ Regla especial para equipos de 4:</strong> La configuración de aeropuertos, vuelos y parámetros debe implementarse mediante una interfaz o carga de archivos — <em>no</em> por hardcode ni archivo de configuración estático (eso aplica solo a equipos de 3).
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="dot dot-req"></div> Obligatorio (Sí)</div>
+  <div class="legend-item"><div class="dot dot-opt"></div> Opcional (Op)</div>
+  <div class="legend-item"><span style="font-size:12px">Haz clic en un ítem para marcarlo como completado</span></div>
+</div>
+
+<div class="progress-bar-wrap">
+  <span class="progress-label">Progreso general</span>
+  <div class="bar-bg"><div class="bar-fill" id="globalBar" style="width: 37.7551%;"></div></div>
+  <span class="progress-count" id="globalCount">37 / 98 requeridos</span>
+</div>
+
+<!-- ============ SECTION A ============ -->
+<div class="section" id="sec-A">
+  <div class="section-header" onclick="toggleSection('A')">
+    <div class="section-letter">A</div>
+    <span class="section-title">Información General del Avance</span>
+    <span class="section-badge" id="badge-A">2/17 req</span>
+    <span class="section-toggle open" id="toggle-A">▼</span>
+  </div>
+  <div class="section-body" id="body-A">
+    <div class="item required checked" data-sec="A" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">A01</span><span class="item-text">Versión del entregable (semana de avance o versión de software)<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="A" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">A02</span><span class="item-text">Fecha de subida o de presentación<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="A" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">A03</span><span class="item-text">Comentarios o problemas reportados sobre el entregable antes de la revisión<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="A" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">A10</span><span class="item-text">Nombre del algoritmo planificador seleccionado (Tabu Search)<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="A" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">A11</span><span class="item-text">Nivel de avance del planificador (%)<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="A" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">A12</span><span class="item-text">Estudiantes asignados al componente planificador<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="A" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">A13</span><span class="item-text">Nombre del algoritmo/tecnologías del visualizador (React + WebSocket)<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="A" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">A14</span><span class="item-text">Nivel de avance del visualizador (%)<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="A" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">A15</span><span class="item-text">Estudiantes asignados al visualizador<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="A" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">A16</span><span class="item-text">¿Revisaron el video de cómo hacer la simulación consumiendo datos? Indicar quiénes sí y quiénes no<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="A" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">A17</span><span class="item-text">Tiempo de ejecución del algoritmo: <strong>Ta</strong> (¿cuánto tarda en planificar?)<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="A" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">A18</span><span class="item-text">Tiempo del salto del algoritmo: <strong>Sa</strong> (intervalo de replanificación)<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="A" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">A19</span><span class="item-text">Salto del eje de consumo: <strong>Sc</strong> (cada cuánto tiempo simulado se consume un bloque de datos)<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="A" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">A20</span><span class="item-text">¿Está desplegado en servidor? — componente <strong>frontend</strong>. Explicar estado.<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="A" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">A21</span><span class="item-text">¿Está desplegado en servidor? — componente <strong>backend</strong>. Explicar estado.<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="A" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">A22</span><span class="item-text">Diagrama explicando cómo se consumen datos en bloques de tiempo (Sc) por cada ciclo del planificador (Sa)<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="A" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">A23</span><span class="item-text">Diagrama explicando cómo interactúan varios navegadores durante la simulación de periodo<span class="badge-req">requerido</span></span></div></div>
+  </div>
+</div>
+
+<!-- ============ SECTION B ============ -->
+<div class="section" id="sec-B">
+  <div class="section-header" onclick="toggleSection('B')">
+    <div class="section-letter" style="background:#7c3aed">B</div>
+    <span class="section-title">Configuración del Sistema</span>
+    <span class="section-badge" id="badge-B">5/8 req</span>
+    <span class="section-toggle open" id="toggle-B">▼</span>
+  </div>
+  <div class="section-body" id="body-B">
+    <div class="item required" data-sec="B" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">B01</span><span class="item-text">¿Cómo se configura el mapa en la pantalla principal?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="B" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">B03</span><span class="item-text">¿Cómo se establece/actualiza los atributos de los aeropuertos (ubicación, capacidad de almacén)? <span class="badge-team4">equipo 4: vía UI o archivo, no hardcode</span><span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="B" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">B04</span><span class="item-text">¿Cómo se establece/actualiza los atributos de los vuelos (origen, destino, capacidad, horario)? <span class="badge-team4">equipo 4: vía UI o archivo</span><span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="B" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">B11</span><span class="item-text">¿Cómo se establece/actualiza los tramos (origen, destino, horarios de salida/llegada)?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="B" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">B13</span><span class="item-text">¿Cómo se carga la data histórica/futura al sistema (vuelos.txt, envíos)?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="B" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">B14</span><span class="item-text">¿Qué fecha/hora se usa para las pruebas de simulación de periodo?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="B" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">B15</span><span class="item-text">¿Se usan los datos proporcionados sin reducción de registros?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="B" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">B16</span><span class="item-text">¿La carga de todos los datos se realiza de forma independiente de los escenarios?<span class="badge-req">requerido</span></span></div></div>
+  </div>
+</div>
+
+<!-- ============ SECTION C ============ -->
+<div class="section" id="sec-C">
+  <div class="section-header" onclick="toggleSection('C')">
+    <div class="section-letter" style="background:#0891b2">C</div>
+    <span class="section-title">Mapa Base — Todos los Escenarios</span>
+    <span class="section-badge" id="badge-C">20/31 req</span>
+    <span class="section-toggle open" id="toggle-C">▼</span>
+  </div>
+  <div class="section-body" id="body-C">
+    <div class="item required checked" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C01</span><span class="item-text">Al inicio: ¿La carga de archivos/envíos se hace en una pantalla/opción separada (no mezclada con el mapa)?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C02</span><span class="item-text">Al inicio: ¿Se pide fecha y hora hasta nivel de minuto?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C03</span><span class="item-text">¿Cuánto tarda en mostrar el mapa luego de presionar "Iniciar"?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C04</span><span class="item-text">¿Cuánto tarda en que el primer avión se empiece a mover?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C07</span><span class="item-text">¿Todo está en un solo idioma (español o inglés), sin mezcla?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C08</span><span class="item-text">¿El zoom in/out es adecuado para ver zonas y detalles del mapa?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C09</span><span class="item-text">¿La pantalla principal se presenta completa al iniciar?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C10</span><span class="item-text">¿Se aprovecha la pantalla para mostrar todos los aeropuertos simultáneamente (de una sola vez)?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C11</span><span class="item-text">¿Al iniciar, los elementos no activos se muestran como "no disponibles" (pantalla limpia)?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C12</span><span class="item-text">¿Se muestra la fecha/hora del <strong>momento simulado</strong> (a nivel de minuto)? — solo en simulación 5D y colapso<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C13</span><span class="item-text">¿Se muestra el <strong>tiempo transcurrido simulado</strong>? — solo en simulación 5D y colapso<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C14</span><span class="item-text">¿Se muestra la fecha/hora del <strong>momento actual real</strong> (a nivel de minuto)? — solo en simulación 5D y colapso<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C15</span><span class="item-text">¿Se muestra el <strong>tiempo transcurrido real</strong>? — solo en simulación 5D y colapso<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C16</span><span class="item-text">¿Los 4 datos de tiempo (C12–C15) se presentan de manera adecuada (ubicación, tamaño, contraste)?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C17</span><span class="item-text">¿Cada aeropuerto aparece en su ubicación geográfica correcta?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C18</span><span class="item-text">¿El ícono del aeropuerto es de tamaño adecuado?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C19</span><span class="item-text">¿El ícono del aeropuerto representa visualmente un aeropuerto?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C20</span><span class="item-text">¿El ícono del aeropuerto contrasta con el fondo del mapa?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C21</span><span class="item-text">¿El ícono del aeropuerto cambia de color según el semáforo de stock (vacío/verde/ámbar/rojo)?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C22</span><span class="item-text">¿Se muestra el stock/ocupación del aeropuerto en números o porcentaje (fijo o al pasar el mouse)?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C23</span><span class="item-text">¿Cada avión aparece en su posición prevista del mapa?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C24</span><span class="item-text">¿El ícono del avión es de tamaño adecuado?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C25</span><span class="item-text">¿El ícono del avión representa visualmente un avión?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C26</span><span class="item-text">¿El ícono del avión contrasta con el fondo del mapa?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C27</span><span class="item-text">¿El ícono del avión cambia de color según el semáforo de stock (vacío/verde/ámbar/rojo)?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C28</span><span class="item-text">¿Se muestra el stock/ocupación de cada avión en números o porcentaje (fijo o al pasar el mouse)?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C29</span><span class="item-text">¿El avión se desplaza con fluidez, sin saltos, sin anomalías?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C30</span><span class="item-text">¿El ícono del avión se orienta en la dirección correcta de vuelo?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C31</span><span class="item-text">¿Se dibuja la línea del tramo (origen → destino) al inicio de cada vuelo?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C33</span><span class="item-text">¿La línea del tramo tiene un grosor/ideograma adecuado?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="C" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">C34</span><span class="item-text">¿La línea del tramo se borra o cambia cuando el avión ya lo recorrió? (evitar acumulación de líneas)<span class="badge-req">requerido</span></span></div></div>
+  </div>
+</div>
+
+<!-- ============ SECTION D ============ -->
+<div class="section" id="sec-D">
+  <div class="section-header" onclick="toggleSection('D')">
+    <div class="section-letter" style="background:#b45309">D</div>
+    <span class="section-title">Circunstancias — Cancelaciones de Vuelo</span>
+    <span class="section-badge" id="badge-D">0/2 req</span>
+    <span class="section-toggle open" id="toggle-D">▼</span>
+  </div>
+  <div class="section-body" id="body-D">
+    <div class="item required" data-sec="D" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">D14</span><span class="item-text">¿Cada cancelación de vuelo se muestra visualmente en el mapa? ¿Cómo?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="D" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">D15</span><span class="item-text">¿La indicación de cancelación permanece visible el tiempo que corresponde?<span class="badge-req">requerido</span></span></div></div>
+  </div>
+</div>
+
+<!-- ============ SECTION E ============ -->
+<div class="section" id="sec-E">
+  <div class="section-header" onclick="toggleSection('E')">
+    <div class="section-letter" style="background:#0f766e">E</div>
+    <span class="section-title">Panel Lateral</span>
+    <span class="section-badge" id="badge-E">3/16 req</span>
+    <span class="section-toggle open" id="toggle-E">▼</span>
+  </div>
+  <div class="section-body" id="body-E">
+    <div class="item required checked" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E01</span><span class="item-text">¿Se presentan paneles colapsados/contraídos al inicio en ubicaciones idóneas?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E02</span><span class="item-text">¿Lista de vuelos con su ocupación/stock en número o %?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E03</span><span class="item-text">¿Desde la lista de vuelos, se puede acceder a los envíos (grupos de maletas) que transporta?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E04</span><span class="item-text">¿Desde la lista de vuelos, se puede acceder a las maletas individuales que transporta?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E05</span><span class="item-text">¿Se muestra el stock de cada vuelo con semáforo (vacío/verde/ámbar/rojo)?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E06</span><span class="item-text">¿Se puede buscar un vuelo por su código o tramo?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E07</span><span class="item-text">¿Se puede buscar vuelos por aeropuerto de origen?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E08</span><span class="item-text">¿Se puede buscar vuelos por aeropuerto de destino?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item optional" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E09</span><span class="item-text">¿Se filtra vuelos por código o patrón?<span class="badge-opt">opcional</span></span></div></div>
+    <div class="item optional" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E10</span><span class="item-text">¿Se filtra vuelos por origen?<span class="badge-opt">opcional</span></span></div></div>
+    <div class="item optional" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E11</span><span class="item-text">¿Se filtra vuelos por destino?<span class="badge-opt">opcional</span></span></div></div>
+    <div class="item required" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E12</span><span class="item-text">¿Se ordena la lista de vuelos por nivel de ocupación?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item optional" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E13</span><span class="item-text">¿Se ordena vuelos por hora de salida?<span class="badge-opt">opcional</span></span></div></div>
+    <div class="item optional" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E14</span><span class="item-text">¿Se ordena vuelos por hora de llegada?<span class="badge-opt">opcional</span></span></div></div>
+    <div class="item optional" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E15</span><span class="item-text">¿Se ordena vuelos por origen?<span class="badge-opt">opcional</span></span></div></div>
+    <div class="item optional" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E16</span><span class="item-text">¿Se ordena vuelos por destino?<span class="badge-opt">opcional</span></span></div></div>
+    <div class="item required checked" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E17</span><span class="item-text">¿Lista de aeropuertos con ocupación/stock en número o %?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E18</span><span class="item-text">¿Desde la lista de aeropuertos se puede ver los envíos que hay en él (destino final + en tránsito)?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item optional" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E19</span><span class="item-text">¿Desde la lista de aeropuertos se puede ver las maletas individuales que hay?<span class="badge-opt">opcional</span></span></div></div>
+    <div class="item required checked" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E20</span><span class="item-text">¿La lista de aeropuertos muestra colores semáforo (vacío/verde/ámbar/rojo)?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E21</span><span class="item-text">¿La lista de aeropuertos muestra envíos (grupos de maletas) planificados que <strong>entran</strong>?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item optional" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E22</span><span class="item-text">¿La lista de aeropuertos muestra maletas individuales planificadas que entran?<span class="badge-opt">opcional</span></span></div></div>
+    <div class="item required" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E23</span><span class="item-text">¿La lista de aeropuertos muestra envíos planificados que <strong>salen</strong>?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item optional" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E24</span><span class="item-text">¿La lista de aeropuertos muestra maletas individuales planificadas que salen?<span class="badge-opt">opcional</span></span></div></div>
+    <div class="item optional" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E25</span><span class="item-text">¿Se filtra aeropuertos por código o patrón?<span class="badge-opt">opcional</span></span></div></div>
+    <div class="item optional" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E26</span><span class="item-text">¿Se filtra aeropuertos por región continental?<span class="badge-opt">opcional</span></span></div></div>
+    <div class="item required" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E27</span><span class="item-text">¿Se ordena la lista de aeropuertos por nivel de ocupación?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item optional" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E28</span><span class="item-text">¿Se ordena aeropuertos según la hora del vuelo más próximo en salir?<span class="badge-opt">opcional</span></span></div></div>
+    <div class="item optional" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E29</span><span class="item-text">¿Se ordena aeropuertos según la hora del vuelo más próximo en llegar?<span class="badge-opt">opcional</span></span></div></div>
+    <div class="item required" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E30</span><span class="item-text">¿Lista planificada de envíos a transportar, indicando destino, vuelo asignado y cantidad de maletas?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item optional" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E31</span><span class="item-text">¿Lista de envíos actualmente en vuelo (origen, destino, vuelo, maletas)?<span class="badge-opt">opcional</span></span></div></div>
+    <div class="item optional" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E32</span><span class="item-text">¿Lista de envíos entregados en las últimas 4 horas?<span class="badge-opt">opcional</span></span></div></div>
+    <div class="item optional" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E33</span><span class="item-text">¿Se filtra envíos por aeropuerto de origen (en tramo o en ruta)?<span class="badge-opt">opcional</span></span></div></div>
+    <div class="item optional" data-sec="E" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">E34</span><span class="item-text">¿Se filtra envíos por aeropuerto de destino (en tramo o en ruta)?<span class="badge-opt">opcional</span></span></div></div>
+  </div>
+</div>
+
+<!-- ============ SECTION F ============ -->
+<div class="section" id="sec-F">
+  <div class="section-header" onclick="toggleSection('F')">
+    <div class="section-letter" style="background:#be185d">F</div>
+    <span class="section-title">Vinculación Mapa ↔ Panel (Bidireccional)</span>
+    <span class="section-badge" id="badge-F">0/9 req</span>
+    <span class="section-toggle open" id="toggle-F">▼</span>
+  </div>
+  <div class="section-body" id="body-F">
+    <div class="item required" data-sec="F" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">F01</span><span class="item-text">¿Al buscar una maleta por ID en el panel, se resalta su ruta en el mapa? (a demanda)<span class="badge-req">requerido</span></span></div></div>
+    <div class="item optional" data-sec="F" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">F02</span><span class="item-text">¿Se muestra también la ruta anterior de esa maleta con datos de sus escalas?<span class="badge-opt">opcional</span></span></div></div>
+    <div class="item required" data-sec="F" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">F03</span><span class="item-text">¿Al buscar un envío (grupo de maletas) por ID en el panel, se resalta su ruta en el mapa? (a demanda)<span class="badge-req">requerido</span></span></div></div>
+    <div class="item optional" data-sec="F" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">F04</span><span class="item-text">¿Se muestra también la ruta anterior del envío con datos de escalas?<span class="badge-opt">opcional</span></span></div></div>
+    <div class="item required" data-sec="F" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">F05</span><span class="item-text">¿Seleccionar un aeropuerto en el panel lo enfoca/resalta en el mapa? (automático o a demanda)<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="F" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">F06</span><span class="item-text">¿Hacer clic en un aeropuerto en el mapa lo resalta/enfoca en el panel? (automático)<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="F" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">F07</span><span class="item-text">¿Seleccionar un vuelo en el panel lo enfoca en el mapa? (automático o a demanda)<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="F" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">F08</span><span class="item-text">¿Hacer clic en un avión en el mapa lo resalta en el panel? (automático)<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="F" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">F09</span><span class="item-text">¿Seleccionar un envío en el panel lo enfoca en el mapa (aeropuerto o avión donde está)? (a demanda)<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="F" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">F15</span><span class="item-text">¿Filtrar por color de semáforo en el panel de aeropuertos se refleja resaltando los aeropuertos en el mapa?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="F" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">F16</span><span class="item-text">¿Filtrar por color de semáforo en el panel de vuelos se refleja resaltando los aviones en el mapa?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item optional" data-sec="F" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">F17</span><span class="item-text">¿Otros filtros de aeropuertos en el panel también se reflejan en el mapa?<span class="badge-opt">opcional</span></span></div></div>
+    <div class="item optional" data-sec="F" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">F18</span><span class="item-text">¿Otros filtros de vuelos en el panel también se reflejan en el mapa?<span class="badge-opt">opcional</span></span></div></div>
+  </div>
+</div>
+
+<!-- ============ SECTION G ============ -->
+<div class="section" id="sec-G">
+  <div class="section-header" onclick="toggleSection('G')">
+    <div class="section-letter" style="background:#047857">G</div>
+    <span class="section-title">Cierre / Indicadores Globales / Percepción</span>
+    <span class="section-badge" id="badge-G">7/15 req</span>
+    <span class="section-toggle open" id="toggle-G">▼</span>
+  </div>
+  <div class="section-body" id="body-G">
+    <div class="item required checked" data-sec="G" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">G01</span><span class="item-text">¿Se muestra el nivel de ocupación <strong>global de la flota de vuelos</strong> (todos juntos)?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="G" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">G02</span><span class="item-text">¿Ese indicador global de vuelos se muestra como semáforo?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="G" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">G03</span><span class="item-text">¿Se muestra el nivel de ocupación <strong>global de los aeropuertos</strong> (todos juntos)?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="G" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">G04</span><span class="item-text">¿Ese indicador global de aeropuertos se muestra como semáforo?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="G" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">G05</span><span class="item-text">¿Se respeta el tiempo mínimo de permanencia de maletas en los aeropuertos (margen de transbordo)?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="G" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">G06</span><span class="item-text">¿Se
+ pueden conectar al menos 2 navegadores desde dispositivos distintos con
+ interacción independiente, sobre un único planificador en simulación
+5D?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="G" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">G08</span><span class="item-text">Al finalizar la simulación de periodo: ¿Se presenta como reporte la última planificación estable?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="G" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">G09</span><span class="item-text">Al cerrar operaciones día a día: ¿Se presenta como reporte la última planificación estable?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required checked" data-sec="G" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">G10</span><span class="item-text">Al finalizar simulación de colapso: ¿Se presenta el reporte de la última planificación estable?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="G" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">G11</span><span class="item-text">Percepción global: ¿El sistema está completo y al día?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="G" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">G12</span><span class="item-text">Percepción global: ¿El sistema es apropiado para el problema?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="G" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">G13</span><span class="item-text">Percepción global: ¿Está claro y sin ambigüedades?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="G" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">G14</span><span class="item-text">Percepción global: ¿Es factible terminarlo en el plazo del curso?<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="G" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">G17</span><span class="item-text">El docente registra: <strong>Fortaleza principal</strong> del sistema<span class="badge-req">requerido</span></span></div></div>
+    <div class="item required" data-sec="G" onclick="toggleItem(this)"><div class="checkbox"></div><div class="item-content"><span class="item-id">G18</span><span class="item-text">El docente registra: <strong>Principal aspecto a mejorar</strong><span class="badge-req">requerido</span></span></div></div>
+  </div>
+</div>
+
+<script>
+const sections = ['A','B','C','D','E','F','G'];
+const openSections = new Set(sections);
+
+function toggleSection(id) {
+  const body = document.getElementById('body-' + id);
+  const toggle = document.getElementById('toggle-' + id);
+  if (openSections.has(id)) {
+    body.style.display = 'none';
+    toggle.classList.remove('open');
+    openSections.delete(id);
+  } else {
+    body.style.display = 'block';
+    toggle.classList.add('open');
+    openSections.add(id);
+  }
+}
+
+// Start with all open
+sections.forEach(id => {
+  document.getElementById('toggle-' + id).classList.add('open');
+});
+
+function toggleItem(el) {
+  el.classList.toggle('checked');
+  updateBadges();
+}
+
+function updateBadges() {
+  let totalReq = 0, doneReq = 0;
+  sections.forEach(sec => {
+    const items = document.querySelectorAll(`.item[data-sec="${sec}"].required`);
+    const done = document.querySelectorAll(`.item[data-sec="${sec}"].required.checked`);
+    document.getElementById('badge-' + sec).textContent = `${done.length}/${items.length} req`;
+    totalReq += items.length;
+    doneReq += done.length;
+  });
+  document.getElementById('globalCount').textContent = `${doneReq} / ${totalReq} requeridos`;
+  const pct = totalReq > 0 ? (doneReq / totalReq * 100) : 0;
+  document.getElementById('globalBar').style.width = pct + '%';
+}
+
+updateBadges();
+</script>
+
+
+<deepl-input-controller translate="no"></deepl-input-controller></body></html>

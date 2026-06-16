@@ -3,15 +3,16 @@ import useMaletasAeropuerto from '../../../hooks/useMaletasAeropuerto'
 import { FECHA_INICIO_SIMULACION_ALGORITMO } from '../../../constants/restricciones'
 import styles from './DetalleMaletasAeropuerto.module.css'
 
-const PAGE_SIZE = 15
+const PAGE_SIZE = 20
+
+// Solo PENDIENTE_SALIDA y EN_HUB: estados que ocupan almacén
+const ESTADOS_ALMACEN = ['PENDIENTE_SALIDA', 'EN_HUB']
 
 const ETIQUETA_ESTADO = {
-  PENDIENTE_SALIDA: 'Pendiente de salida',
+  PENDIENTE_SALIDA: 'Origen (esperando salida)',
   EN_HUB:           'En tránsito (escala)',
-  ENTREGADA:        'Entregada',
+  ENTREGADA:        'Entregado al cliente',
 }
-
-const ORDEN_ESTADO = ['PENDIENTE_SALIDA', 'EN_HUB', 'ENTREGADA']
 
 function formatearMinutosAbs(min) {
   if (min == null || min < 0) return '—'
@@ -25,10 +26,43 @@ function formatearMinutosAbs(min) {
   return `${dd}/${mo}/${yyyy} ${hh}:${mm}`
 }
 
+function ItemMaleta({ m }) {
+  const esEntregada = m.estado === 'ENTREGADA'
+
+  return (
+    <div className={`${styles.item} ${styles[`borde_${m.estado}`]} ${esEntregada ? styles.itemEntregado : ''}`}>
+      <div className={styles.itemHeader}>
+        <div className={styles.itemHeaderIzq}>
+          <span className={styles.envioId}>{m.envioId}</span>
+          {m.presenteAhora && <span className={styles.badgeAhora}>ahora</span>}
+        </div>
+        <span className={esEntregada ? styles.cantidadEntregado : styles.cantidad}>
+          {m.cantidad} mlt
+        </span>
+      </div>
+      <div className={styles.ruta}>
+        {m.ciudadOrigen} <span className={styles.flecha}>→</span> {m.ciudadDestino}
+      </div>
+      <div className={styles.tiempos}>
+        {esEntregada
+          ? <>
+              Entregado al cliente el {formatearMinutosAbs(m.tiempoLlegadaAeropuerto)}
+              <span className={styles.badgeNoAlmacen}>no ocupa almacén</span>
+            </>
+          : <>
+              Llega {formatearMinutosAbs(m.tiempoLlegadaAeropuerto)}
+              {' · sale '}{formatearMinutosAbs(m.tiempoSalidaAeropuerto)}
+            </>
+        }
+      </div>
+    </div>
+  )
+}
+
 function DetalleMaletasAeropuerto({ codigo, tiempoMin = 0 }) {
   const [abierto, setAbierto] = useState(false)
   const [visibles, setVisibles] = useState(PAGE_SIZE)
-  const [filtro, setFiltro]     = useState('TODOS')
+  const [filtro, setFiltro]     = useState('ALMACEN_HOY')
 
   const { maletas, error } = useMaletasAeropuerto(codigo, tiempoMin, abierto)
 
@@ -37,79 +71,84 @@ function DetalleMaletasAeropuerto({ codigo, tiempoMin = 0 }) {
     setAbierto(nuevoEstado)
     if (!nuevoEstado) {
       setVisibles(PAGE_SIZE)
-      setFiltro('TODOS')
+      setFiltro('ALMACEN_HOY')
     }
   }
 
   function renderContenido() {
-    if (error)           return <div className={styles.estado}>{error}</div>
+    if (error)            return <div className={styles.estado}>{error}</div>
     if (maletas === null) return <div className={styles.estado}>Cargando…</div>
     if (maletas.length === 0) return <div className={styles.estado}>Sin envíos registrados en este momento</div>
 
-    const conteos = maletas.reduce((acc, m) => {
-      acc[m.estado] = (acc[m.estado] || 0) + 1
-      return acc
-    }, {})
+    const enAlmacenHoy  = maletas.filter(m => ESTADOS_ALMACEN.includes(m.estado))
+    const presentesAhora = enAlmacenHoy.filter(m => m.presenteAhora)
+    const entregadas     = maletas.filter(m => m.estado === 'ENTREGADA')
 
-    const lista = filtro === 'TODOS'
-      ? maletas
-      : maletas.filter((m) => m.estado === filtro)
+    const maletasAlmacenHoy = enAlmacenHoy.reduce((s, m) => s + m.cantidad, 0)
 
+    let lista
+    if (filtro === 'ALMACEN_HOY') {
+      lista = enAlmacenHoy
+    } else if (filtro === 'AHORA') {
+      lista = presentesAhora
+    } else {
+      lista = entregadas
+    }
+
+    // Orden: presentes ahora primero, luego los demás por tiempo de llegada
     const ordenada = [...lista].sort((a, b) => {
-      const pa = ORDEN_ESTADO.indexOf(a.estado)
-      const pb = ORDEN_ESTADO.indexOf(b.estado)
-      if (pa !== pb) return pa - pb
-      return b.cantidad - a.cantidad
+      if (filtro === 'ALMACEN_HOY') {
+        if (a.presenteAhora !== b.presenteAhora) return a.presenteAhora ? -1 : 1
+      }
+      return a.tiempoLlegadaAeropuerto - b.tiempoLlegadaAeropuerto
     })
 
     const mostrar = ordenada.slice(0, visibles)
-    const totalMaletas = lista.reduce((s, m) => s + m.cantidad, 0)
 
     return (
       <div className={styles.contenedor}>
+        {/* Chips de filtro */}
         <div className={styles.filtros}>
           <button
-            className={`${styles.chip} ${filtro === 'TODOS' ? styles.chipActivo : ''}`}
-            onClick={() => { setFiltro('TODOS'); setVisibles(PAGE_SIZE) }}
+            className={`${styles.chip} ${filtro === 'ALMACEN_HOY' ? styles.chipActivo : ''}`}
+            onClick={() => { setFiltro('ALMACEN_HOY'); setVisibles(PAGE_SIZE) }}
           >
-            Todos ({maletas.length})
+            En almacén hoy ({enAlmacenHoy.length})
           </button>
-          {ORDEN_ESTADO.filter((e) => conteos[e]).map((estado) => (
+          <button
+            className={`${styles.chip} ${styles.chip_AHORA} ${filtro === 'AHORA' ? styles.chipActivo : ''}`}
+            onClick={() => { setFiltro('AHORA'); setVisibles(PAGE_SIZE) }}
+          >
+            Presentes ahora ({presentesAhora.length})
+          </button>
+          {entregadas.length > 0 && (
             <button
-              key={estado}
-              className={`${styles.chip} ${filtro === estado ? styles.chipActivo : ''} ${styles[`chip_${estado}`]}`}
-              onClick={() => { setFiltro(estado); setVisibles(PAGE_SIZE) }}
+              className={`${styles.chip} ${styles.chip_ENTREGADA} ${filtro === 'ENTREGADA' ? styles.chipActivo : ''}`}
+              onClick={() => { setFiltro('ENTREGADA'); setVisibles(PAGE_SIZE) }}
             >
-              {ETIQUETA_ESTADO[estado]} ({conteos[estado]})
+              Entregados ({entregadas.length})
             </button>
-          ))}
+          )}
         </div>
 
+        {/* Resumen de totales */}
         <div className={styles.totales}>
-          {lista.length} envío{lista.length !== 1 ? 's' : ''} · {totalMaletas} maleta{totalMaletas !== 1 ? 's' : ''}
+          <span>
+            {enAlmacenHoy.length} envíos · {maletasAlmacenHoy} maletas en almacén hoy
+          </span>
+          <span className={styles.totalesAhora}>
+            {' '}({presentesAhora.length} presentes en este momento)
+          </span>
+          {entregadas.length > 0 && (
+            <span className={styles.totalesEntregadas}>
+              {' '}· {entregadas.length} entregados al cliente
+            </span>
+          )}
         </div>
 
+        {/* Lista */}
         <div className={styles.lista}>
-          {mostrar.map((m) => (
-            <div key={m.envioId} className={`${styles.item} ${styles[`borde_${m.estado}`]}`}>
-              <div className={styles.itemHeader}>
-                <span className={styles.envioId}>{m.envioId}</span>
-                <span className={styles.cantidad}>{m.cantidad} mlt</span>
-              </div>
-              <div className={styles.ruta}>
-                {m.ciudadOrigen} <span className={styles.flecha}>→</span> {m.ciudadDestino}
-              </div>
-              <div className={styles.tiempos}>
-                {m.estado === 'ENTREGADA'
-                  ? <>Llegó {formatearMinutosAbs(m.tiempoLlegadaAeropuerto)}</>
-                  : <>
-                      Aquí desde {formatearMinutosAbs(m.tiempoLlegadaAeropuerto)}
-                      {' · sale '}{formatearMinutosAbs(m.tiempoSalidaAeropuerto)}
-                    </>
-                }
-              </div>
-            </div>
-          ))}
+          {mostrar.map((m) => <ItemMaleta key={m.envioId} m={m} />)}
         </div>
 
         {visibles < ordenada.length && (

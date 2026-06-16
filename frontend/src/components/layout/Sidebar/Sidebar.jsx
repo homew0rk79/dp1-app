@@ -15,11 +15,13 @@ import {
 import PanelMetrica from '../../common/PanelMetrica/PanelMetrica'
 import Semaforo from '../../common/Semaforo/Semaforo'
 import Badge from '../../common/Badge/Badge'
+import PanelVuelos from './PanelVuelos/PanelVuelos'
 import useSimulacionStore from '../../../store/simulacionStore'
 import { getColorSemaforo, COLORES_SEMAFORO } from '../../../utils/semaforo'
 import useConfiguracionStore from '../../../store/configuracionStore'
+import useSeleccionStore from '../../../store/seleccionStore'
 import { ESCENARIOS, ETIQUETAS_ESCENARIO } from '../../../constants/escenarios'
-import { DURACIONES_PERIODO, FECHA_INICIO_DATOS, FECHA_FIN_DATOS } from '../../../constants/restricciones'
+import { DURACIONES_PERIODO, FECHA_INICIO_DATOS, FECHA_FIN_DATOS, FECHA_INICIO_SIMULACION_ALGORITMO } from '../../../constants/restricciones'
 import usePlanificadorStore from '../../../store/planificadorStore'
 import { simulacionService } from '../../../services/simulacionService'
 import styles from './Sidebar.module.css'
@@ -34,8 +36,14 @@ function formatearTiempo(segundos) {
 function Sidebar() {
   const navigate = useNavigate()
   const [collapsed, setCollapsed] = useState(false)
-  const intervalRef = useRef(null)
+  const [tabActivo, setTabActivo] = useState('aeropuertos')
+  const intervalRef    = useRef(null)
+  const ultimaHoraRef  = useRef(-1)
   const rangosSemaforo = useConfiguracionStore((s) => s.rangosSemaforo)
+  const [ocupacionRealtime, setOcupacionRealtime] = useState({})
+
+  const aeropuertoSeleccionado = useSeleccionStore((s) => s.aeropuertoSeleccionado)
+  const setAeropuertoSeleccionado = useSeleccionStore((s) => s.setAeropuertoSeleccionado)
 
   const {
     escenarioActivo,
@@ -62,11 +70,39 @@ function Sidebar() {
   const completado = usePlanificadorStore((s) => s.completado)
   const resetPlanificador = usePlanificadorStore((s) => s.resetPlanificador)
 
+  const offsetMinutos = (() => {
+    const base   = new Date(FECHA_INICIO_SIMULACION_ALGORITMO)
+    const inicio = new Date(parametros.fechaInicio || FECHA_INICIO_SIMULACION_ALGORITMO)
+    return Math.round((inicio - base) / 60000)
+  })()
+
   // Sincronizar estado local con eventos del backend
   useEffect(() => {
     if (!progreso) return
     if (progreso.estado) setEstado(progreso.estado)
   }, [progreso, setEstado])
+
+  // Cuando el mapa selecciona un aeropuerto, cambia al tab de aeropuertos
+  useEffect(() => {
+    if (aeropuertoSeleccionado) setTabActivo('aeropuertos')
+  }, [aeropuertoSeleccionado])
+
+  // Ocupación en tiempo real — se actualiza una vez por hora simulada
+  useEffect(() => {
+    if (!manifest) {
+      ultimaHoraRef.current = -1
+      setOcupacionRealtime({})
+      return
+    }
+    const horaSimulada = Math.floor(tiempoAnimacion / 60)
+    if (horaSimulada === ultimaHoraRef.current) return
+    ultimaHoraRef.current = horaSimulada
+
+    const tiempoMin = Math.floor(tiempoAnimacion) + offsetMinutos
+    simulacionService.obtenerOcupacionActual(tiempoMin)
+      .then(res => setOcupacionRealtime(res.data ?? {}))
+      .catch(() => {})
+  }, [tiempoAnimacion, manifest, offsetMinutos])
 
   // Aeropuertos en tiempo real (desde snapshot WS) o lista vacía
   const aeropuertosWS = snapshot?.aeropuertos ?? []
@@ -80,19 +116,15 @@ function Sidebar() {
     if (!manifestLookup) return fallbackPct ?? 0
     const aero = manifestLookup[codigo]
     if (!aero) return fallbackPct ?? 0
-    const cap        = aero.capacidadMax || 1
-    const diaActual  = Math.floor(tiempoAnimacion / 1440)
-    const fraccion   = (tiempoAnimacion % 1440) / 1440
-    const m0 = aero.ocupacionPorDia?.[diaActual]   ?? aero.ocupacionPorDia?.[String(diaActual)]   ?? 0
-    const m1 = aero.ocupacionPorDia?.[diaActual+1] ?? aero.ocupacionPorDia?.[String(diaActual+1)] ?? m0
-    return Math.round((m0 + (m1 - m0) * fraccion) / cap * 1000) / 10
+    const cap     = aero.capacidadMax || 1
+    const maletas = ocupacionRealtime[codigo] ?? 0
+    return Math.round((maletas / cap) * 1000) / 10
   }
 
   // KPIs animados desde el manifest (cuando hay animación activa)
   const kpisAnimados = (() => {
     if (!manifest) return null
-    const T   = tiempoAnimacion
-    const dia = Math.floor(T / 1440)
+    const T = tiempoAnimacion
     let maletasEnTransito = 0
     let vuelosSaturados   = 0
     for (const o of manifest.ocurrencias) {
@@ -103,7 +135,7 @@ function Sidebar() {
     }
     let aeropuertosSaturados = 0
     for (const a of manifest.aeropuertos) {
-      const maletas = a.ocupacionPorDia?.[dia] ?? a.ocupacionPorDia?.[String(dia)] ?? 0
+      const maletas = ocupacionRealtime[a.codigo] ?? 0
       if (maletas / (a.capacidadMax || 1) > rangosSemaforo.ambar / 100) aeropuertosSaturados++
     }
     return { maletasEnTransito, vuelosSaturados, aeropuertosSaturados }
@@ -216,7 +248,7 @@ function Sidebar() {
   const planificando = estadoEjecucion === 'PLANIFICANDO'
   const completadoEstado = estadoEjecucion === 'COMPLETADO'
   const errorEstado = estadoEjecucion === 'ERROR'
-  const puedeIniciar = estadoEjecucion === 'IDLE' || errorEstado || Boolean(manifest)
+  const puedeIniciar = estadoEjecucion === 'IDLE' || errorEstado || completadoEstado || Boolean(manifest)
   const enCurso = cargando || planificando
   const simulacionEnCurso = Boolean(manifest && playingAnimacion)
 
@@ -274,35 +306,63 @@ function Sidebar() {
             </section>
           )}
 
-          {/* Lista de aeropuertos (real-time desde WS, vacío si no hay snapshot) */}
+          {/* Panel con tabs: Aeropuertos / Vuelos */}
           <section className={`${styles.section} ${styles.sectionScroll}`}>
-            <h3 className={styles.sectionTitle}>Estado de aeropuertos</h3>
-            {aeropuertosWS.length === 0 ? (
-              <p style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                Disponible al iniciar una simulación
-              </p>
-            ) : (
-              <ul className={styles.aeropuertoList}>
-                {aeropuertosWS.map((a) => {
-                  const pct   = getOcupacionPct(a.codigo, a.porcentajeOcupacion)
-                  const color = getColorSemaforo(pct, rangosSemaforo)
-                  const hex   = COLORES_SEMAFORO[color]
-                  return (
-                    <li key={a.codigo} className={styles.aeropuertoItem}>
-                      <div className={styles.aeropuertoInfo}>
-                        <span className={styles.aeropuertoNombre}>{a.ciudad}</span>
-                        <span className={styles.aeropuertoPais}>{a.continente}</span>
-                      </div>
-                      <div className={styles.aeropuertoOcupacion}>
-                        <span className={styles.ocupacionTexto} style={{ color: hex }}>
-                          {pct.toFixed(1)}%
-                        </span>
-                        <Semaforo valor={pct} />
-                      </div>
-                    </li>
-                  )
-                })}
-              </ul>
+            <div className={styles.tabs}>
+              <button
+                className={`${styles.tab} ${tabActivo === 'aeropuertos' ? styles.tabActivo : ''}`}
+                onClick={() => setTabActivo('aeropuertos')}
+              >
+                Aeropuertos
+              </button>
+              <button
+                className={`${styles.tab} ${tabActivo === 'vuelos' ? styles.tabActivo : ''}`}
+                onClick={() => setTabActivo('vuelos')}
+              >
+                Vuelos
+              </button>
+            </div>
+
+            {tabActivo === 'aeropuertos' && (
+              aeropuertosWS.length === 0 ? (
+                <p style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                  Disponible al iniciar una simulación
+                </p>
+              ) : (
+                <ul className={styles.aeropuertoList}>
+                  {aeropuertosWS.map((a) => {
+                    const pct      = getOcupacionPct(a.codigo, a.porcentajeOcupacion)
+                    const color    = getColorSemaforo(pct, rangosSemaforo)
+                    const hex      = COLORES_SEMAFORO[color]
+                    const selected = aeropuertoSeleccionado === a.codigo
+                    return (
+                      <li
+                        key={a.codigo}
+                        className={`${styles.aeropuertoItem} ${selected ? styles.aeropuertoSeleccionado : ''}`}
+                        onClick={() => setAeropuertoSeleccionado(selected ? null : a.codigo)}
+                      >
+                        <div className={styles.aeropuertoInfo}>
+                          <span className={styles.aeropuertoNombre}>{a.ciudad}</span>
+                          <span className={styles.aeropuertoPais}>{a.continente}</span>
+                        </div>
+                        <div className={styles.aeropuertoOcupacion}>
+                          <span className={styles.ocupacionTexto} style={{ color: hex }}>
+                            {pct.toFixed(1)}%
+                          </span>
+                          <Semaforo valor={pct} />
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )
+            )}
+
+            {tabActivo === 'vuelos' && (
+              <PanelVuelos
+                ocurrencias={manifest?.ocurrencias ?? null}
+                tiempoAnimacion={tiempoAnimacion}
+              />
             )}
           </section>
 
@@ -327,8 +387,8 @@ function Sidebar() {
                 </select>
               </div>
 
-              {/* Fecha de inicio (PERIODO y DIA_A_DIA) */}
-              {escenarioActivo !== ESCENARIOS.COLAPSO && escenarioActivo !== null && (
+              {/* Fecha de inicio — disponible para todos los escenarios */}
+              {escenarioActivo !== null && (
                 <div className={styles.simField}>
                   <label className={styles.simLabel}>Fecha de inicio</label>
                   <input

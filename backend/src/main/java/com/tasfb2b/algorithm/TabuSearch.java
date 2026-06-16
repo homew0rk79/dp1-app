@@ -97,6 +97,7 @@ public class TabuSearch {
 
         Solucion actual       = solucionInicial.clonar();
         Solucion mejorGlobal  = solucionInicial.clonar();
+        int[] aceptados = new int[4]; // índices 1, 2, 3 por tipo
 
         System.out.printf("  Parametros: %d iteraciones | muestra de %,d envios por iter | tenencia tabu: %d%n",
             maxIteraciones, tamanoMuestra, tenenciaTabu);
@@ -113,19 +114,25 @@ public class TabuSearch {
             }
 
             // ─── b. Elegir el mejor movimiento permitido ──────────────────────
-            Movimiento elegido     = null;
-            double     mejorDelta  = Double.MAX_VALUE;
+            Movimiento elegido    = null;
+            double     mejorDelta = Double.MAX_VALUE;
+            double costoActual    = actual.getCostoTotal();
 
             for (Movimiento mov : candidatos) {
-                boolean esTabu     = listaTabu.contains(mov.getClaveTabu());
-                double  costoNuevo = actual.getCostoTotal() + mov.getDeltaCosto();
+                boolean esTabu = listaTabu.contains(mov.getClaveTabu());
 
-                // Criterio de aspiración: tabú pero mejor que el mejor global
+                // Delta real: aplica temporalmente y mide el cambio global
+                // (incluye capacidad de aeropuertos y vuelos, no solo tiempo local)
+                actual.agregarRuta(mov.getRutaNueva());
+                double deltaReal = actual.getCostoTotal() - costoActual;
+                actual.agregarRuta(mov.getRutaAnterior()); // revert
+
+                double  costoNuevo       = costoActual + deltaReal;
                 boolean superaAspiracion = costoNuevo < mejorGlobal.getCostoTotal();
 
                 if (!esTabu || superaAspiracion) {
-                    if (mov.getDeltaCosto() < mejorDelta) {
-                        mejorDelta = mov.getDeltaCosto();
+                    if (deltaReal < mejorDelta) {
+                        mejorDelta = deltaReal;
                         elegido    = mov;
                     }
                 }
@@ -143,6 +150,8 @@ public class TabuSearch {
 
             // ─── c. Aplicar el movimiento ─────────────────────────────────────
             aplicarMovimiento(actual, elegido);
+            int tipoElegido = elegido.getTipo();
+            if (tipoElegido >= 1 && tipoElegido <= 3) aceptados[tipoElegido]++;
 
             // ─── d. Actualizar la lista tabú ──────────────────────────────────
             listaTabu.add(elegido.getClaveTabu());
@@ -167,7 +176,7 @@ public class TabuSearch {
                     actual.getCostoTotal(),
                     mejorGlobal.getCostoTotal(),
                     actual.getPenaltyCapacidad(),
-                    elegido.getDeltaCosto()
+                    mejorDelta
                 );
             }
         }
@@ -178,6 +187,9 @@ public class TabuSearch {
         System.out.printf("    Costo inicial  : %,12.0f%n", solucionInicial.getCostoTotal());
         System.out.printf("    Mejor hallado  : %,12.0f%n", mejorGlobal.getCostoTotal());
         System.out.printf("    Mejora total   : %,12.0f  (%.2f%%)%n", mejora, pctMejora);
+        System.out.printf("  Movimientos generados — %s%n", vecindad.getResumenGenerados());
+        System.out.printf("  Movimientos aceptados — T1: %,d  T2: %,d  T3: %,d%n",
+            aceptados[1], aceptados[2], aceptados[3]);
 
         return mejorGlobal;
     }

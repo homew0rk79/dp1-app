@@ -83,6 +83,46 @@
   gap: 0.4rem;
 }
 
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 0.6rem;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+}
+
+.tab {
+  flex: 1;
+  padding: 0.3rem 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tab:hover {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.tabActivo {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.tabActivo:hover {
+  background: var(--color-accent-hover);
+  color: #fff;
+}
+
 /* Lista de aeropuertos */
 .aeropuertoList {
   list-style: none;
@@ -98,11 +138,21 @@
   padding: 0.42rem 0.5rem;
   border-radius: var(--radius-sm);
   transition: background 0.12s;
-  cursor: default;
+  cursor: pointer;
 }
 
 .aeropuertoItem:hover {
   background: var(--color-bg);
+}
+
+.aeropuertoSeleccionado {
+  background: #eff6ff;
+  outline: 1px solid #bfdbfe;
+  border-radius: var(--radius-sm);
+}
+
+.aeropuertoSeleccionado:hover {
+  background: #dbeafe;
 }
 
 .aeropuertoInfo {

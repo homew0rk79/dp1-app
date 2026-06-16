@@ -14,7 +14,7 @@ public class TramoRuta {
 
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "tramo_ruta_seq")
-    @SequenceGenerator(name = "tramo_ruta_seq", sequenceName = "tramo_ruta_id_seq", allocationSize = 500)
+    @SequenceGenerator(name = "tramo_ruta_seq", sequenceName = "tramo_ruta_id_seq", allocationSize = 1)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
