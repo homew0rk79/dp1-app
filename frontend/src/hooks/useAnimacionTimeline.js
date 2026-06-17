@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import useSimulacionStore from '../store/simulacionStore'
+import { SA_SALTO_ALGORITMO_MIN } from '../constants/restricciones'
 
 /**
  * Gestiona el estado de la animación de vuelos.
@@ -27,12 +28,12 @@ function useAnimacionTimeline() {
 
   const tiempoRef    = useRef(initialTiempo)
   const velocidadRef = useRef(initialVelocidad)
-  const lastDiaRef   = useRef(Math.floor(initialTiempo / 60))
+  const lastSaltoRef = useRef(Math.floor(initialTiempo / SA_SALTO_ALGORITMO_MIN))
 
   useEffect(() => {
     if (Math.abs(tiempoRef.current - tiempoAnimacion) <= 1) return
     tiempoRef.current = tiempoAnimacion
-    lastDiaRef.current = Math.floor(tiempoAnimacion / 1440)
+    lastSaltoRef.current = Math.floor(tiempoAnimacion / SA_SALTO_ALGORITMO_MIN)
     setTiempoDisplay(tiempoAnimacion)
   }, [tiempoAnimacion])
 
@@ -41,7 +42,7 @@ function useAnimacionTimeline() {
 
   const seekTo = useCallback((t) => {
     tiempoRef.current  = t
-    lastDiaRef.current = Math.floor(t / 1440)
+    lastSaltoRef.current = Math.floor(t / SA_SALTO_ALGORITMO_MIN)
     setTiempoDisplay(t)
     setTiempoAnimacion(t)
   }, [setTiempoAnimacion])
@@ -54,7 +55,7 @@ function useAnimacionTimeline() {
 
   const cargarManifest = useCallback((data) => {
     tiempoRef.current  = 0
-    lastDiaRef.current = 0
+    lastSaltoRef.current = 0
     setTiempoDisplay(0)
     setPlayingAnimacion(false)
     setManifest(data)
@@ -63,9 +64,9 @@ function useAnimacionTimeline() {
   const onTick = useCallback((t) => {
     setTiempoDisplay(t)
     // Actualizar el store cada hora simulada — el Sidebar lee esto para KPIs y aeropuertos
-    const newHora = Math.floor(t / 60)
-    if (newHora !== lastDiaRef.current) {
-      lastDiaRef.current = newHora
+    const nuevoSalto = Math.floor(t / SA_SALTO_ALGORITMO_MIN)
+    if (nuevoSalto !== lastSaltoRef.current) {
+      lastSaltoRef.current = nuevoSalto
       setTiempoAnimacion(t)
     }
     if (manifest && t >= manifest.duracionTotalMinutos) {

@@ -8,13 +8,14 @@ import { useMap } from 'react-leaflet'
  * Colores según % de ocupación: azul → amarillo → rojo.
  * La lógica de tiempo (avanzar T) vive aquí para evitar re-renders en el árbol React.
  */
-function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick }) {
+function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avanceTickMin = 1 }) {
   const map          = useRef(null)
   const mapInstance  = useMap()
   const canvasRef    = useRef(null)
   const playingRef   = useRef(playing)
   const aerosRef     = useRef({})
   const animIdRef    = useRef(null)
+  const tiempoContinuoRef = useRef(0)
 
   map.current = mapInstance
 
@@ -26,6 +27,7 @@ function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick }) {
     const lookup = {}
     manifest.aeropuertos.forEach(a => { lookup[a.codigo] = a })
     aerosRef.current = lookup
+    tiempoContinuoRef.current = tiempoRef.current
   }, [manifest])
 
   // Insertar canvas dentro del overlayPane, ANTES del <svg> de Leaflet,
@@ -137,11 +139,19 @@ function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick }) {
     const frame = (ts) => {
       if (lastTs !== null && playingRef.current) {
         const dt = Math.min((ts - lastTs) / 1000, 0.1)
+        const pasoMin = Math.max(1, Number(avanceTickMin) || 1)
+        tiempoContinuoRef.current = Math.max(tiempoContinuoRef.current, tiempoRef.current)
+        tiempoContinuoRef.current = Math.min(
+          tiempoContinuoRef.current + velocidadRef.current * dt,
+          manifest.duracionTotalMinutos,
+        )
         tiempoRef.current = Math.min(
-          tiempoRef.current + velocidadRef.current * dt,
+          Math.floor(tiempoContinuoRef.current / pasoMin) * pasoMin,
           manifest.duracionTotalMinutos,
         )
         onTick?.(tiempoRef.current)
+      } else {
+        tiempoContinuoRef.current = tiempoRef.current
       }
       lastTs = ts
       draw()
@@ -153,7 +163,7 @@ function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick }) {
     return () => {
       if (animIdRef.current) cancelAnimationFrame(animIdRef.current)
     }
-  }, [manifest, draw, tiempoRef, velocidadRef, onTick])
+  }, [manifest, draw, tiempoRef, velocidadRef, onTick, avanceTickMin])
 
   // Redibujado al hacer pan/zoom (cuando la animación está pausada)
   useEffect(() => {

@@ -6,6 +6,7 @@ const useSimulacionStore = create((set) => ({
   estadoEjecucion: 'IDLE',
   colapsoDetectado: false,
   tiempoSegundos: 0,
+  inicioEjecucionReal: null,
   wsVersion: 0,
   parametros: {
     duracionPeriodo: DURACIONES_PERIODO[1], // 5 días por defecto
@@ -21,6 +22,7 @@ const useSimulacionStore = create((set) => ({
   setEscenario: (escenario) => set({ escenarioActivo: escenario }),
   setEstado: (estado) => set({ estadoEjecucion: estado }),
   setColapso: (valor) => set({ colapsoDetectado: valor }),
+  setInicioEjecucionReal: (valor) => set({ inicioEjecucionReal: valor }),
   setParametros: (parametros) =>
     set((s) => ({ parametros: { ...s.parametros, ...parametros } })),
   incrementarTiempo: () => set((s) => ({ tiempoSegundos: s.tiempoSegundos + 1 })),
@@ -35,6 +37,7 @@ const useSimulacionStore = create((set) => ({
       estadoEjecucion: 'IDLE',
       colapsoDetectado: false,
       tiempoSegundos: 0,
+      inicioEjecucionReal: null,
       manifest: null,
       tiempoAnimacion: 0,
       playingAnimacion: false,

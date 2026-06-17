@@ -68,12 +68,16 @@ public class PlanificadorService {
     private static final LocalDate DIA_CERO_ALGORITMO = LocalDate.of(2026, 1, 1);
     // Primer día con datos reales
     private static final LocalDate PRIMER_DIA_DATOS   = LocalDate.of(2026, 1, 2);
+    // Sc: salto del eje de consumo de datos, expresado en minutos simulados.
+    @Value("${tasf.simulacion.sc-salto-consumo-min:60}")
+    private int saltoConsumoBloqueMinutos;
 
     // ── Datos cargados ────────────────────────────────────────────────────────
     private volatile Map<String, Aeropuerto> aeropuertosCargados = null;
     private volatile List<Vuelo> vuelosCargados = null;
     private volatile Solucion solucionActual = null;
     private volatile LocalDate fechaInicioSimulacion = PRIMER_DIA_DATOS;
+    private volatile LocalDateTime fechaHoraInicioSimulacion = PRIMER_DIA_DATOS.atStartOfDay();
     private volatile PlanificacionStats statsActual = new PlanificacionStats();
 
     private final WebSocketEventPublisher wsPublisher;
@@ -181,7 +185,7 @@ public class PlanificadorService {
         statsActual = new PlanificacionStats();
         replanificacionesEjecutadas = 0;
         ejecutandoColapso = false;
-        LocalDate fechaInicio = parsearFecha(fechaInicioStr);
+        LocalDateTime fechaInicio = parsearFechaHora(fechaInicioStr);
         Thread t = new Thread(() -> ejecutar(escenario, fechaInicio, numDias), "planificador");
         t.setDaemon(true);
         t.start();
@@ -191,9 +195,9 @@ public class PlanificadorService {
     // Lógica de planificación (hilo de fondo)
     // =========================================================================
 
-    private void ejecutar(String escenario, LocalDate fechaInicio, int numDias) {
+    private void ejecutar(String escenario, LocalDateTime fechaInicio, int numDias) {
         if ("COLAPSO".equalsIgnoreCase(escenario)) {
-            ejecutarColapso(fechaInicio);
+            ejecutarColapso(fechaInicio != null ? fechaInicio.toLocalDate() : null);
             return;
         }
 
@@ -202,10 +206,12 @@ public class PlanificadorService {
         statsActual = stats;
         long inicioTotal = System.nanoTime();
         try {
-            LocalDate fechaBase = fechaInicio != null ? fechaInicio : PRIMER_DIA_DATOS;
-            fechaInicioSimulacion = fechaBase;
+            LocalDateTime fechaBase = fechaInicio != null ? fechaInicio : PRIMER_DIA_DATOS.atStartOfDay();
+            LocalDate fechaBaseDia = fechaBase.toLocalDate();
+            fechaInicioSimulacion = fechaBaseDia;
+            fechaHoraInicioSimulacion = fechaBase;
             int dias = resolverDiasEscenario(escenario, numDias);
-            simulacion = simulacionRepository.save(new Simulacion(escenario, fechaBase, dias));
+            simulacion = simulacionRepository.save(new Simulacion(escenario, fechaBaseDia, dias));
             simulacionActualId = simulacion.getId();
             setEstado(Estado.CARGANDO, 5, "Cargando aeropuertos y vuelos...", 0);
 
@@ -283,7 +289,7 @@ public class PlanificadorService {
             solucionActual = mejor;
 
             // Detectar y publicar colapso para DIA_A_DIA y PERIODO
-            detectarPrimerColapsoNuevo(mejor, aeropuertos, fechaBase, new HashSet<>())
+            detectarPrimerColapsoNuevo(mejor, aeropuertos, fechaBaseDia, new HashSet<>())
                 .ifPresent(wsPublisher::publicarColapso);
 
             long inicioPersistencia = System.nanoTime();
@@ -337,6 +343,7 @@ public class PlanificadorService {
             setEstado(Estado.CARGANDO, 5, "Cargando aeropuertos y vuelos...", 0);
 
             fechaInicioSimulacion = fechaBase;
+            fechaHoraInicioSimulacion = fechaBase.atStartOfDay();
 
             Map<String, Aeropuerto> aeropuertos = aeropuertoRepository.findAll().stream()
                 .collect(Collectors.toMap(Aeropuerto::getCodigo, a -> a, (a, b) -> a, LinkedHashMap::new));
@@ -356,7 +363,7 @@ public class PlanificadorService {
             ejecutandoColapso = true;
 
             while (ejecutandoColapso) {
-                List<Envio> enviosChunk = cargarEnviosDbPorPeriodo(fechaActual, DIAS_CHUNK);
+                List<Envio> enviosChunk = cargarEnviosDbPorPeriodo(fechaActual.atStartOfDay(), DIAS_CHUNK);
                 if (enviosChunk.isEmpty()) break;
 
                 for (Envio e : enviosChunk) {
@@ -411,6 +418,7 @@ public class PlanificadorService {
                 // La animación arranca desde el chunk del colapso, no desde el día 1
                 simulacion.setFechaInicio(fechaActual);
                 fechaInicioSimulacion = fechaActual;
+                fechaHoraInicioSimulacion = fechaActual.atStartOfDay();
                 simulacion.setNumDias(DIAS_CHUNK);
                 guardarRutasEnDb(solucionActual, simulacion);
                 guardarMetricasEnSimulacion(simulacion, solucionActual);
@@ -536,7 +544,7 @@ public class PlanificadorService {
     }
 
     private List<Envio> cargarEnviosSegunEscenario(String escenario,
-                                                    LocalDate fechaInicio,
+                                                    LocalDateTime fechaInicio,
                                                     int numDias) throws Exception {
         switch (escenario.toUpperCase()) {
             case "DIA_A_DIA": {
@@ -670,10 +678,9 @@ public class PlanificadorService {
         }
     }
 
-    private List<Envio> cargarEnviosDbPorPeriodo(LocalDate fechaInicio, int numDias) throws Exception {
-        LocalDate fecha = fechaInicio != null ? fechaInicio : LocalDate.of(2026, 1, 2);
-        LocalDateTime desde = fecha.atStartOfDay();
-        LocalDateTime hasta = fecha.plusDays(numDias).atStartOfDay();
+    private List<Envio> cargarEnviosDbPorPeriodo(LocalDateTime fechaInicio, int numDias) throws Exception {
+        LocalDateTime desde = fechaInicio != null ? fechaInicio : LocalDate.of(2026, 1, 2).atStartOfDay();
+        LocalDateTime hasta = desde.plusDays(numDias);
         return envioRepository
             .findByFechaHoraRegistroGreaterThanEqualAndFechaHoraRegistroLessThan(desde, hasta);
     }
@@ -794,6 +801,11 @@ public class PlanificadorService {
     private static int minutosDesdeInicioSimulacion(LocalDate fecha) {
         LocalDate base = LocalDate.of(2026, 1, 1);
         return (int) ChronoUnit.DAYS.between(base, fecha) * 1440;
+    }
+
+    private static int minutosDesdeInicioSimulacion(LocalDateTime fecha) {
+        LocalDateTime base = LocalDateTime.of(2026, 1, 1, 0, 0);
+        return (int) ChronoUnit.MINUTES.between(base, fecha);
     }
 
     private static int calcularHorizonteOperacionalMinutos(int numDias) {
@@ -991,9 +1003,12 @@ public class PlanificadorService {
         return "ROJO";
     }
 
-    private static LocalDate parsearFecha(String fechaStr) {
+    private static LocalDateTime parsearFechaHora(String fechaStr) {
         if (fechaStr == null || fechaStr.isBlank()) return null;
-        return LocalDate.parse(fechaStr, DateTimeFormatter.ISO_LOCAL_DATE);
+        if (fechaStr.length() == 10) {
+            return LocalDate.parse(fechaStr, DateTimeFormatter.ISO_LOCAL_DATE).atStartOfDay();
+        }
+        return LocalDateTime.parse(fechaStr, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
     }
 
     private static String formatearMinutos(int minutos) {
@@ -1011,9 +1026,11 @@ public class PlanificadorService {
             return getAnimacionManifestPersistida().orElse(null);
         }
         Optional<Simulacion> simOpt = getUltimaSimulacion();
-        int inicioAbs = simOpt.map(Simulacion::getFechaInicio)
-            .map(PlanificadorService::minutosDesdeInicioSimulacion)
-            .orElse(0);
+        int inicioAbs = fechaHoraInicioSimulacion != null
+            ? minutosDesdeInicioSimulacion(fechaHoraInicioSimulacion)
+            : simOpt.map(Simulacion::getFechaInicio)
+                .map(PlanificadorService::minutosDesdeInicioSimulacion)
+                .orElse(0);
         int duracionVentana = simOpt.map(s -> s.getNumDias() > 0 ? calcularHorizonteOperacionalMinutos(s.getNumDias()) : 0)
             .orElse(0);
         int diaInicio = inicioAbs / 1440;
@@ -1071,6 +1088,37 @@ public class PlanificadorService {
             .collect(Collectors.toList());
 
         return new AnimacionManifestDTO(duracionManifest(maxLlegada, duracionVentana), 0, ocurrencias, aeropuertos);
+    }
+
+    public List<Map<String, Object>> getConsumoBloques() {
+        AnimacionManifestDTO manifest = getAnimacionManifest();
+        if (manifest == null || manifest.getDuracionTotalMinutos() <= 0) {
+            return Collections.emptyList();
+        }
+
+        List<Map<String, Object>> bloques = new ArrayList<>();
+        int bloque = 1;
+        int saltoMin = Math.max(1, saltoConsumoBloqueMinutos);
+        for (int inicio = 0; inicio < manifest.getDuracionTotalMinutos(); inicio += saltoMin) {
+            int fin = Math.min(inicio + saltoMin, manifest.getDuracionTotalMinutos());
+            int maletas = 0;
+            int vuelosActivos = 0;
+            for (OcurrenciaVueloDTO ocurrencia : manifest.getOcurrencias()) {
+                if (ocurrencia.getSalidaAbs() < fin && ocurrencia.getLlegadaAbs() > inicio) {
+                    maletas += ocurrencia.getMaletas();
+                    vuelosActivos++;
+                }
+            }
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("bloque", bloque++);
+            item.put("inicioMin", inicio);
+            item.put("finMin", fin);
+            item.put("saltoMin", saltoMin);
+            item.put("maletas", maletas);
+            item.put("vuelosActivos", vuelosActivos);
+            bloques.add(item);
+        }
+        return bloques;
     }
 
     private Optional<AnimacionManifestDTO> getAnimacionManifestPersistida() {

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet'
+import L from 'leaflet'
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 
 import LeyendaMapa from '../LeyendaMapa/LeyendaMapa'
@@ -9,18 +10,25 @@ import MapController from './MapController'
 import SimulacionControles from '../../SimulacionControles/SimulacionControles'
 import { getColorSemaforo, COLORES_SEMAFORO } from '../../../utils/semaforo'
 import { formatearCapacidad } from '../../../utils/formatters'
+import { formatearDuracion, formatearFechaHora, sumarMinutos } from '../../../utils/tiempos'
 import useConfiguracionStore from '../../../store/configuracionStore'
 import usePlanificadorStore from '../../../store/planificadorStore'
 import useSimulacionStore from '../../../store/simulacionStore'
 import useSeleccionStore from '../../../store/seleccionStore'
 import useAnimacionTimeline from '../../../hooks/useAnimacionTimeline'
 import { simulacionService } from '../../../services/simulacionService'
-import { FECHA_INICIO_SIMULACION_ALGORITMO } from '../../../constants/restricciones'
+import {
+  FECHA_INICIO_SIMULACION_ALGORITMO,
+  TA_EJECUCION_ALGORITMO_MIN,
+  SA_SALTO_ALGORITMO_MIN,
+} from '../../../constants/restricciones'
 import styles from './MapaInteractivo.module.css'
 
 function MapaInteractivo() {
   const rangosSemaforo = useConfiguracionStore((s) => s.rangosSemaforo)
   const fechaInicio = useSimulacionStore((s) => s.parametros.fechaInicio)
+  const tiempoSegundos = useSimulacionStore((s) => s.tiempoSegundos)
+  const inicioEjecucionReal = useSimulacionStore((s) => s.inicioEjecucionReal)
 
   const aeropuertoSeleccionado = useSeleccionStore((s) => s.aeropuertoSeleccionado)
   const setAeropuertoSeleccionado = useSeleccionStore((s) => s.setAeropuertoSeleccionado)
@@ -32,6 +40,8 @@ function MapaInteractivo() {
   })()
 
   const [aeropuertos, setAeropuertos] = useState([])
+  const [ahoraReal, setAhoraReal] = useState(() => new Date())
+  const [consumoBloques, setConsumoBloques] = useState([])
   // Ocupación durante el algoritmo (snapshot WS), usada antes de tener manifest
   const [ocupacionWS, setOcupacionWS] = useState({})
   // Ocupación real al minuto exacto de la animación (actualizada c/hora simulada)
@@ -57,6 +67,12 @@ function MapaInteractivo() {
     onTick,
   } = useAnimacionTimeline()
 
+  const hayDatosSimulacion = Boolean(manifest || snapshot || completado)
+  const fechaSimulada = sumarMinutos(fechaInicio, tiempoDisplay)
+  const segundosReales = inicioEjecucionReal
+    ? Math.max(0, Math.floor((ahoraReal.getTime() - inicioEjecucionReal) / 1000))
+    : tiempoSegundos
+
   // Cargar aeropuertos base al montar
   useEffect(() => {
     simulacionService.obtenerAeropuertos()
@@ -65,6 +81,21 @@ function MapaInteractivo() {
         console.error('No se pudieron cargar aeropuertos:', err)
       })
   }, [])
+
+  useEffect(() => {
+    const id = setInterval(() => setAhoraReal(new Date()), 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    if (!manifest && !completado) {
+      setConsumoBloques([])
+      return
+    }
+    simulacionService.obtenerConsumoBloques()
+      .then(res => setConsumoBloques(res.data ?? []))
+      .catch(() => setConsumoBloques([]))
+  }, [manifest, completado])
 
   // Ocupación en tiempo real durante la ejecución del algoritmo
   useEffect(() => {
@@ -110,9 +141,9 @@ function MapaInteractivo() {
       setOcupacionRealtime({})
       return
     }
-    const horaSimulada = Math.floor(tiempoDisplay / 60)
-    if (horaSimulada === ultimaHoraRef.current) return
-    ultimaHoraRef.current = horaSimulada
+    const saltoSimulado = Math.floor(tiempoDisplay / SA_SALTO_ALGORITMO_MIN)
+    if (saltoSimulado === ultimaHoraRef.current) return
+    ultimaHoraRef.current = saltoSimulado
 
     const tiempoMin = Math.floor(tiempoDisplay) + offsetMinutos
     simulacionService.obtenerOcupacionActual(tiempoMin)
@@ -134,6 +165,10 @@ function MapaInteractivo() {
     }
     return ocupacionWS[codigo] ?? null
   }
+
+  const maxConsumo = consumoBloques.reduce((max, item) => Math.max(max, item.maletas || 0), 0)
+  const bloquesVisibles = consumoBloques.slice(0, 24)
+  const scConsumoReal = bloquesVisibles[0]?.saltoMin ?? null
 
   return (
     <div className={styles.contenedor}>
@@ -160,28 +195,36 @@ function MapaInteractivo() {
             velocidadRef={velocidadRef}
             playing={playing}
             onTick={onTick}
+            avanceTickMin={TA_EJECUCION_ALGORITMO_MIN}
           />
         )}
 
-        {/* Aeropuertos */}
-        {aeropuertos.map((aeropuerto) => {
+        {/* Aeropuertos: se muestran cuando existe ejecucion, snapshot o manifest */}
+        {hayDatosSimulacion && aeropuertos.map((aeropuerto) => {
           const estado    = getOcupacion(aeropuerto.codigo)
           const pctOcup   = estado?.ocupacion ?? 0
           const color     = getColorSemaforo(pctOcup, rangosSemaforo)
           const colorHex  = COLORES_SEMAFORO[color]
           const seleccionado = aeropuertoSeleccionado === aeropuerto.codigo
 
+          const icon = L.divIcon({
+            className: styles.aeropuertoMarker,
+            html: `
+              <span class="${styles.aeropuertoIcono}" style="--airport-color:${colorHex};">
+                <span class="${styles.aeropuertoPista}"></span>
+                <span class="${styles.aeropuertoAvion}">&#9992;</span>
+              </span>
+            `,
+            iconSize: seleccionado ? [32, 32] : [28, 28],
+            iconAnchor: seleccionado ? [16, 16] : [14, 14],
+          })
+
           return (
-            <CircleMarker
+            <Marker
               key={aeropuerto.codigo}
-              center={[aeropuerto.lat, aeropuerto.lng]}
-              radius={seleccionado ? 13 : 10}
-              pathOptions={{
-                fillColor:   colorHex,
-                fillOpacity: 0.9,
-                color:       seleccionado ? '#1d4ed8' : 'white',
-                weight:      seleccionado ? 3 : 2,
-              }}
+              position={[aeropuerto.lat, aeropuerto.lng]}
+              icon={icon}
+              zIndexOffset={seleccionado ? 500 : 0}
               eventHandlers={{
                 click: () => setAeropuertoSeleccionado(
                   seleccionado ? null : aeropuerto.codigo
@@ -220,12 +263,52 @@ function MapaInteractivo() {
                   )}
                 </div>
               </Popup>
-            </CircleMarker>
+            </Marker>
           )
         })}
       </MapContainer>
 
-      <LeyendaMapa />
+      {hayDatosSimulacion && <LeyendaMapa />}
+
+      {hayDatosSimulacion && (
+        <div className={styles.panelTiempos}>
+          <div>
+            <span>Fecha-hora simulada</span>
+            <strong>{formatearFechaHora(fechaSimulada)}</strong>
+          </div>
+          <div>
+            <span>Fecha-hora real</span>
+            <strong>{formatearFechaHora(ahoraReal)}</strong>
+          </div>
+          <div>
+            <span>Transcurrido simulado</span>
+            <strong>{formatearDuracion(tiempoDisplay * 60)}</strong>
+          </div>
+          <div>
+            <span>Transcurrido real</span>
+            <strong>{formatearDuracion(segundosReales)}</strong>
+          </div>
+        </div>
+      )}
+
+      {(manifest || completado) && bloquesVisibles.length > 0 && (
+        <div className={styles.panelConsumo}>
+          <div className={styles.consumoHeader}>
+            <span>Consumo por bloques</span>
+            <strong>{scConsumoReal ? `Sc=${scConsumoReal} min` : 'Sc --'}</strong>
+          </div>
+          <div className={styles.consumoBarras}>
+            {bloquesVisibles.map((item) => (
+              <span
+                key={item.bloque}
+                className={styles.consumoBarra}
+                title={`Bloque ${item.bloque}: ${item.maletas} maletas`}
+                style={{ height: `${Math.max(8, ((item.maletas || 0) / (maxConsumo || 1)) * 52)}px` }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Controles de animación — aparecen solo cuando hay manifest */}
       <SimulacionControles

@@ -22,3 +22,35 @@ export function estaEnPlazo(fechaIngreso, plazoEnDias) {
   limite.setDate(limite.getDate() + plazoEnDias)
   return new Date() <= limite
 }
+
+export function parseFechaLocal(fechaStr) {
+  if (!fechaStr) return null
+  const normalizada = fechaStr.length === 10 ? `${fechaStr}T00:00` : fechaStr
+  const fecha = new Date(normalizada)
+  return Number.isNaN(fecha.getTime()) ? null : fecha
+}
+
+export function formatearFechaHora(fecha) {
+  if (!fecha || Number.isNaN(fecha.getTime())) return '--/--/---- --:--:--'
+  const dd = String(fecha.getDate()).padStart(2, '0')
+  const mm = String(fecha.getMonth() + 1).padStart(2, '0')
+  const yyyy = fecha.getFullYear()
+  const hh = String(fecha.getHours()).padStart(2, '0')
+  const min = String(fecha.getMinutes()).padStart(2, '0')
+  const ss = String(fecha.getSeconds()).padStart(2, '0')
+  return `${dd}/${mm}/${yyyy} ${hh}:${min}:${ss}`
+}
+
+export function formatearDuracion(segundos) {
+  const total = Math.max(0, Math.floor(segundos || 0))
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const s = total % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
+
+export function sumarMinutos(fechaStr, minutos) {
+  const fecha = parseFechaLocal(fechaStr)
+  if (!fecha) return null
+  return new Date(fecha.getTime() + Math.floor(minutos || 0) * 60000)
+}

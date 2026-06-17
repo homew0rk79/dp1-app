@@ -10,6 +10,7 @@ import {
   RotateCcw,
   ChevronLeft,
   ChevronRight,
+  Gauge,
 } from 'lucide-react'
 
 import PanelMetrica from '../../common/PanelMetrica/PanelMetrica'
@@ -21,17 +22,18 @@ import { getColorSemaforo, COLORES_SEMAFORO } from '../../../utils/semaforo'
 import useConfiguracionStore from '../../../store/configuracionStore'
 import useSeleccionStore from '../../../store/seleccionStore'
 import { ESCENARIOS, ETIQUETAS_ESCENARIO } from '../../../constants/escenarios'
-import { DURACIONES_PERIODO, FECHA_INICIO_DATOS, FECHA_FIN_DATOS, FECHA_INICIO_SIMULACION_ALGORITMO } from '../../../constants/restricciones'
+import {
+  DURACIONES_PERIODO,
+  FECHA_INICIO_DATOS,
+  FECHA_FIN_DATOS,
+  FECHA_INICIO_SIMULACION_ALGORITMO,
+  TA_EJECUCION_ALGORITMO_MIN,
+  SA_SALTO_ALGORITMO_MIN,
+} from '../../../constants/restricciones'
+import { formatearDuracion } from '../../../utils/tiempos'
 import usePlanificadorStore from '../../../store/planificadorStore'
 import { simulacionService } from '../../../services/simulacionService'
 import styles from './Sidebar.module.css'
-
-function formatearTiempo(segundos) {
-  const h = Math.floor(segundos / 3600)
-  const m = Math.floor((segundos % 3600) / 60)
-  const s = segundos % 60
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-}
 
 function Sidebar() {
   const navigate = useNavigate()
@@ -41,6 +43,7 @@ function Sidebar() {
   const ultimaHoraRef  = useRef(-1)
   const rangosSemaforo = useConfiguracionStore((s) => s.rangosSemaforo)
   const [ocupacionRealtime, setOcupacionRealtime] = useState({})
+  const [scConsumoReal, setScConsumoReal] = useState(null)
 
   const aeropuertoSeleccionado = useSeleccionStore((s) => s.aeropuertoSeleccionado)
   const setAeropuertoSeleccionado = useSeleccionStore((s) => s.setAeropuertoSeleccionado)
@@ -63,6 +66,7 @@ function Sidebar() {
     clearManifest,
     setTiempoAnimacion,
     setPlayingAnimacion,
+    setInicioEjecucionReal,
   } = useSimulacionStore()
 
   const progreso = usePlanificadorStore((s) => s.progreso)
@@ -94,15 +98,25 @@ function Sidebar() {
       setOcupacionRealtime({})
       return
     }
-    const horaSimulada = Math.floor(tiempoAnimacion / 60)
-    if (horaSimulada === ultimaHoraRef.current) return
-    ultimaHoraRef.current = horaSimulada
+    const saltoSimulado = Math.floor(tiempoAnimacion / SA_SALTO_ALGORITMO_MIN)
+    if (saltoSimulado === ultimaHoraRef.current) return
+    ultimaHoraRef.current = saltoSimulado
 
     const tiempoMin = Math.floor(tiempoAnimacion) + offsetMinutos
     simulacionService.obtenerOcupacionActual(tiempoMin)
       .then(res => setOcupacionRealtime(res.data ?? {}))
       .catch(() => {})
   }, [tiempoAnimacion, manifest, offsetMinutos])
+
+  useEffect(() => {
+    if (!manifest && !completado) {
+      setScConsumoReal(null)
+      return
+    }
+    simulacionService.obtenerConsumoBloques()
+      .then(res => setScConsumoReal(res.data?.[0]?.saltoMin ?? null))
+      .catch(() => setScConsumoReal(null))
+  }, [manifest, completado])
 
   // Aeropuertos en tiempo real (desde snapshot WS) o lista vacía
   const aeropuertosWS = snapshot?.aeropuertos ?? []
@@ -200,6 +214,7 @@ function Sidebar() {
       clearManifest()
       setColapso(false)
       setEstado('CARGANDO')
+      setInicioEjecucionReal(Date.now())
       await simulacionService.iniciar({
         escenario: escenarioActivo,
         fechaInicio: parametros.fechaInicio,
@@ -390,12 +405,13 @@ function Sidebar() {
               {/* Fecha de inicio — disponible para todos los escenarios */}
               {escenarioActivo !== null && (
                 <div className={styles.simField}>
-                  <label className={styles.simLabel}>Fecha de inicio</label>
+                  <label className={styles.simLabel}>Fecha y hora de inicio</label>
                   <input
-                    type="date"
+                    type="datetime-local"
                     className={styles.simSelect}
                     min={FECHA_INICIO_DATOS}
-                    max={FECHA_FIN_DATOS}
+                    max={`${FECHA_FIN_DATOS}T23:59`}
+                    step={60}
                     value={parametros.fechaInicio}
                     onChange={(e) => setParametros({ fechaInicio: e.target.value })}
                     disabled={enCurso}
@@ -430,8 +446,20 @@ function Sidebar() {
                   {estadoEjecucion === 'ERROR' && 'Error'}
                 </span>
                 {estadoEjecucion !== 'IDLE' && (
-                  <span className={styles.simTiempo}>{formatearTiempo(tiempoSegundos ?? 0)}</span>
+                  <span className={styles.simTiempo}>{formatearDuracion(tiempoSegundos ?? 0)}</span>
                 )}
+              </div>
+
+              <div className={styles.parametrosAlgoritmo}>
+                <div className={styles.paramHeader}>
+                  <Gauge size={13} />
+                  <span>Tiempos del algoritmo</span>
+                </div>
+                <div className={styles.paramGrid}>
+                  <span>Ta: avance por tick</span><strong>{TA_EJECUCION_ALGORITMO_MIN} min</strong>
+                  <span>Sa: salto algoritmo</span><strong>{SA_SALTO_ALGORITMO_MIN} min</strong>
+                  <span>Sc: bloque consumo</span><strong>{scConsumoReal ? `${scConsumoReal} min` : '--'}</strong>
+                </div>
               </div>
 
               {simulacionEnCurso && (
