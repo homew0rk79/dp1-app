@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import styles from './SimulacionControles.module.css'
 import useSimulacionStore from '../../store/simulacionStore'
+import { formatearFechaHora, sumarMinutos } from '../../utils/tiempos'
+import { TA_EJECUCION_ALGORITMO_MIN } from '../../constants/restricciones'
 
 const PRESETS = [
-  { label: '×30',  valor: 30 },
-  { label: '×60',  valor: 60 },
-  { label: '×120', valor: 120 },
-  { label: '×360', valor: 360 },
+  { label: 'x30', valor: 30 },
+  { label: 'x60', valor: 60 },
+  { label: 'x120', valor: 120 },
+  { label: 'x360', valor: 360 },
   { label: '1d/s', valor: 1440 },
 ]
 
@@ -18,19 +20,12 @@ function formatTiempo(minutos, duracionTotalMinutos, fechaInicioStr) {
     : minutos
   const tiempo = Math.max(0, Math.min(Math.floor(minutos), limite))
   const dia = Math.floor(tiempo / 1440) + 1
-  const hh  = String(Math.floor((tiempo % 1440) / 60)).padStart(2, '0')
-  const mm  = String(Math.floor(tiempo % 60)).padStart(2, '0')
+  const hh = String(Math.floor((tiempo % 1440) / 60)).padStart(2, '0')
+  const mm = String(Math.floor(tiempo % 60)).padStart(2, '0')
+  const fecha = sumarMinutos(fechaInicioStr, tiempo)
+  const fechaStr = fecha ? ` (${formatearFechaHora(fecha).slice(0, 16)})` : ''
 
-  let fechaStr = ''
-  if (fechaInicioStr) {
-    const [y, mo, d] = fechaInicioStr.split('-').map(Number)
-    const fecha = new Date(y, mo - 1, d + dia - 1)
-    const dd = String(fecha.getDate()).padStart(2, '0')
-    const mes = String(fecha.getMonth() + 1).padStart(2, '0')
-    fechaStr = ` (${dd}/${mes}/${fecha.getFullYear()})`
-  }
-
-  return `Día ${dia}${fechaStr} · ${hh}:${mm}`
+  return `Dia ${dia}${fechaStr} - ${hh}:${mm}`
 }
 
 function SimulacionControles({
@@ -48,13 +43,9 @@ function SimulacionControles({
 
   if (!manifest) return null
 
-  const progreso = manifest.duracionTotalMinutos > 0
-    ? tiempoDisplay / manifest.duracionTotalMinutos
-    : 0
-
   function handleDuracionBlur() {
     const n = parseFloat(duracionMin)
-    if (!isNaN(n) && n > 0 && manifest.duracionTotalMinutos > 0) {
+    if (!Number.isNaN(n) && n > 0 && manifest.duracionTotalMinutos > 0) {
       const v = manifest.duracionTotalMinutos / (n * 60)
       onVelocidad(Math.round(v))
     }
@@ -62,14 +53,13 @@ function SimulacionControles({
 
   return (
     <div className={styles.panel}>
-      {/* Fila superior: play + tiempo + barra */}
       <div className={styles.fila}>
         <button
           className={styles.btnPlay}
           onClick={playing ? onPause : onPlay}
           aria-label={playing ? 'Pausar' : 'Reproducir'}
         >
-          {playing ? '⏸' : '▶'}
+          {playing ? '||' : '>'}
         </button>
 
         <span className={styles.tiempo}>
@@ -81,7 +71,7 @@ function SimulacionControles({
           className={styles.progreso}
           min={0}
           max={manifest.duracionTotalMinutos}
-          step={1}
+          step={TA_EJECUCION_ALGORITMO_MIN}
           value={Math.floor(tiempoDisplay)}
           onChange={(e) => onSeek(Number(e.target.value))}
         />
@@ -95,7 +85,6 @@ function SimulacionControles({
         </span>
       </div>
 
-      {/* Fila inferior: presets de velocidad + campo duración */}
       <div className={styles.fila}>
         <span className={styles.velocidadLabel}>Velocidad:</span>
         <div className={styles.chips}>
@@ -104,6 +93,7 @@ function SimulacionControles({
               key={p.valor}
               className={`${styles.chip} ${velocidad === p.valor ? styles.chipActivo : ''}`}
               onClick={() => onVelocidad(p.valor)}
+              type="button"
             >
               {p.label}
             </button>

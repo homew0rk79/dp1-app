@@ -9,8 +9,13 @@ import com.tasfb2b.model.Vuelo;
 import com.tasfb2b.repository.VueloRepository;
 import com.tasfb2b.model.Envio;
 import com.tasfb2b.repository.EnvioRepository;
+import org.springframework.jdbc.core.BatchPreparedStatementSetter;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.List;
 
 import java.io.IOException;
@@ -28,6 +33,7 @@ public class CargaDatosDbService {
     private final AeropuertoRepository aeropuertoRepository;
     private final VueloRepository vueloRepository;
     private final EnvioRepository envioRepository;
+    private final JdbcTemplate jdbcTemplate;
 
     @Value("${tasf.datos.aeropuertos}")
     private String rutaAeropuertos;
@@ -41,11 +47,13 @@ public class CargaDatosDbService {
     public CargaDatosDbService(
             AeropuertoRepository aeropuertoRepository,
             VueloRepository vueloRepository,
-            EnvioRepository envioRepository
+            EnvioRepository envioRepository,
+            JdbcTemplate jdbcTemplate
     ) {
         this.aeropuertoRepository = aeropuertoRepository;
         this.vueloRepository = vueloRepository;
         this.envioRepository = envioRepository;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     public void cargarAeropuertos() throws IOException {
@@ -95,7 +103,7 @@ public class CargaDatosDbService {
 
         DataLoader loader = new DataLoader(rutaAeropuertos, rutaVuelos, rutaEnvios);
         List<Envio> envios = loader.cargarEnvios(-1);
-        envioRepository.saveAll(envios);
+        guardarEnviosPorLotes(envios);
 
         System.out.println("Envios guardados en PostgreSQL: " + envios.size());
     }
@@ -179,17 +187,11 @@ public class CargaDatosDbService {
             DataLoader loader = new DataLoader(rutaAeropuertos, rutaVuelos, tempDir.toString());
             List<Envio> envios = loader.cargarEnvios(-1);
 
-            int insertados = 0;
-            int actualizados = 0;
-            for (Envio envio : envios) {
-                if (envioRepository.existsById(envio.getId())) {
-                    actualizados++;
-                } else {
-                    insertados++;
-                }
-            }
-            envioRepository.saveAll(envios);
+            long existentesAntes = envioRepository.countByIdOriginalIsNotNull();
+            guardarEnviosPorLotes(envios);
 
+            int insertados = existentesAntes == 0 ? envios.size() : 0;
+            int actualizados = existentesAntes == 0 ? 0 : envios.size();
             Map<String, Object> respuesta = respuesta("envios", archivos.size() + " archivo(s)", envios.size(), insertados, actualizados);
             respuesta.put("archivos", archivos.stream().map(MultipartFile::getOriginalFilename).toList());
             return respuesta;
@@ -247,6 +249,56 @@ public class CargaDatosDbService {
         destino.setLlegadaMinutos(origen.getLlegadaMinutos());
         destino.setCapacidadMax(origen.getCapacidadMax());
         destino.setOcupacion(origen.getOcupacion());
+    }
+
+    private void guardarEnviosPorLotes(List<Envio> envios) {
+        if (envios == null || envios.isEmpty()) return;
+
+        final int batchSize = 5000;
+        final String sql = """
+            INSERT INTO envio (
+                id_envio, cantidad, destino, entregado, fecha_hora_registro,
+                id_cliente, id_original, origen, plazo_maximo_minutos
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (id_envio) DO UPDATE SET
+                cantidad = EXCLUDED.cantidad,
+                destino = EXCLUDED.destino,
+                entregado = EXCLUDED.entregado,
+                fecha_hora_registro = EXCLUDED.fecha_hora_registro,
+                id_cliente = EXCLUDED.id_cliente,
+                id_original = EXCLUDED.id_original,
+                origen = EXCLUDED.origen,
+                plazo_maximo_minutos = EXCLUDED.plazo_maximo_minutos
+            """;
+
+        for (int inicio = 0; inicio < envios.size(); inicio += batchSize) {
+            int fin = Math.min(inicio + batchSize, envios.size());
+            List<Envio> lote = envios.subList(inicio, fin);
+            jdbcTemplate.batchUpdate(sql, new BatchPreparedStatementSetter() {
+                @Override
+                public void setValues(PreparedStatement ps, int i) throws SQLException {
+                    Envio envio = lote.get(i);
+                    ps.setString(1, envio.getId());
+                    ps.setInt(2, envio.getCantidad());
+                    ps.setString(3, envio.getDestino());
+                    ps.setBoolean(4, envio.isEntregado());
+                    ps.setTimestamp(5, Timestamp.valueOf(envio.getFechaHoraRegistro()));
+                    ps.setString(6, envio.getIdCliente());
+                    ps.setString(7, envio.getIdOriginal());
+                    ps.setString(8, envio.getOrigen());
+                    ps.setInt(9, envio.getPlazoMaximoMinutos());
+                }
+
+                @Override
+                public int getBatchSize() {
+                    return lote.size();
+                }
+            });
+            if (fin % 100000 == 0 || fin == envios.size()) {
+                System.out.println("[CargaDatosDbService] Envios persistidos: " + fin + "/" + envios.size());
+            }
+        }
     }
 
     private Map<String, Object> respuesta(String tipo, String fuente, int procesados, int insertados, int actualizados) {

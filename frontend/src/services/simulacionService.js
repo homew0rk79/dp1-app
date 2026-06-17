@@ -7,6 +7,7 @@ export const simulacionService = {
   obtenerAeropuertos: () => api.get('/aeropuertos'),
   obtenerVuelos: () => api.get('/vuelos'),
   obtenerManifestAnimacion: () => api.get('/planificacion/animacion'),
+  obtenerConsumoBloques: () => api.get('/planificacion/consumo-bloques'),
   obtenerMaletasEnAeropuerto: (codigo, tiempoMin = 0) =>
     api.get(`/aeropuertos/${codigo}/maletas`, { params: { tiempoMin } }),
   obtenerOcupacionActual: (tiempoMin = 0) =>

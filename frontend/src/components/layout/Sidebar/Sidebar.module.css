@@ -260,6 +260,43 @@
   letter-spacing: 0.02em;
 }
 
+.parametrosAlgoritmo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: #f8fafc;
+}
+
+.paramHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #475569;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.paramGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.22rem 0.55rem;
+  align-items: center;
+  font-size: 0.7rem;
+}
+
+.paramGrid span {
+  color: #64748b;
+  font-weight: 700;
+}
+
+.paramGrid strong {
+  color: #0f172a;
+  font-weight: 800;
+}
+
 .simControles {
   display: flex;
   gap: 0.4rem;

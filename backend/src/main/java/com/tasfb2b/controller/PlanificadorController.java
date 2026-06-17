@@ -63,4 +63,9 @@ public class PlanificadorController {
         return ResponseEntity.ok(manifest);
     }
 
+    @GetMapping("/consumo-bloques")
+    public ResponseEntity<java.util.List<Map<String, Object>>> getConsumoBloques() {
+        return ResponseEntity.ok(service.getConsumoBloques());
+    }
+
 }
