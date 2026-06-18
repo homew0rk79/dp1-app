@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import Modal from '../../components/common/Modal/Modal'
 import { obtenerDetalleRuta } from '../../services/rutasService'
+import usePlanificadorStore from '../../store/planificadorStore'
 import styles from './GestionRutasModule.module.css'
 
 function ReasignarModal({ abierto, rutaId, onCerrar, onConfirmar }) {
@@ -9,6 +10,7 @@ function ReasignarModal({ abierto, rutaId, onCerrar, onConfirmar }) {
   const [seleccion, setSeleccion] = useState(null)
   const [cargando, setCargando] = useState(false)
   const [cargandoDetalle, setCargandoDetalle] = useState(false)
+  const addAlertaCancelacion = usePlanificadorStore((s) => s.addAlertaCancelacion)
 
   useEffect(() => {
     if (!abierto || !rutaId) return
@@ -33,6 +35,8 @@ function ReasignarModal({ abierto, rutaId, onCerrar, onConfirmar }) {
         destino: tramo.destino,
         horaSalidaMinutos: tramo.horaSalidaMinutos,
       })
+      // Disparar alerta visual en el mapa sobre los aeropuertos afectados (#57)
+      addAlertaCancelacion({ origen: tramo.origen, destino: tramo.destino })
       onCerrar()
     } finally {
       setCargando(false)
