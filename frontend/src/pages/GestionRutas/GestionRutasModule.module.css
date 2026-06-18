@@ -691,6 +691,22 @@
   text-decoration: underline;
 }
 
+.linkAccionPeligro {
+  background: none;
+  border: none;
+  color: #b91c1c;
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 4px 4px;
+  white-space: nowrap;
+  margin-left: 6px;
+}
+
+.linkAccionPeligro:hover {
+  text-decoration: underline;
+}
+
 .exitoBanner {
   background: #ecfdf5;
   border: 1px solid #bbf7d0;

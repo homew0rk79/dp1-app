@@ -173,6 +173,28 @@
   color: var(--color-text-muted);
 }
 
+/* ── Marcadores de cancelación pulsantes (#57/#58) ─────────────────────── */
+
+@keyframes cancelPulse {
+  0%   { transform: scale(0.4); opacity: 0.85; }
+  65%  { transform: scale(1.7); opacity: 0.25; }
+  100% { transform: scale(2.1); opacity: 0;    }
+}
+
+.cancelacionWrapper {
+  background: transparent !important;
+  border: none !important;
+}
+
+.cancelacionPulse {
+  display: block;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #dc2626;
+  animation: cancelPulse 1.15s ease-out infinite;
+}
+
 @media (max-width: 720px) {
   .panelTiempos {
     grid-template-columns: 1fr;

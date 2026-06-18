@@ -51,6 +51,21 @@ function MapaInteractivo() {
   const snapshot = usePlanificadorStore((s) => s.snapshot)
   const completado = usePlanificadorStore((s) => s.completado)
   const progreso = usePlanificadorStore((s) => s.progreso)
+  const alertasCancelacion = usePlanificadorStore((s) => s.alertasCancelacion)
+  const removeAlertaCancelacion = usePlanificadorStore((s) => s.removeAlertaCancelacion)
+
+  // Ref para no registrar el mismo timer dos veces (#58)
+  const alertaTimersRef = useRef({})
+
+  useEffect(() => {
+    alertasCancelacion.forEach((alerta) => {
+      if (alertaTimersRef.current[alerta.id]) return
+      alertaTimersRef.current[alerta.id] = setTimeout(() => {
+        removeAlertaCancelacion(alerta.id)
+        delete alertaTimersRef.current[alerta.id]
+      }, 9000)
+    })
+  }, [alertasCancelacion, removeAlertaCancelacion])
 
   const {
     manifest,
@@ -266,6 +281,28 @@ function MapaInteractivo() {
             </Marker>
           )
         })}
+        {/* Marcadores de cancelación (#57/#58) — pulsantes, auto-desaparecen */}
+        {alertasCancelacion.flatMap((alerta) =>
+          [alerta.origen, alerta.destino].map((codigo) => {
+            const aero = aeropuertos.find((a) => a.codigo === codigo)
+            if (!aero) return null
+            const icon = L.divIcon({
+              className: styles.cancelacionWrapper,
+              html: `<span class="${styles.cancelacionPulse}"></span>`,
+              iconSize: [44, 44],
+              iconAnchor: [22, 22],
+            })
+            return (
+              <Marker
+                key={`alerta-${alerta.id}-${codigo}`}
+                position={[aero.lat, aero.lng]}
+                icon={icon}
+                interactive={false}
+                zIndexOffset={1000}
+              />
+            )
+          }).filter(Boolean)
+        )}
       </MapContainer>
 
       {hayDatosSimulacion && <LeyendaMapa />}

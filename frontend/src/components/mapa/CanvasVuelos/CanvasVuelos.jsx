@@ -4,10 +4,55 @@ import { useMap } from 'react-leaflet'
 /**
  * Canvas overlay sobre Leaflet que anima las ocurrencias de vuelo activas en tiempo T.
  *
- * Dibuja arcos bezier curvos + un punto móvil por vuelo.
+ * Dibuja arcos bezier curvos + un ícono de avión por vuelo.
  * Colores según % de ocupación: azul → amarillo → rojo.
  * La lógica de tiempo (avanzar T) vive aquí para evitar re-renders en el árbol React.
  */
+
+/** Bearing en radianes entre dos puntos lat/lng (0 = Norte, positivo = sentido horario). */
+function calcularBearing(lat1, lng1, lat2, lng2) {
+  const toRad = (d) => (d * Math.PI) / 180
+  const dLng = toRad(lng2 - lng1)
+  const y = Math.sin(dLng) * Math.cos(toRad(lat2))
+  const x =
+    Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+    Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLng)
+  return Math.atan2(y, x)
+}
+
+/** Dibuja un ícono de avión centrado en (0,0) apuntando hacia arriba (Norte). */
+function drawAirplaneIcon(ctx, size, fillColor) {
+  // Fuselaje
+  ctx.beginPath()
+  ctx.moveTo(0, -size)
+  ctx.lineTo(size * 0.2, 0)
+  ctx.lineTo(size * 0.15, size * 0.82)
+  ctx.lineTo(0, size * 0.65)
+  ctx.lineTo(-size * 0.15, size * 0.82)
+  ctx.lineTo(-size * 0.2, 0)
+  ctx.closePath()
+  ctx.fillStyle = fillColor
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)'
+  ctx.lineWidth = 0.9
+  ctx.stroke()
+
+  // Alas
+  ctx.beginPath()
+  ctx.moveTo(0, -size * 0.05)
+  ctx.lineTo(-size * 0.88, size * 0.28)
+  ctx.lineTo(-size * 0.62, size * 0.42)
+  ctx.lineTo(0, size * 0.2)
+  ctx.lineTo(size * 0.62, size * 0.42)
+  ctx.lineTo(size * 0.88, size * 0.28)
+  ctx.closePath()
+  ctx.fillStyle = fillColor
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)'
+  ctx.lineWidth = 0.7
+  ctx.stroke()
+}
+
 function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avanceTickMin = 1 }) {
   const map          = useRef(null)
   const mapInstance  = useMap()
@@ -16,6 +61,9 @@ function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avan
   const aerosRef     = useRef({})
   const animIdRef    = useRef(null)
   const tiempoContinuoRef = useRef(0)
+  // Hit areas para tooltip: [{ x, y, o, bearing }]
+  const hitAreasRef  = useRef([])
+  const tooltipRef   = useRef(null)
 
   map.current = mapInstance
 
@@ -51,6 +99,79 @@ function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avan
     }
   }, [mapInstance])
 
+  // Tooltip DOM — se añade al contenedor del mapa (encima del canvas)
+  useEffect(() => {
+    const container = mapInstance.getContainer()
+    const tooltip = document.createElement('div')
+    tooltip.style.cssText = [
+      'position:absolute',
+      'z-index:10000',
+      'pointer-events:none',
+      'background:rgba(15,23,42,0.92)',
+      'color:#f8fafc',
+      'padding:7px 11px',
+      'border-radius:7px',
+      'font-size:12px',
+      'line-height:1.55',
+      'white-space:nowrap',
+      'border:1px solid rgba(255,255,255,0.14)',
+      'box-shadow:0 4px 14px rgba(0,0,0,0.3)',
+      'display:none',
+    ].join(';')
+    container.appendChild(tooltip)
+    tooltipRef.current = tooltip
+    return () => {
+      if (tooltip.parentNode) tooltip.parentNode.removeChild(tooltip)
+    }
+  }, [mapInstance])
+
+  // Mousemove sobre el mapa → hit-test contra posiciones de UTs dibujadas
+  useEffect(() => {
+    const RADIUS = 14 // px de detección
+
+    const handleMove = (e) => {
+      const cp = mapInstance.mouseEventToContainerPoint(e.originalEvent)
+      const { x, y } = cp
+      let found = null
+      for (const hit of hitAreasRef.current) {
+        const dx = hit.x - x
+        const dy = hit.y - y
+        if (dx * dx + dy * dy <= RADIUS * RADIUS) { found = hit; break }
+      }
+      const tip = tooltipRef.current
+      if (!tip) return
+      if (found) {
+        const pct = found.o.capacidadMax > 0
+          ? Math.round((found.o.maletas / found.o.capacidadMax) * 1000) / 10
+          : 0
+        const c = pct > 90 ? '#f44336' : pct > 70 ? '#ff9800' : '#4caf50'
+        tip.innerHTML = `
+          <div style="font-weight:700;margin-bottom:4px;color:${c}">
+            ${found.o.origen} → ${found.o.destino}
+          </div>
+          <div>Maletas: <strong>${found.o.maletas} / ${found.o.capacidadMax}</strong></div>
+          <div>Ocupación: <strong style="color:${c}">${pct.toFixed(1)}%</strong></div>
+        `
+        tip.style.display = 'block'
+        tip.style.left = `${x + 16}px`
+        tip.style.top = `${y - 8}px`
+      } else {
+        tip.style.display = 'none'
+      }
+    }
+
+    const handleLeave = () => {
+      if (tooltipRef.current) tooltipRef.current.style.display = 'none'
+    }
+
+    mapInstance.on('mousemove', handleMove)
+    mapInstance.getContainer().addEventListener('mouseleave', handleLeave)
+    return () => {
+      mapInstance.off('mousemove', handleMove)
+      mapInstance.getContainer().removeEventListener('mouseleave', handleLeave)
+    }
+  }, [mapInstance])
+
   // Función de dibujo pura — lee tiempoRef.current directamente
   const draw = useCallback(() => {
     const canvas = canvasRef.current
@@ -62,19 +183,21 @@ function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avan
     if (canvas.width !== W)  canvas.width  = W
     if (canvas.height !== H) canvas.height = H
 
-    // Counteract the CSS transform Leaflet applies to mapPane during pan/zoom.
-    // Without this, the canvas moves with the pane but its drawn content
-    // (which uses container-relative coords) appears double-shifted.
     const topLeft = map.current.containerPointToLayerPoint([0, 0])
     canvas.style.transform = `translate(${topLeft.x}px,${topLeft.y}px)`
 
     const ctx = canvas.getContext('2d')
     ctx.clearRect(0, 0, W, H)
 
-    const T = tiempoRef.current
+    const T    = tiempoRef.current
+    const zoom = map.current.getZoom()
+    // Ícono escala con zoom: pequeño en vista mundial, mayor al acercar
+    const iconSize = Math.max(3.5, Math.min(9, (zoom - 1) * 0.9))
+
+    const newHits = []
 
     for (const o of manifest.ocurrencias) {
-      if (o.salidaAbs > T || T > o.llegadaAbs) continue
+      if (o.salidaAbs > T || T > o.llegadaAbs) continue  // vuelo no activo o ya llegó (#56)
 
       const a = aerosRef.current[o.origen]
       const b = aerosRef.current[o.destino]
@@ -88,13 +211,12 @@ function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avan
       const dist = Math.sqrt(dx * dx + dy * dy)
       if (dist < 3) continue
 
-      // Punto de control bezier: perpendicular izquierda al vector de vuelo
       const nx   = -dy / dist
       const ny   =  dx / dist
       const cpX  = (p1.x + p2.x) / 2 + nx * dist * 0.28
       const cpY  = (p1.y + p2.y) / 2 + ny * dist * 0.28
 
-      const fillRatio = Math.min(1, o.maletas / o.capacidadMax)
+      const fillRatio = Math.min(1, o.maletas / (o.capacidadMax || 1))
       const alpha     = 0.35 + fillRatio * 0.45
 
       const color =
@@ -102,7 +224,12 @@ function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avan
         : fillRatio > 0.7 ? `rgba(234,179,8,${alpha})`
         : `rgba(37,99,235,${alpha})`
 
-      // Arco
+      const dotColor =
+        fillRatio > 0.9 ? 'rgba(220,38,38,0.95)'
+        : fillRatio > 0.7 ? 'rgba(234,179,8,0.95)'
+        : 'rgba(37,99,235,0.95)'
+
+      // Arco Bézier
       ctx.beginPath()
       ctx.moveTo(p1.x, p1.y)
       ctx.quadraticCurveTo(cpX, cpY, p2.x, p2.y)
@@ -110,24 +237,27 @@ function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avan
       ctx.lineWidth   = Math.max(1.2, Math.min(3.5, o.maletas / 70))
       ctx.stroke()
 
-      // Punto móvil sobre el arco (bezier paramétrico)
+      // Posición del avión sobre el arco (paramétrico Bézier) — #53 bearing
       const tp = Math.max(0, Math.min(1, (T - o.salidaAbs) / (o.llegadaAbs - o.salidaAbs)))
       const bx = (1 - tp) ** 2 * p1.x + 2 * (1 - tp) * tp * cpX + tp ** 2 * p2.x
       const by = (1 - tp) ** 2 * p1.y + 2 * (1 - tp) * tp * cpY + tp ** 2 * p2.y
 
-      const dotColor =
-        fillRatio > 0.9 ? 'rgba(220,38,38,0.95)'
-        : fillRatio > 0.7 ? 'rgba(234,179,8,0.95)'
-        : 'rgba(37,99,235,0.95)'
+      // Tangente de la curva Bézier en el punto tp (para orientar el avión)
+      const tdx = 2 * (1 - tp) * (cpX - p1.x) + 2 * tp * (p2.x - cpX)
+      const tdy = 2 * (1 - tp) * (cpY - p1.y) + 2 * tp * (p2.y - cpY)
+      const canvasBearing = Math.atan2(tdx, -tdy) // atan2(x, -y) → ángulo respecto a "arriba"
 
-      ctx.beginPath()
-      ctx.arc(bx, by, 4, 0, Math.PI * 2)
-      ctx.fillStyle   = dotColor
-      ctx.fill()
-      ctx.strokeStyle = 'white'
-      ctx.lineWidth   = 1.5
-      ctx.stroke()
+      // Ícono de avión rotado (#48 + #53)
+      ctx.save()
+      ctx.translate(bx, by)
+      ctx.rotate(canvasBearing)
+      drawAirplaneIcon(ctx, iconSize, dotColor)
+      ctx.restore()
+
+      newHits.push({ x: bx, y: by, o })
     }
+
+    hitAreasRef.current = newHits
   }, [manifest, tiempoRef])
 
   // RAF loop — avanza T y dibuja cada frame

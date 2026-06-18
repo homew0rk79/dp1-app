@@ -15,12 +15,13 @@ import {
   Building2,
 } from 'lucide-react'
 
+import ReasignarModal from './ReasignarModal'
 import Tabla from '../../components/common/Tabla/Tabla'
 import tabStyles from '../../components/common/Tabla/Tabla.module.css'
 import BarraProgreso from '../../components/common/BarraProgreso/BarraProgreso'
 import Semaforo from '../../components/common/Semaforo/Semaforo'
 import Badge from '../../components/common/Badge/Badge'
-import { obtenerRutas, obtenerDetalleRuta } from '../../services/rutasService'
+import { obtenerRutas, obtenerDetalleRuta, cancelarVuelo } from '../../services/rutasService'
 import useConfiguracionStore from '../../store/configuracionStore'
 import usePlanificadorStore from '../../store/planificadorStore'
 import { getColorSemaforo } from '../../utils/semaforo'
@@ -79,6 +80,7 @@ function GestionRutasPage() {
   const navigate = useNavigate()
   const rangosSemaforo = useConfiguracionStore((s) => s.rangosSemaforo)
   const snapshot = usePlanificadorStore((s) => s.snapshot)
+  const completado = usePlanificadorStore((s) => s.completado)
   const [rutas, setRutas] = useState([])
   const [cargando, setCargando] = useState(true)
   const [detalle, setDetalle] = useState(null)
@@ -90,6 +92,7 @@ function GestionRutasPage() {
 
   const [selectedId, setSelectedId] = useState(null)
   const [panelAbierto, setPanelAbierto] = useState(false)
+  const [modalReasignarId, setModalReasignarId] = useState(null)
 
   const cargarLista = useCallback(async () => {
     setCargando(true)
@@ -162,6 +165,11 @@ function GestionRutasPage() {
     setQuery('')
     setOrigen('Todos')
     setDestino('Todos')
+  }
+
+  async function handleConfirmarCancelacion({ origen, destino, horaSalidaMinutos }) {
+    await cancelarVuelo(origen, destino, horaSalidaMinutos)
+    cargarLista()
   }
 
   const kpisEstaticos = useMemo(() => {
@@ -392,6 +400,17 @@ function GestionRutasPage() {
                         >
                           Ver detalle
                         </button>
+                        <button
+                          type="button"
+                          className={styles.linkAccionPeligro}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setModalReasignarId(r.id)
+                          }}
+                          title="Replanificar por vuelo cancelado"
+                        >
+                          Reasignar
+                        </button>
                       </td>
                     </tr>
                   )
@@ -465,6 +484,13 @@ function GestionRutasPage() {
           )}
         </aside>
       </div>
+
+      <ReasignarModal
+        abierto={Boolean(modalReasignarId)}
+        rutaId={modalReasignarId}
+        onCerrar={() => setModalReasignarId(null)}
+        onConfirmar={handleConfirmarCancelacion}
+      />
 
       {panelAbierto && detalle && (
         <div className={styles.mobileOverlay} onClick={() => setPanelAbierto(false)}>
