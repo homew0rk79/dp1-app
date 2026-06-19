@@ -9,7 +9,7 @@ const ETIQUETAS_TIPO = {
 }
 
 function formatearMinuto(min) {
-  const base  = new Date(`${FECHA_INICIO_SIMULACION_ALGORITMO}T00:00:00Z`)
+  const base  = new Date(`${FECHA_INICIO_SIMULACION_ALGORITMO.slice(0, 10)}T00:00:00Z`)
   const fecha = new Date(base.getTime() + min * 60000)
   const dd    = fecha.getUTCDate().toString().padStart(2, '0')
   const mo    = (fecha.getUTCMonth() + 1).toString().padStart(2, '0')
