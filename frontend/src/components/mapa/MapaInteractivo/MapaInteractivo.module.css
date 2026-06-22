@@ -133,8 +133,8 @@
 
 /* Popup personalizado */
 .popup {
-  min-width: 220px;
-  max-width: 320px;
+  min-width: 260px;
+  max-width: 380px;
   padding: 0.1rem 0;
 }
 

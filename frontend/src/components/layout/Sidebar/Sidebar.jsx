@@ -14,11 +14,10 @@ import {
 } from 'lucide-react'
 
 import PanelMetrica from '../../common/PanelMetrica/PanelMetrica'
-import Semaforo from '../../common/Semaforo/Semaforo'
 import Badge from '../../common/Badge/Badge'
-import PanelVuelos from './PanelVuelos/PanelVuelos'
+import PanelUnidadesTransporte from './PanelUnidadesTransporte/PanelUnidadesTransporte'
+import ListaAeropuertosSidebar from './ListaAeropuertosSidebar/ListaAeropuertosSidebar'
 import useSimulacionStore from '../../../store/simulacionStore'
-import { getColorSemaforo, COLORES_SEMAFORO } from '../../../utils/semaforo'
 import useConfiguracionStore from '../../../store/configuracionStore'
 import useSeleccionStore from '../../../store/seleccionStore'
 import { ESCENARIOS, ETIQUETAS_ESCENARIO } from '../../../constants/escenarios'
@@ -334,47 +333,22 @@ function Sidebar() {
                 className={`${styles.tab} ${tabActivo === 'vuelos' ? styles.tabActivo : ''}`}
                 onClick={() => setTabActivo('vuelos')}
               >
-                Vuelos
+                UT
               </button>
             </div>
 
             {tabActivo === 'aeropuertos' && (
-              aeropuertosWS.length === 0 ? (
-                <p style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                  Disponible al iniciar una simulación
-                </p>
-              ) : (
-                <ul className={styles.aeropuertoList}>
-                  {aeropuertosWS.map((a) => {
-                    const pct      = getOcupacionPct(a.codigo, a.porcentajeOcupacion)
-                    const color    = getColorSemaforo(pct, rangosSemaforo)
-                    const hex      = COLORES_SEMAFORO[color]
-                    const selected = aeropuertoSeleccionado === a.codigo
-                    return (
-                      <li
-                        key={a.codigo}
-                        className={`${styles.aeropuertoItem} ${selected ? styles.aeropuertoSeleccionado : ''}`}
-                        onClick={() => setAeropuertoSeleccionado(selected ? null : a.codigo)}
-                      >
-                        <div className={styles.aeropuertoInfo}>
-                          <span className={styles.aeropuertoNombre}>{a.ciudad}</span>
-                          <span className={styles.aeropuertoPais}>{a.continente}</span>
-                        </div>
-                        <div className={styles.aeropuertoOcupacion}>
-                          <span className={styles.ocupacionTexto} style={{ color: hex }}>
-                            {pct.toFixed(1)}%
-                          </span>
-                          <Semaforo valor={pct} />
-                        </div>
-                      </li>
-                    )
-                  })}
-                </ul>
-              )
+              <ListaAeropuertosSidebar
+                aeropuertosWS={aeropuertosWS}
+                getOcupacionPct={getOcupacionPct}
+                rangosSemaforo={rangosSemaforo}
+                aeropuertoSeleccionado={aeropuertoSeleccionado}
+                setAeropuertoSeleccionado={setAeropuertoSeleccionado}
+              />
             )}
 
             {tabActivo === 'vuelos' && (
-              <PanelVuelos
+              <PanelUnidadesTransporte
                 ocurrencias={manifest?.ocurrencias ?? null}
                 tiempoAnimacion={tiempoAnimacion}
               />

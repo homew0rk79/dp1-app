@@ -1,0 +1,213 @@
+import { useMemo, useState } from 'react'
+import { Search, ArrowUp, ArrowDown } from 'lucide-react'
+import Semaforo from '../../../common/Semaforo/Semaforo'
+import { getColorSemaforo, COLORES_SEMAFORO } from '../../../../utils/semaforo'
+import { AEROPUERTOS_MOCK } from '../../../../mocks/aeropuertos'
+import {
+  proximaSalidaAeropuerto,
+  proximaLlegadaAeropuerto,
+} from '../../../../utils/planificacionAeropuerto'
+import { TIEMPO_SIMULADO_REFERENCIA } from '../../../../constants/tiempoSimulado'
+import styles from './ListaAeropuertosSidebar.module.css'
+
+const CONTINENTES = ['Todos', 'América', 'Europa', 'Asia', 'Oceanía']
+
+function formatearProxima(fecha) {
+  if (!fecha) return '—'
+  const hh = fecha.getUTCHours().toString().padStart(2, '0')
+  const mm = fecha.getUTCMinutes().toString().padStart(2, '0')
+  const dd = fecha.getUTCDate().toString().padStart(2, '0')
+  const mo = (fecha.getUTCMonth() + 1).toString().padStart(2, '0')
+  return `${dd}/${mo} ${hh}:${mm}`
+}
+
+function cmpTiempo(ta, tb, dir) {
+  if (ta == null && tb == null) return 0
+  if (ta == null) return 1
+  if (tb == null) return -1
+  return (ta - tb) * dir
+}
+
+function BotonOrdenAero({ campo, label, ordenCampo, ordenDir, onOrdenar }) {
+  const activo = ordenCampo === campo
+  return (
+    <button
+      type="button"
+      className={`${styles.ordenBtn} ${activo ? styles.ordenBtnActivo : ''}`}
+      onClick={() => onOrdenar(campo)}
+    >
+      {label}
+      {activo ? (
+        ordenDir === 'asc' ? <ArrowUp size={11} /> : <ArrowDown size={11} />
+      ) : (
+        <span className={styles.sortNeutral}>↕</span>
+      )}
+    </button>
+  )
+}
+
+function ListaAeropuertosSidebar({
+  aeropuertosWS,
+  getOcupacionPct,
+  rangosSemaforo,
+  aeropuertoSeleccionado,
+  setAeropuertoSeleccionado,
+}) {
+  const [busqueda, setBusqueda] = useState('')
+  const [continente, setContinente] = useState('Todos')
+  const [ordenCampo, setOrdenCampo] = useState('ocupacion')
+  const [ordenDir, setOrdenDir] = useState('desc')
+
+  const aeropuertosBase = useMemo(() => {
+    if (aeropuertosWS.length > 0) {
+      return aeropuertosWS.map((a) => ({
+        codigo: a.codigo,
+        ciudad: a.ciudad,
+        continente: a.continente,
+        porcentajeOcupacion: getOcupacionPct(a.codigo, a.porcentajeOcupacion),
+      }))
+    }
+    return AEROPUERTOS_MOCK.map((a) => ({
+      codigo: a.codigo,
+      ciudad: a.ciudad ?? a.nombre,
+      continente: a.continente,
+      porcentajeOcupacion: a.ocupacion,
+    }))
+  }, [aeropuertosWS, getOcupacionPct])
+
+  const aeropuertosFiltrados = useMemo(() => {
+    const q = busqueda.trim().toLowerCase()
+    let lista = aeropuertosBase.filter((a) => {
+      if (q && !a.codigo.toLowerCase().includes(q) && !a.ciudad.toLowerCase().includes(q)) {
+        return false
+      }
+      if (continente !== 'Todos' && a.continente !== continente) return false
+      return true
+    })
+
+    const ref = new Date(TIEMPO_SIMULADO_REFERENCIA)
+    const dir = ordenDir === 'asc' ? 1 : -1
+
+    lista = [...lista].sort((a, b) => {
+      if (ordenCampo === 'ocupacion') {
+        return (a.porcentajeOcupacion - b.porcentajeOcupacion) * dir
+      }
+      if (ordenCampo === 'proximaSalida') {
+        const sa = proximaSalidaAeropuerto(a.codigo, ref)?.getTime() ?? null
+        const sb = proximaSalidaAeropuerto(b.codigo, ref)?.getTime() ?? null
+        return cmpTiempo(sa, sb, dir)
+      }
+      if (ordenCampo === 'proximaLlegada') {
+        const la = proximaLlegadaAeropuerto(a.codigo, ref)?.getTime() ?? null
+        const lb = proximaLlegadaAeropuerto(b.codigo, ref)?.getTime() ?? null
+        return cmpTiempo(la, lb, dir)
+      }
+      return 0
+    })
+
+    return lista
+  }, [aeropuertosBase, busqueda, continente, ordenCampo, ordenDir])
+
+  function handleOrdenar(campo) {
+    if (ordenCampo === campo) {
+      setOrdenDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setOrdenCampo(campo)
+      setOrdenDir(campo === 'ocupacion' ? 'desc' : 'asc')
+    }
+  }
+
+  const usaMock = aeropuertosWS.length === 0
+  const ref = new Date(TIEMPO_SIMULADO_REFERENCIA)
+
+  return (
+    <div className={styles.contenedor}>
+      <div className={styles.controles}>
+        <div className={styles.searchWrap}>
+          <Search size={12} className={styles.searchIcon} />
+          <input
+            className={styles.searchInput}
+            placeholder="Código IATA o ciudad"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+          />
+        </div>
+        <select
+          className={styles.select}
+          value={continente}
+          onChange={(e) => setContinente(e.target.value)}
+        >
+          {CONTINENTES.map((c) => (
+            <option key={c} value={c}>{c === 'Todos' ? 'Continente: todos' : c}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className={styles.ordenRow}>
+        <BotonOrdenAero
+          campo="ocupacion"
+          label="% Ocupación"
+          ordenCampo={ordenCampo}
+          ordenDir={ordenDir}
+          onOrdenar={handleOrdenar}
+        />
+        <BotonOrdenAero
+          campo="proximaSalida"
+          label="Próx. salida"
+          ordenCampo={ordenCampo}
+          ordenDir={ordenDir}
+          onOrdenar={handleOrdenar}
+        />
+        <BotonOrdenAero
+          campo="proximaLlegada"
+          label="Próx. llegada"
+          ordenCampo={ordenCampo}
+          ordenDir={ordenDir}
+          onOrdenar={handleOrdenar}
+        />
+      </div>
+
+      {usaMock && (
+        <p className={styles.notaMock}>Datos mock · referencia {TIEMPO_SIMULADO_REFERENCIA.slice(0, 16).replace('T', ' ')} UTC</p>
+      )}
+
+      {aeropuertosFiltrados.length === 0 ? (
+        <p className={styles.vacio}>Sin aeropuertos que coincidan</p>
+      ) : (
+        <ul className={styles.lista}>
+          {aeropuertosFiltrados.map((a) => {
+            const pct = a.porcentajeOcupacion
+            const color = getColorSemaforo(pct, rangosSemaforo)
+            const hex = COLORES_SEMAFORO[color]
+            const selected = aeropuertoSeleccionado === a.codigo
+            const proxSal = proximaSalidaAeropuerto(a.codigo, ref)
+            const proxLleg = proximaLlegadaAeropuerto(a.codigo, ref)
+
+            return (
+              <li
+                key={a.codigo}
+                className={`${styles.item} ${selected ? styles.itemSeleccionado : ''}`}
+                onClick={() => setAeropuertoSeleccionado(selected ? null : a.codigo)}
+              >
+                <div className={styles.info}>
+                  <span className={styles.codigo}>{a.codigo}</span>
+                  <span className={styles.nombre}>{a.ciudad}</span>
+                  <span className={styles.continente}>{a.continente}</span>
+                  <span className={styles.proximas}>
+                    Sal: {formatearProxima(proxSal)} · Lleg: {formatearProxima(proxLleg)}
+                  </span>
+                </div>
+                <div className={styles.ocupacion}>
+                  <span style={{ color: hex }}>{pct.toFixed(1)}%</span>
+                  <Semaforo valor={pct} />
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+export default ListaAeropuertosSidebar

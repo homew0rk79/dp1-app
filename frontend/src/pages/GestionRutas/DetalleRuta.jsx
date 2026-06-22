@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
   MapPin,
   Clock3,
   Plane,
   ChevronRight,
+  Map,
 } from 'lucide-react'
 
 import BarraProgreso from '../../components/common/BarraProgreso/BarraProgreso'
 import Badge from '../../components/common/Badge/Badge'
 import { obtenerDetalleRuta } from '../../services/rutasService'
+import { obtenerRutaMockPorId } from '../../mocks/rutas'
 import styles from './GestionRutasModule.module.css'
 
 function textoEstado(estado) {
@@ -42,6 +44,7 @@ function FilaDetalle({ icono, label, value }) {
 
 function DetalleRuta() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const [detalle, setDetalle] = useState(null)
   const [cargando, setCargando] = useState(true)
 
@@ -50,7 +53,9 @@ function DetalleRuta() {
     setCargando(true)
     try {
       const d = await obtenerDetalleRuta(id)
-      setDetalle(d)
+      setDetalle(d ?? obtenerRutaMockPorId(id))
+    } catch {
+      setDetalle(obtenerRutaMockPorId(id))
     } finally {
       setCargando(false)
     }
@@ -177,9 +182,48 @@ function DetalleRuta() {
             Resumen de la secuencia
           </h3>
           <div className={styles.tramos}>
-            <span className={styles.rutaPill}>{detalle.origen}</span>
-            <ChevronRight size={14} color="#94a3b8" />
-            <span className={styles.rutaPill}>{detalle.destino}</span>
+            {(detalle.escalas ?? [detalle.origen, detalle.destino]).map((codigo, i, arr) => (
+              <span key={`${codigo}-${i}`} style={{ display: 'contents' }}>
+                <span className={styles.rutaPill}>{codigo}</span>
+                {i < arr.length - 1 && <ChevronRight size={14} color="#94a3b8" />}
+              </span>
+            ))}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 12 }}>
+            <button
+              type="button"
+              className={styles.botonPlan}
+              onClick={() => navigate('/visualizador', {
+                state: {
+                  overlayRuta: {
+                    escalas: detalle.escalas ?? [detalle.origen, detalle.destino],
+                    variante: 'actual',
+                    rutaId: detalle.id,
+                  },
+                },
+              })}
+            >
+              <Map size={16} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+              Ver en mapa
+            </button>
+            {detalle.rutaAnterior?.length >= 2 && (
+              <button
+                type="button"
+                className={styles.botonSecundario}
+                onClick={() => navigate('/visualizador', {
+                  state: {
+                    overlayRuta: {
+                      escalas: detalle.rutaAnterior,
+                      variante: 'anterior',
+                      rutaId: detalle.id,
+                    },
+                  },
+                })}
+              >
+                <Map size={16} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+                Ver ruta anterior en mapa
+              </button>
+            )}
           </div>
           <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: '10px 0 0' }}>
             Los vuelos por tramo se detallan en la tabla superior.

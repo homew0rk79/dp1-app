@@ -13,6 +13,7 @@ import {
   X,
   RefreshCw,
   Building2,
+  Map,
 } from 'lucide-react'
 
 import ReasignarModal from './ReasignarModal'
@@ -22,6 +23,8 @@ import BarraProgreso from '../../components/common/BarraProgreso/BarraProgreso'
 import Semaforo from '../../components/common/Semaforo/Semaforo'
 import Badge from '../../components/common/Badge/Badge'
 import { obtenerRutas, obtenerDetalleRuta, cancelarVuelo } from '../../services/rutasService'
+import { RUTAS_MOCK, obtenerRutaMockPorId } from '../../mocks/rutas'
+import { TIEMPO_SIMULADO_REFERENCIA } from '../../constants/tiempoSimulado'
 import useConfiguracionStore from '../../store/configuracionStore'
 import usePlanificadorStore from '../../store/planificadorStore'
 import { getColorSemaforo } from '../../utils/semaforo'
@@ -89,6 +92,7 @@ function GestionRutasPage() {
   const [query, setQuery] = useState('')
   const [origen, setOrigen] = useState('Todos')
   const [destino, setDestino] = useState('Todos')
+  const [filtroEntregas, setFiltroEntregas] = useState('todas')
 
   const [selectedId, setSelectedId] = useState(null)
   const [panelAbierto, setPanelAbierto] = useState(false)
@@ -98,7 +102,11 @@ function GestionRutasPage() {
     setCargando(true)
     try {
       const data = await obtenerRutas()
-      setRutas(data)
+      const apiIds = new Set(data.map((r) => r.id))
+      const extras = RUTAS_MOCK.filter((m) => !apiIds.has(m.id))
+      setRutas([...data, ...extras])
+    } catch {
+      setRutas(RUTAS_MOCK)
     } finally {
       setCargando(false)
     }
@@ -115,10 +123,16 @@ function GestionRutasPage() {
     }
     let cancel = false
     setCargandoDetalle(true)
-    obtenerDetalleRuta(selectedId).then((d) => {
-      if (!cancel) setDetalle(d)
-      if (!cancel) setCargandoDetalle(false)
-    })
+    obtenerDetalleRuta(selectedId)
+      .then((d) => {
+        if (!cancel) setDetalle(d ?? obtenerRutaMockPorId(selectedId))
+      })
+      .catch(() => {
+        if (!cancel) setDetalle(obtenerRutaMockPorId(selectedId))
+      })
+      .finally(() => {
+        if (!cancel) setCargandoDetalle(false)
+      })
     return () => {
       cancel = true
     }
@@ -136,6 +150,9 @@ function GestionRutasPage() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
+    const ref = new Date(TIEMPO_SIMULADO_REFERENCIA)
+    const horasLimite = filtroEntregas === '4h' ? 4 : filtroEntregas === '12h' ? 12 : filtroEntregas === '24h' ? 24 : null
+
     return rutas.filter((r) => {
       const matchQ =
         !q ||
@@ -148,9 +165,15 @@ function GestionRutasPage() {
       const matchOrigen = origen === 'Todos' || r.origen === origen
       const matchDest = destino === 'Todos' || r.destino === destino
 
-      return matchQ && matchOrigen && matchDest
+      if (!matchQ || !matchOrigen || !matchDest) return false
+
+      if (horasLimite == null) return true
+      if (!r.fechaEntrega) return false
+      const entrega = new Date(r.fechaEntrega)
+      const diffH = (ref.getTime() - entrega.getTime()) / 3600000
+      return diffH >= 0 && diffH <= horasLimite
     })
-  }, [rutas, query, origen, destino])
+  }, [rutas, query, origen, destino, filtroEntregas])
 
   useEffect(() => {
     if (filtered.length === 0) return
@@ -165,6 +188,21 @@ function GestionRutasPage() {
     setQuery('')
     setOrigen('Todos')
     setDestino('Todos')
+    setFiltroEntregas('todas')
+  }
+
+  function verEnMapa(ruta, e) {
+    e?.stopPropagation?.()
+    const escalas = ruta.escalas ?? [ruta.origen, ruta.destino]
+    navigate('/visualizador', {
+      state: {
+        overlayRuta: {
+          escalas,
+          variante: 'actual',
+          rutaId: ruta.id,
+        },
+      },
+    })
   }
 
   async function handleConfirmarCancelacion({ origen, destino, horaSalidaMinutos }) {
@@ -319,6 +357,17 @@ function GestionRutasPage() {
                 ))}
               </select>
 
+              <select
+                className={styles.select}
+                value={filtroEntregas}
+                onChange={(e) => setFiltroEntregas(e.target.value)}
+              >
+                <option value="todas">Entregados: Todas</option>
+                <option value="4h">Entregados: Últimas 4 h</option>
+                <option value="12h">Entregados: Últimas 12 h</option>
+                <option value="24h">Entregados: Últimas 24 h</option>
+              </select>
+
               <button type="button" className={styles.botonLimpiar} onClick={limpiarFiltros}>
                 Limpiar
               </button>
@@ -390,6 +439,15 @@ function GestionRutasPage() {
                         <BadgeCumplimiento cumplimiento={r.cumplimiento} />
                       </td>
                       <td className={styles.centerCell}>
+                        <button
+                          type="button"
+                          className={styles.linkAccion}
+                          onClick={(e) => verEnMapa(r, e)}
+                          title="Ver ruta en el mapa"
+                        >
+                          <Map size={13} style={{ verticalAlign: 'middle', marginRight: 2 }} />
+                          Ver en mapa
+                        </button>
                         <button
                           type="button"
                           className={styles.linkAccion}

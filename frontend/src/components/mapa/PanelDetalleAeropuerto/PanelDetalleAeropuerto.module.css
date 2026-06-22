@@ -1,0 +1,85 @@
+.panel {
+  margin-top: 0.65rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.seccion {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.seccionTitulo {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #334155;
+}
+
+.lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.item {
+  padding: 0.4rem 0.45rem;
+  border-radius: 6px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.itemHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.envioId {
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: ui-monospace, monospace;
+  color: #2563eb;
+}
+
+.maletas {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+.producto {
+  font-size: 0.76rem;
+  color: #334155;
+  margin-top: 0.12rem;
+}
+
+.meta {
+  font-size: 0.68rem;
+  color: #64748b;
+  margin-top: 0.18rem;
+  line-height: 1.35;
+}
+
+.vacio {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #94a3b8;
+  font-style: italic;
+}

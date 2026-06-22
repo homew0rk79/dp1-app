@@ -1,0 +1,152 @@
+.contenedor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-height: 0;
+  flex: 1;
+}
+
+.notaMock {
+  margin: 0;
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.filtroWrap {
+  position: relative;
+}
+
+.filtroIcon {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.filtroInput {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.42rem 0.55rem 0.42rem 1.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.78rem;
+  outline: none;
+}
+
+.filtroInput:focus {
+  border-color: var(--color-accent);
+}
+
+.filtroInput::placeholder {
+  color: var(--color-text-muted);
+}
+
+.tablaWrap {
+  flex: 1;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: min(360px, 42vh);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+}
+
+.tabla {
+  width: 100%;
+  min-width: 520px;
+  border-collapse: collapse;
+  font-size: 0.76rem;
+}
+
+.thSortable {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--color-surface);
+  padding: 0.45rem 0.35rem;
+  text-align: left;
+  font-weight: 700;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s, color 0.12s;
+}
+
+.thSortable:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.thActivo {
+  color: var(--color-accent);
+  background: #eff6ff;
+}
+
+.thSortable span:first-child {
+  margin-right: 0.2rem;
+}
+
+.sortIcon {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+
+.sortNeutral {
+  font-size: 0.65rem;
+  opacity: 0.45;
+}
+
+.tabla td {
+  padding: 0.48rem 0.35rem;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+  line-height: 1.35;
+}
+
+.tabla tbody tr {
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.tabla tbody tr:hover {
+  background: var(--color-surface);
+}
+
+.filaSeleccionada {
+  background: #eff6ff !important;
+  outline: 1px solid #bfdbfe;
+}
+
+.mono {
+  font-family: ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 0.74rem;
+}
+
+.celdaOcupacion {
+  white-space: nowrap;
+}
+
+.ocupacion {
+  font-weight: 700;
+  margin-right: 0.35rem;
+}
+
+.sinResultados {
+  text-align: center;
+  padding: 1rem 0.5rem !important;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
