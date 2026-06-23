@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
-import { PlaneLanding, PlaneTakeoff } from 'lucide-react'
-import { obtenerProximasLlegadas, obtenerProximasSalidas } from '../../../utils/planificacionAeropuerto'
+import { PlaneLanding, PlaneTakeoff, XCircle } from 'lucide-react'
 import { TIEMPO_SIMULADO_REFERENCIA } from '../../../constants/tiempoSimulado'
+import useSimulacionStore from '../../../store/simulacionStore'
+import { sumarMinutos, formatearFechaHora } from '../../../utils/tiempos'
 import styles from './PanelDetalleAeropuerto.module.css'
 
 function ListaEnvios({ items, tipo }) {
@@ -39,33 +40,60 @@ function ListaEnvios({ items, tipo }) {
   )
 }
 
-function PanelDetalleAeropuerto({ codigo, tiempoReferencia = TIEMPO_SIMULADO_REFERENCIA }) {
-  const llegadas = useMemo(
-    () => obtenerProximasLlegadas(codigo, tiempoReferencia),
-    [codigo, tiempoReferencia],
-  )
-  const salidas = useMemo(
-    () => obtenerProximasSalidas(codigo, tiempoReferencia),
-    [codigo, tiempoReferencia],
-  )
+function PanelDetalleAeropuerto({ codigo, onCancelVuelo }) {
+
+  const manifest = useSimulacionStore((s) => s.manifest)
+  const tiempoAnimacion = useSimulacionStore((s) => s.tiempoAnimacion)
+  const fechaInicio = useSimulacionStore((s) => s.parametros.fechaInicio)
+
+  let vuelosReales = []
+  if (manifest) {
+    vuelosReales = manifest.ocurrencias
+      .filter((o) => o.origen === codigo && o.salidaAbs >= tiempoAnimacion)
+      .sort((a, b) => a.salidaAbs - b.salidaAbs)
+      .slice(0, 5)
+  }
 
   return (
     <div className={styles.panel}>
-      <section className={styles.seccion}>
-        <h5 className={styles.seccionTitulo}>
-          <PlaneLanding size={13} />
-          Próximas llegadas
-        </h5>
-        <ListaEnvios items={llegadas} tipo="llegada" />
-      </section>
+      {manifest && (
+        <section className={styles.seccion}>
+          <h5 className={styles.seccionTitulo} style={{ color: '#ef4444' }}>
+            <PlaneTakeoff size={13} />
+            Próximos Vuelos (Tiempo Real)
+          </h5>
+          {vuelosReales.length === 0 ? (
+            <p className={styles.vacio}>Sin vuelos próximos</p>
+          ) : (
+            <ul className={styles.lista}>
+              {vuelosReales.map((v) => (
+                <li key={`${v.destino}-${v.salidaAbs}`} className={styles.item} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div className={styles.itemHeader}>
+                      <span className={styles.envioId}>Hacia {v.destino}</span>
+                      <span className={styles.maletas}>{v.maletas} mlt</span>
+                    </div>
+                    <div className={styles.meta}>
+                      Sale: {formatearFechaHora(sumarMinutos(fechaInicio, v.salidaAbs))}
+                    </div>
+                  </div>
+                  {onCancelVuelo && (
+                    <button
+                      onClick={() => onCancelVuelo(v)}
+                      style={{ padding: '4px 6px', fontSize: '11px', background: '#dc2626', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                      title="Cancelar este vuelo"
+                    >
+                      <XCircle size={12} />
+                      Cancelar
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
-      <section className={styles.seccion}>
-        <h5 className={styles.seccionTitulo}>
-          <PlaneTakeoff size={13} />
-          Próximas salidas
-        </h5>
-        <ListaEnvios items={salidas} tipo="salida" />
-      </section>
     </div>
   )
 }

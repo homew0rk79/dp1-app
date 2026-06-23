@@ -30,6 +30,7 @@ function MapaInteractivo() {
   const fechaInicio = useSimulacionStore((s) => s.parametros.fechaInicio)
   const tiempoSegundos = useSimulacionStore((s) => s.tiempoSegundos)
   const inicioEjecucionReal = useSimulacionStore((s) => s.inicioEjecucionReal)
+  const wsVersion = useSimulacionStore((s) => s.wsVersion)
 
   const aeropuertoSeleccionado = useSeleccionStore((s) => s.aeropuertoSeleccionado)
   const setAeropuertoSeleccionado = useSeleccionStore((s) => s.setAeropuertoSeleccionado)
@@ -48,6 +49,7 @@ function MapaInteractivo() {
   // Ocupación real al minuto exacto de la animación (actualizada c/hora simulada)
   const [ocupacionRealtime, setOcupacionRealtime] = useState({})
   const ultimaHoraRef = useRef(-1)
+  const ultimaVersionRef = useRef(-1)
 
   const snapshot = usePlanificadorStore((s) => s.snapshot)
   const completado = usePlanificadorStore((s) => s.completado)
@@ -81,7 +83,34 @@ function MapaInteractivo() {
     seekTo,
     setVelocidad,
     onTick,
+    actualizarManifest,
   } = useAnimacionTimeline()
+
+  const handleCancelVuelo = async (vuelo) => {
+    const horaSalida = sumarMinutos(fechaInicio, vuelo.salidaAbs)
+    if (!window.confirm(`¿Seguro que desea cancelar el vuelo de ${vuelo.origen} a ${vuelo.destino} (salida: ${formatearFechaHora(horaSalida)})?`)) {
+      return
+    }
+
+    const wasPlaying = playing
+    pause()
+
+    try {
+      await simulacionService.cancelarVuelo({
+        origen: vuelo.origen,
+        destino: vuelo.destino,
+        horaSalidaMinutos: vuelo.horaSalidaMinutos,
+      })
+      const res = await simulacionService.obtenerManifestAnimacion()
+      if (res.data) {
+        actualizarManifest(res.data)
+      }
+    } catch (err) {
+      alert("No se pudo cancelar el vuelo: " + (err.response?.data?.error || err.response?.data || err.message))
+    } finally {
+      if (wasPlaying) play()
+    }
+  }
 
   const hayDatosSimulacion = Boolean(manifest || snapshot || completado)
   const fechaSimulada = sumarMinutos(fechaInicio, tiempoDisplay)
@@ -158,14 +187,17 @@ function MapaInteractivo() {
       return
     }
     const saltoSimulado = Math.floor(tiempoDisplay / SA_SALTO_ALGORITMO_MIN)
-    if (saltoSimulado === ultimaHoraRef.current) return
+    const versionCambio = wsVersion !== ultimaVersionRef.current
+    if (!versionCambio && saltoSimulado === ultimaHoraRef.current) return
+    
     ultimaHoraRef.current = saltoSimulado
+    ultimaVersionRef.current = wsVersion
 
     const tiempoMin = Math.floor(tiempoDisplay) + offsetMinutos
     simulacionService.obtenerOcupacionActual(tiempoMin)
       .then(res => setOcupacionRealtime(res.data ?? {}))
       .catch(() => {})
-  }, [tiempoDisplay, manifest, offsetMinutos])
+  }, [tiempoDisplay, manifest, offsetMinutos, wsVersion])
 
   // Ocupación en tiempo real al minuto exacto de la animación
   function getOcupacion(codigo) {
@@ -212,6 +244,7 @@ function MapaInteractivo() {
             playing={playing}
             onTick={onTick}
             avanceTickMin={TA_EJECUCION_ALGORITMO_MIN}
+            onCancelVuelo={handleCancelVuelo}
           />
         )}
 
@@ -270,7 +303,10 @@ function MapaInteractivo() {
                     </span>
                   </div>
 
-                  <PanelDetalleAeropuerto codigo={aeropuerto.codigo} />
+                  <PanelDetalleAeropuerto 
+                    codigo={aeropuerto.codigo} 
+                    onCancelVuelo={handleCancelVuelo}
+                  />
 
                   {/* Detalle desplegable de envíos en este aeropuerto (simulación activa) */}
                   {manifest && (

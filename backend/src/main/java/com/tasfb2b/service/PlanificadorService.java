@@ -1072,7 +1072,7 @@ public class PlanificadorService {
             llegadaRel = duracionVentana > 0 ? Math.min(duracionVentana, llegadaRel) : llegadaRel;
 
             ocurrencias.add(new OcurrenciaVueloDTO(
-                origen, destino, salidaRel, llegadaRel, e.getValue(), vuelo.getCapacidadMax()));
+                origen, destino, salidaRel, llegadaRel, e.getValue(), vuelo.getCapacidadMax(), salidaMinutos));
             maxLlegada = Math.max(maxLlegada, llegadaRel);
         }
 
@@ -1151,13 +1151,13 @@ public class PlanificadorService {
             int llegadaRelFinal = llegadaRel;
             OcurrenciaAcumulada acc = ocurrenciasMap.computeIfAbsent(key,
                 k -> new OcurrenciaAcumulada(v.getOrigen(), v.getDestino(), salidaRelFinal,
-                    llegadaRelFinal, v.getCapacidadMax()));
+                    llegadaRelFinal, v.getCapacidadMax(), v.getSalidaMinutos()));
             acc.maletas += intOrZero(t.getCapacidadReservada());
             maxLlegada = Math.max(maxLlegada, llegadaRel);
         }
 
         List<OcurrenciaVueloDTO> ocurrencias = ocurrenciasMap.values().stream()
-            .map(o -> new OcurrenciaVueloDTO(o.origen, o.destino, o.salidaAbs, o.llegadaAbs, o.maletas, o.capacidadMax))
+            .map(o -> new OcurrenciaVueloDTO(o.origen, o.destino, o.salidaAbs, o.llegadaAbs, o.maletas, o.capacidadMax, o.horaSalidaMinutos))
             .sorted(Comparator.comparingInt(OcurrenciaVueloDTO::getSalidaAbs))
             .collect(Collectors.toList());
 
@@ -1326,14 +1326,16 @@ public class PlanificadorService {
         final int salidaAbs;
         final int llegadaAbs;
         final int capacidadMax;
+        final int horaSalidaMinutos;
         int maletas;
 
-        OcurrenciaAcumulada(String origen, String destino, int salidaAbs, int llegadaAbs, int capacidadMax) {
+        OcurrenciaAcumulada(String origen, String destino, int salidaAbs, int llegadaAbs, int capacidadMax, int horaSalidaMinutos) {
             this.origen = origen;
             this.destino = destino;
             this.salidaAbs = salidaAbs;
             this.llegadaAbs = llegadaAbs;
             this.capacidadMax = capacidadMax;
+            this.horaSalidaMinutos = horaSalidaMinutos;
         }
     }
 
@@ -1436,9 +1438,58 @@ public class PlanificadorService {
 
         int reasignados = 0, sinRuta = 0;
         for (Envio envio : afectados) {
-            Ruta nueva = si.construirRuta(envio);
+            Ruta rutaAntigua = solucionActual.getRutas().stream()
+                .filter(r -> r.getEnvio().getId().equals(envio.getId()))
+                .findFirst().orElse(null);
+                
+            if (rutaAntigua == null) continue;
+
+            int index = -1;
+            for (int i = 0; i < rutaAntigua.getVuelos().size(); i++) {
+                Vuelo v = rutaAntigua.getVuelos().get(i);
+                if (v.getOrigen().equals(origen) && v.getDestino().equals(destino) && v.getSalidaMinutos() == horaSalidaMinutos) {
+                    index = i;
+                    break;
+                }
+            }
+
+            if (index == -1) continue;
+
+            // Extraer vuelos anteriores al vuelo cancelado
+            List<Vuelo> vuelosPrevios = new ArrayList<>(rutaAntigua.getVuelos().subList(0, index));
+            
+            // Calcular el tiempo de llegada al origen del vuelo cancelado (donde se quedó el paquete)
+            int tiempoActual = envio.getMinutosRegistro();
+            for (Vuelo v : vuelosPrevios) {
+                int salidaAbsoluta = com.tasfb2b.algorithm.GrafoVuelos.proximaSalidaAbsoluta(tiempoActual, v.getSalidaMinutos(), 30);
+                tiempoActual = salidaAbsoluta + v.getDuracionMinutos();
+            }
+
+            // Crear un envio virtual que nace donde se canceló el vuelo, con la hora en que aterrizó ahí
+            Envio envioFicticio = new Envio(
+                envio.getIdOriginal(), origen, envio.getDestino(), 
+                "20260101", "00", "00", // La fecha no importa tanto si sobreescribimos los minutos luego
+                String.valueOf(envio.getCantidad()), envio.getIdCliente()
+            );
+            // El getter usa FECHA_INICIO_SIMULACION (1 enero 2026), por tanto setear la fechaRegistro 
+            // a esa base mas el tiempoActual hace que getMinutosRegistro() == tiempoActual
+            envioFicticio.setFechaHoraRegistro(java.time.LocalDate.of(2026, 1, 1)
+                .atStartOfDay().plusMinutes(tiempoActual));
+            envioFicticio.setPlazoMaximoMinutos(envio.getPlazoMaximoMinutos()); // Mantener plazo si es necesario
+
+            Ruta rutaRestante = si.construirRuta(envioFicticio);
+            
+            Ruta nueva = new Ruta(envio);
+            vuelosPrevios.forEach(nueva::agregarVuelo);
+            if (!rutaRestante.isSinSolucion()) {
+                rutaRestante.getVuelos().forEach(nueva::agregarVuelo);
+                reasignados++;
+            } else {
+                nueva.setSinSolucion(true);
+                sinRuta++;
+            }
+            
             solucionActual.agregarRuta(nueva);
-            if (nueva.isSinSolucion()) sinRuta++; else reasignados++;
         }
 
         publicarSnapshot(solucionActual, aeropuertosCargados, 0);
