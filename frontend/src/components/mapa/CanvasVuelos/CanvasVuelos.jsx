@@ -53,7 +53,7 @@ function drawAirplaneIcon(ctx, size, fillColor) {
   ctx.stroke()
 }
 
-function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avanceTickMin = 1 }) {
+function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avanceTickMin = 1, onCancelVuelo }) {
   const map          = useRef(null)
   const mapInstance  = useMap()
   const canvasRef    = useRef(null)
@@ -151,6 +151,9 @@ function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avan
           </div>
           <div>Maletas: <strong>${found.o.maletas} / ${found.o.capacidadMax}</strong></div>
           <div>Ocupación: <strong style="color:${c}">${pct.toFixed(1)}%</strong></div>
+          <div style="margin-top:6px; font-size:10px; color:#94a3b8; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 4px;">
+            Haga clic para cancelar vuelo
+          </div>
         `
         tip.style.display = 'block'
         tip.style.left = `${x + 16}px`
@@ -160,17 +163,33 @@ function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avan
       }
     }
 
+    const handleClick = (e) => {
+      const cp = mapInstance.mouseEventToContainerPoint(e.originalEvent)
+      const { x, y } = cp
+      let found = null
+      for (const hit of hitAreasRef.current) {
+        const dx = hit.x - x
+        const dy = hit.y - y
+        if (dx * dx + dy * dy <= RADIUS * RADIUS) { found = hit; break }
+      }
+      if (found && onCancelVuelo) {
+        onCancelVuelo(found.o)
+      }
+    }
+
     const handleLeave = () => {
       if (tooltipRef.current) tooltipRef.current.style.display = 'none'
     }
 
     mapInstance.on('mousemove', handleMove)
+    mapInstance.on('click', handleClick)
     mapInstance.getContainer().addEventListener('mouseleave', handleLeave)
     return () => {
       mapInstance.off('mousemove', handleMove)
+      mapInstance.off('click', handleClick)
       mapInstance.getContainer().removeEventListener('mouseleave', handleLeave)
     }
-  }, [mapInstance])
+  }, [mapInstance, onCancelVuelo])
 
   // Función de dibujo pura — lee tiempoRef.current directamente
   const draw = useCallback(() => {

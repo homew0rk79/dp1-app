@@ -8,16 +8,19 @@ public class OcurrenciaVueloDTO {
     private int llegadaAbs;
     private int maletas;
     private int capacidadMax;
+    private int horaSalidaMinutos;
 
     public OcurrenciaVueloDTO(String origen, String destino,
                                int salidaAbs, int llegadaAbs,
-                               int maletas, int capacidadMax) {
+                               int maletas, int capacidadMax,
+                               int horaSalidaMinutos) {
         this.origen      = origen;
         this.destino     = destino;
         this.salidaAbs   = salidaAbs;
         this.llegadaAbs  = llegadaAbs;
         this.maletas     = maletas;
         this.capacidadMax = capacidadMax;
+        this.horaSalidaMinutos = horaSalidaMinutos;
     }
 
     public String getOrigen()       { return origen; }
@@ -26,4 +29,5 @@ public class OcurrenciaVueloDTO {
     public int getLlegadaAbs()      { return llegadaAbs; }
     public int getMaletas()         { return maletas; }
     public int getCapacidadMax()    { return capacidadMax; }
+    public int getHoraSalidaMinutos() { return horaSalidaMinutos; }
 }

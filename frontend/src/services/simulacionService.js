@@ -13,4 +13,5 @@ export const simulacionService = {
   obtenerOcupacionActual: (tiempoMin = 0) =>
     api.get('/aeropuertos/ocupacion-actual', { params: { tiempoMin } }),
   continuarColapso: () => api.post('/planificacion/continuar-colapso'),
+  cancelarVuelo: (payload) => api.post('/replanificacion/vuelo-cancelado', payload),
 }

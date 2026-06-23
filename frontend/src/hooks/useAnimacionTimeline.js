@@ -61,6 +61,10 @@ function useAnimacionTimeline() {
     setManifest(data)
   }, [setManifest, setPlayingAnimacion])
 
+  const actualizarManifest = useCallback((data) => {
+    useSimulacionStore.getState().updateManifest(data)
+  }, [])
+
   const onTick = useCallback((t) => {
     setTiempoDisplay(t)
     // Actualizar el store cada hora simulada — el Sidebar lee esto para KPIs y aeropuertos
@@ -87,6 +91,7 @@ function useAnimacionTimeline() {
     seekTo,
     setVelocidad,
     onTick,
+    actualizarManifest,
   }
 }
 
