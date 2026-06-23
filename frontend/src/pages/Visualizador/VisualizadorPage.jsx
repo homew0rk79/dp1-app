@@ -1,14 +1,17 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { X } from 'lucide-react'
 import MapaInteractivo from '../../components/mapa/MapaInteractivo/MapaInteractivo'
 import { OverlayRutaProvider } from '../../context/OverlayRutaContext'
-import { useState, useCallback } from 'react'
+import useSeleccionStore from '../../store/seleccionStore'
 import styles from './VisualizadorPage.module.css'
 
 function VisualizadorPage() {
   const location = useLocation()
   const [overlay, setOverlay] = useState(() => location.state?.overlayRuta ?? null)
+  const overlayStore = useSeleccionStore((s) => s.overlayRuta)
+  const limpiarOverlayRuta = useSeleccionStore((s) => s.limpiarOverlayRuta)
+  const overlayVisible = overlayStore ?? overlay
 
   useEffect(() => {
     if (location.state?.overlayRuta) {
@@ -16,16 +19,19 @@ function VisualizadorPage() {
     }
   }, [location.state])
 
-  const limpiarOverlay = useCallback(() => setOverlay(null), [])
+  const limpiarOverlay = useCallback(() => {
+    setOverlay(null)
+    limpiarOverlayRuta()
+  }, [limpiarOverlayRuta])
 
   return (
-    <OverlayRutaProvider value={{ overlay, setOverlay: limpiarOverlay }}>
+    <OverlayRutaProvider value={{ overlay: overlayVisible, setOverlay: limpiarOverlay }}>
       <div className={styles.page}>
-        {overlay?.escalas?.length >= 2 && (
+        {overlayVisible?.escalas?.length >= 2 && (
           <div className={styles.overlayBar}>
             <span>
-              Ruta en mapa: {overlay.escalas.join(' → ')}
-              {overlay.variante === 'anterior' ? ' (anterior)' : ''}
+              Ruta en mapa: {overlayVisible.escalas.join(' -> ')}
+              {overlayVisible.variante === 'anterior' ? ' (anterior)' : ''}
             </span>
             <button type="button" className={styles.overlayBtn} onClick={limpiarOverlay}>
               <X size={14} />

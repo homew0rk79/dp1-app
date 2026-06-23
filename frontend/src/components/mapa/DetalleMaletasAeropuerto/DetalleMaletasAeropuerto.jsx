@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import useMaletasAeropuerto from '../../../hooks/useMaletasAeropuerto'
 import { FECHA_INICIO_SIMULACION_ALGORITMO } from '../../../constants/restricciones'
+import { obtenerDetalleRuta } from '../../../services/rutasService'
+import useSeleccionStore from '../../../store/seleccionStore'
 import styles from './DetalleMaletasAeropuerto.module.css'
 
 const PAGE_SIZE = 20
@@ -26,11 +28,16 @@ function formatearMinutosAbs(min) {
   return `${dd}/${mo}/${yyyy} ${hh}:${mm}`
 }
 
-function ItemMaleta({ m }) {
+function ItemMaleta({ m, onSelect }) {
   const esEntregada = m.estado === 'ENTREGADA'
 
   return (
-    <div className={`${styles.item} ${styles[`borde_${m.estado}`]} ${esEntregada ? styles.itemEntregado : ''}`}>
+    <button
+      type="button"
+      className={`${styles.item} ${styles.itemBtn} ${styles[`borde_${m.estado}`]} ${esEntregada ? styles.itemEntregado : ''}`}
+      onClick={() => onSelect(m)}
+      title="Seleccionar envio y enfocar su ruta en el mapa"
+    >
       <div className={styles.itemHeader}>
         <div className={styles.itemHeaderIzq}>
           <span className={styles.envioId}>{m.envioId}</span>
@@ -55,7 +62,7 @@ function ItemMaleta({ m }) {
             </>
         }
       </div>
-    </div>
+    </button>
   )
 }
 
@@ -63,8 +70,29 @@ function DetalleMaletasAeropuerto({ codigo, tiempoMin = 0 }) {
   const [abierto, setAbierto] = useState(false)
   const [visibles, setVisibles] = useState(PAGE_SIZE)
   const [filtro, setFiltro]     = useState('ALMACEN_HOY')
+  const setEnvioSeleccionado = useSeleccionStore((s) => s.setEnvioSeleccionado)
 
   const { maletas, error } = useMaletasAeropuerto(codigo, tiempoMin, abierto)
+
+  async function seleccionarEnvio(m) {
+    try {
+      const detalle = await obtenerDetalleRuta(m.envioId)
+      const escalas = detalle?.tramos?.length
+        ? [detalle.tramos[0].origen, ...detalle.tramos.map((t) => t.destino)]
+        : [m.origen, m.destino]
+      setEnvioSeleccionado(m.envioId, {
+        escalas,
+        variante: 'actual',
+        rutaId: m.envioId,
+      })
+    } catch {
+      setEnvioSeleccionado(m.envioId, {
+        escalas: [m.origen, m.destino],
+        variante: 'actual',
+        rutaId: m.envioId,
+      })
+    }
+  }
 
   function handleToggle(e) {
     const nuevoEstado = e.target.open
@@ -148,7 +176,7 @@ function DetalleMaletasAeropuerto({ codigo, tiempoMin = 0 }) {
 
         {/* Lista */}
         <div className={styles.lista}>
-          {mostrar.map((m) => <ItemMaleta key={m.envioId} m={m} />)}
+          {mostrar.map((m) => <ItemMaleta key={m.envioId} m={m} onSelect={seleccionarEnvio} />)}
         </div>
 
         {visibles < ordenada.length && (

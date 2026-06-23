@@ -15,6 +15,7 @@ import {
 
 import PanelMetrica from '../../common/PanelMetrica/PanelMetrica'
 import Badge from '../../common/Badge/Badge'
+import Semaforo from '../../common/Semaforo/Semaforo'
 import PanelUnidadesTransporte from './PanelUnidadesTransporte/PanelUnidadesTransporte'
 import ListaAeropuertosSidebar from './ListaAeropuertosSidebar/ListaAeropuertosSidebar'
 import useSimulacionStore from '../../../store/simulacionStore'
@@ -45,6 +46,7 @@ function Sidebar() {
   const [scConsumoReal, setScConsumoReal] = useState(null)
 
   const aeropuertoSeleccionado = useSeleccionStore((s) => s.aeropuertoSeleccionado)
+  const vueloSeleccionado = useSeleccionStore((s) => s.vueloSeleccionado)
   const setAeropuertoSeleccionado = useSeleccionStore((s) => s.setAeropuertoSeleccionado)
 
   const {
@@ -89,6 +91,10 @@ function Sidebar() {
   useEffect(() => {
     if (aeropuertoSeleccionado) setTabActivo('aeropuertos')
   }, [aeropuertoSeleccionado])
+
+  useEffect(() => {
+    if (vueloSeleccionado) setTabActivo('vuelos')
+  }, [vueloSeleccionado])
 
   // Ocupación en tiempo real — se actualiza una vez por hora simulada
   useEffect(() => {
@@ -140,19 +146,44 @@ function Sidebar() {
     const T = tiempoAnimacion
     let maletasEnTransito = 0
     let vuelosSaturados   = 0
+    let capacidadFlotaActiva = 0
     for (const o of manifest.ocurrencias) {
       if (o.salidaAbs <= T && T <= o.llegadaAbs) {
         maletasEnTransito += o.maletas
+        capacidadFlotaActiva += o.capacidadMax || 0
         if (o.maletas / (o.capacidadMax || 1) > 0.9) vuelosSaturados++
       }
     }
     let aeropuertosSaturados = 0
+    let maletasAlmacenadas = 0
+    let capacidadAlmacenes = 0
     for (const a of manifest.aeropuertos) {
       const maletas = ocupacionRealtime[a.codigo] ?? 0
+      maletasAlmacenadas += maletas
+      capacidadAlmacenes += a.capacidadMax || 0
       if (maletas / (a.capacidadMax || 1) > rangosSemaforo.ambar / 100) aeropuertosSaturados++
     }
-    return { maletasEnTransito, vuelosSaturados, aeropuertosSaturados }
+    return {
+      maletasEnTransito,
+      vuelosSaturados,
+      aeropuertosSaturados,
+      pctFlota: capacidadFlotaActiva > 0 ? Math.round((maletasEnTransito * 1000) / capacidadFlotaActiva) / 10 : 0,
+      pctAlmacenes: capacidadAlmacenes > 0 ? Math.round((maletasAlmacenadas * 1000) / capacidadAlmacenes) / 10 : 0,
+    }
   })()
+
+  const semaforosGlobales = {
+    flota: kpisAnimados
+      ? kpisAnimados.pctFlota
+      : completado?.vuelosUtilizados > 0
+        ? Math.min(100, Math.round((completado.vuelosSaturados * 1000) / completado.vuelosUtilizados) / 10)
+        : 0,
+    almacenes: kpisAnimados
+      ? kpisAnimados.pctAlmacenes
+      : completado?.aeropuertosProcesados > 0
+        ? Math.min(100, Math.round((completado.aeropuertosSaturados * 1000) / completado.aeropuertosProcesados) / 10)
+        : 0,
+  }
 
   const kpis = [
     {
@@ -296,6 +327,18 @@ function Sidebar() {
                 <PanelMetrica key={kpi.label} {...kpi} />
               ))}
             </div>
+            <div className={styles.semaforosGlobales}>
+              <div className={styles.semaforoGlobal}>
+                <span>Flota</span>
+                <strong>{semaforosGlobales.flota.toFixed(1)}%</strong>
+                <Semaforo valor={semaforosGlobales.flota} />
+              </div>
+              <div className={styles.semaforoGlobal}>
+                <span>Almacenes</span>
+                <strong>{semaforosGlobales.almacenes.toFixed(1)}%</strong>
+                <Semaforo valor={semaforosGlobales.almacenes} />
+              </div>
+            </div>
           </section>
 
           {/* Barra de progreso mientras corre el algoritmo */}
@@ -421,6 +464,29 @@ function Sidebar() {
                 </span>
                 {estadoEjecucion !== 'IDLE' && (
                   <span className={styles.simTiempo}>{formatearDuracion(tiempoSegundos ?? 0)}</span>
+                )}
+              </div>
+
+              <div className={styles.simControles}>
+                {puedeIniciar && (
+                  <button
+                    className={styles.simBtnIniciar}
+                    onClick={handleIniciar}
+                    disabled={!escenarioActivo || simulacionEnCurso}
+                    type="button"
+                  >
+                    <Play size={13} strokeWidth={2.5} /> Iniciar
+                  </button>
+                )}
+                {enCurso && (
+                  <button className={styles.simBtnPeligro} onClick={handleDetener} type="button">
+                    <Square size={13} /> Detener
+                  </button>
+                )}
+                {(completadoEstado || errorEstado) && (
+                  <button className={styles.simBtnSecundario} onClick={handleNuevaSimulacion} type="button">
+                    <RotateCcw size={13} /> Nueva simulación
+                  </button>
                 )}
               </div>
 

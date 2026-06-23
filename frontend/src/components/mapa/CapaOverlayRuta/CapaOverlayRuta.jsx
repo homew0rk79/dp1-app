@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Polyline, CircleMarker, Tooltip, useMap } from 'react-leaflet'
-import { rutaACoordenadas, obtenerEscalas } from '../../../utils/rutaMapa'
+import { obtenerEscalas } from '../../../utils/rutaMapa'
 import { AEROPUERTOS_POR_CODIGO } from '../../../mocks/aeropuertos'
 
 const ESTILO_ACTUAL = {
@@ -16,9 +16,25 @@ const ESTILO_ANTERIOR = {
   dashArray: '8 6',
 }
 
-function CapaOverlayRuta({ escalas, variante = 'actual' }) {
+function normalizarAeropuertos(aeropuertos = []) {
+  return Object.fromEntries(
+    aeropuertos
+      .filter((a) => a?.codigo && a.lat != null && a.lng != null)
+      .map((a) => [a.codigo, a]),
+  )
+}
+
+function CapaOverlayRuta({ escalas, variante = 'actual', aeropuertos = [] }) {
   const map = useMap()
-  const coords = rutaACoordenadas(escalas)
+  const aeropuertosPorCodigo = { ...AEROPUERTOS_POR_CODIGO, ...normalizarAeropuertos(aeropuertos) }
+  const coords = Array.isArray(escalas)
+    ? escalas
+        .map((codigo) => {
+          const aero = aeropuertosPorCodigo[codigo]
+          return aero ? [aero.lat, aero.lng] : null
+        })
+        .filter(Boolean)
+    : []
   const estilo = variante === 'anterior' ? ESTILO_ANTERIOR : ESTILO_ACTUAL
   const intermedias = obtenerEscalas(escalas)
 
@@ -33,7 +49,7 @@ function CapaOverlayRuta({ escalas, variante = 'actual' }) {
     <>
       <Polyline positions={coords} pathOptions={estilo} />
       {escalas.map((codigo, i) => {
-        const aero = AEROPUERTOS_POR_CODIGO[codigo]
+        const aero = aeropuertosPorCodigo[codigo]
         if (!aero) return null
         const esEscala = intermedias.includes(codigo)
         const esOrigen = i === 0

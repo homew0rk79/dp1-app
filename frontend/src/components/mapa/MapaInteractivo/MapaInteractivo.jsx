@@ -34,6 +34,7 @@ function MapaInteractivo() {
 
   const aeropuertoSeleccionado = useSeleccionStore((s) => s.aeropuertoSeleccionado)
   const setAeropuertoSeleccionado = useSeleccionStore((s) => s.setAeropuertoSeleccionado)
+  const filtrosMapa = useSeleccionStore((s) => s.filtrosMapa)
 
   const offsetMinutos = (() => {
     const base = new Date(FECHA_INICIO_SIMULACION_ALGORITMO)
@@ -214,6 +215,23 @@ function MapaInteractivo() {
     return ocupacionWS[codigo] ?? null
   }
 
+  function aeropuertoPasaFiltros(aeropuerto, pctOcup) {
+    const filtros = filtrosMapa?.almacenes
+    if (!filtros) return true
+    const hayFiltro =
+      Boolean(filtros.texto?.trim()) ||
+      filtros.continente !== 'Todos' ||
+      filtros.semaforo !== 'todos'
+    if (!hayFiltro) return true
+    if (Array.isArray(filtros.visibles)) {
+      return filtros.visibles.includes(aeropuerto.codigo)
+    }
+    if (filtros.semaforo !== 'todos' && getColorSemaforo(pctOcup, rangosSemaforo) !== filtros.semaforo) return false
+    if (filtros.continente !== 'Todos' && aeropuerto.continente !== filtros.continente) return false
+    const q = filtros.texto.trim().toLowerCase()
+    return !q || aeropuerto.codigo.toLowerCase().includes(q) || aeropuerto.ciudad.toLowerCase().includes(q)
+  }
+
   const maxConsumo = consumoBloques.reduce((max, item) => Math.max(max, item.maletas || 0), 0)
   const bloquesVisibles = consumoBloques.slice(0, 24)
   const scConsumoReal = bloquesVisibles[0]?.saltoMin ?? null
@@ -245,6 +263,7 @@ function MapaInteractivo() {
             onTick={onTick}
             avanceTickMin={TA_EJECUCION_ALGORITMO_MIN}
             onCancelVuelo={handleCancelVuelo}
+            filtrosUT={filtrosMapa?.ut}
           />
         )}
 
@@ -255,6 +274,8 @@ function MapaInteractivo() {
           const color     = getColorSemaforo(pctOcup, rangosSemaforo)
           const colorHex  = COLORES_SEMAFORO[color]
           const seleccionado = aeropuertoSeleccionado === aeropuerto.codigo
+          const visiblePorFiltro = aeropuertoPasaFiltros(aeropuerto, pctOcup)
+          if (!visiblePorFiltro && !seleccionado) return null
 
           const icon = L.divIcon({
             className: styles.aeropuertoMarker,

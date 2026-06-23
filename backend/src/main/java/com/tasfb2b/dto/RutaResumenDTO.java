@@ -11,7 +11,7 @@ public class RutaResumenDTO {
     private String destino;
     private String origenCiudad;
     private String destinoCiudad;
-    private String estado;        // "en_transito" | "sin_ruta"
+    private String estado;        // "en_transito" | "sin_ruta" | "cancelado"
     private String cumplimiento;  // "verde" | "ambar" | "rojo"
     private String tiempoEstimado;
     private String fechaIngreso;

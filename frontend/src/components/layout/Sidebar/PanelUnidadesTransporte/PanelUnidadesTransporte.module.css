@@ -46,6 +46,22 @@
   color: var(--color-text-muted);
 }
 
+.filtroSelect {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.78rem;
+  outline: none;
+}
+
+.filtroSelect:focus {
+  border-color: var(--color-accent);
+}
+
 .tablaWrap {
   flex: 1;
   min-height: 0;

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Search, ArrowUp, ArrowDown } from 'lucide-react'
 import Semaforo from '../../../common/Semaforo/Semaforo'
 import { getColorSemaforo, COLORES_SEMAFORO } from '../../../../utils/semaforo'
@@ -8,6 +8,7 @@ import {
   proximaLlegadaAeropuerto,
 } from '../../../../utils/planificacionAeropuerto'
 import { TIEMPO_SIMULADO_REFERENCIA } from '../../../../constants/tiempoSimulado'
+import useSeleccionStore from '../../../../store/seleccionStore'
 import styles from './ListaAeropuertosSidebar.module.css'
 
 const CONTINENTES = ['Todos', 'América', 'Europa', 'Asia', 'Oceanía']
@@ -55,8 +56,10 @@ function ListaAeropuertosSidebar({
 }) {
   const [busqueda, setBusqueda] = useState('')
   const [continente, setContinente] = useState('Todos')
+  const [semaforo, setSemaforo] = useState('todos')
   const [ordenCampo, setOrdenCampo] = useState('ocupacion')
   const [ordenDir, setOrdenDir] = useState('desc')
+  const setFiltroAlmacenes = useSeleccionStore((s) => s.setFiltroAlmacenes)
 
   const aeropuertosBase = useMemo(() => {
     if (aeropuertosWS.length > 0) {
@@ -82,6 +85,7 @@ function ListaAeropuertosSidebar({
         return false
       }
       if (continente !== 'Todos' && a.continente !== continente) return false
+      if (semaforo !== 'todos' && getColorSemaforo(a.porcentajeOcupacion, rangosSemaforo) !== semaforo) return false
       return true
     })
 
@@ -106,7 +110,16 @@ function ListaAeropuertosSidebar({
     })
 
     return lista
-  }, [aeropuertosBase, busqueda, continente, ordenCampo, ordenDir])
+  }, [aeropuertosBase, busqueda, continente, semaforo, rangosSemaforo, ordenCampo, ordenDir])
+
+  useEffect(() => {
+    setFiltroAlmacenes({
+      texto: busqueda,
+      continente,
+      semaforo,
+      visibles: aeropuertosFiltrados.map((a) => a.codigo),
+    })
+  }, [busqueda, continente, semaforo, aeropuertosFiltrados, setFiltroAlmacenes])
 
   function handleOrdenar(campo) {
     if (ordenCampo === campo) {
@@ -140,6 +153,16 @@ function ListaAeropuertosSidebar({
           {CONTINENTES.map((c) => (
             <option key={c} value={c}>{c === 'Todos' ? 'Continente: todos' : c}</option>
           ))}
+        </select>
+        <select
+          className={styles.select}
+          value={semaforo}
+          onChange={(e) => setSemaforo(e.target.value)}
+        >
+          <option value="todos">Semaforo: todos</option>
+          <option value="verde">Verde</option>
+          <option value="ambar">Ambar</option>
+          <option value="rojo">Rojo</option>
         </select>
       </div>
 

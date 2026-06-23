@@ -82,15 +82,16 @@ public class MaletasController {
         }
         if (paradas.size() == 1 && ruta.getDestino() != null) paradas.add(ruta.getDestino());
 
-        String estado = ruta.isSinSolucion()
-            ? "Demorado"
-            : "Entregado";
+        boolean cancelado = "cancelado".equalsIgnoreCase(ruta.getEstado());
+        String estado = cancelado
+            ? "Cancelado"
+            : (ruta.isSinSolucion() ? "Demorado" : "Entregado");
         String riesgo = "rojo".equalsIgnoreCase(ruta.getCumplimiento())
             ? "rojo"
             : "ambar".equalsIgnoreCase(ruta.getCumplimiento()) ? "ambar" : "verde";
         int tiempo = ruta.getTiempoTotalMinutos() != null ? ruta.getTiempoTotalMinutos() : 0;
         int plazo = ruta.getPlazoMaximoMinutos() != null ? ruta.getPlazoMaximoMinutos() : 0;
-        int progreso = ruta.isSinSolucion() ? 0 : 100;
+        int progreso = (ruta.isSinSolucion() || cancelado) ? 0 : 100;
 
         Map<String, Object> item = new LinkedHashMap<>();
         item.put("id", ruta.getEnvio() != null ? ruta.getEnvio().getId() : valor(ruta.getIdEnvioOriginal()));
@@ -102,7 +103,7 @@ public class MaletasController {
         item.put("cantidad", ruta.getCantidad() != null ? ruta.getCantidad() : 0);
         item.put("estado", estado);
         item.put("riesgo", riesgo);
-        item.put("ubicacion", ruta.isSinSolucion() ? "Sin ruta viable" : valor(ruta.getDestino()) + " - Entregado");
+        item.put("ubicacion", cancelado ? "Cancelado" : (ruta.isSinSolucion() ? "Sin ruta viable" : valor(ruta.getDestino()) + " - Entregado"));
         item.put("plazo", plazo > 1440 ? "48h" : "24h");
         item.put("registro", ruta.getEnvio() != null ? ruta.getEnvio().getFechaHoraRegistro().format(FMT) : "-");
         item.put("estimada", !ruta.isSinSolucion() && ruta.getEnvio() != null

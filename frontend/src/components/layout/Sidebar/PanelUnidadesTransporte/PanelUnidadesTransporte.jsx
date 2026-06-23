@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ArrowUp, ArrowDown, Search } from 'lucide-react'
 import Semaforo from '../../../common/Semaforo/Semaforo'
 import { getColorSemaforo, COLORES_SEMAFORO } from '../../../../utils/semaforo'
@@ -101,8 +101,10 @@ function PanelUnidadesTransporte({ ocurrencias, tiempoAnimacion }) {
   const rangosSemaforo = useConfiguracionStore((s) => s.rangosSemaforo)
   const vueloSeleccionado = useSeleccionStore((s) => s.vueloSeleccionado)
   const setVueloSeleccionado = useSeleccionStore((s) => s.setVueloSeleccionado)
+  const setFiltroUT = useSeleccionStore((s) => s.setFiltroUT)
 
   const [filtroDestino, setFiltroDestino] = useState('')
+  const [filtroSemaforo, setFiltroSemaforo] = useState('todos')
   const [sortConfig, setSortConfig] = useState({ key: 'horaSalida', direction: 'asc' })
 
   const listaBase = useMemo(() => {
@@ -115,12 +117,27 @@ function PanelUnidadesTransporte({ ocurrencias, tiempoAnimacion }) {
     const q = filtroDestino.trim().toLowerCase()
     let lista = listaBase
     if (q) {
-      lista = lista.filter((ut) => ut.destino.toLowerCase().includes(q))
+      lista = lista.filter((ut) =>
+        ut.destino.toLowerCase().includes(q) ||
+        ut.origen.toLowerCase().includes(q) ||
+        ut.codigo.toLowerCase().includes(q),
+      )
+    }
+    if (filtroSemaforo !== 'todos') {
+      lista = lista.filter((ut) => getColorSemaforo(ut.ocupacion, rangosSemaforo) === filtroSemaforo)
     }
     return [...lista].sort((a, b) =>
       compararFilas(a, b, sortConfig.key, sortConfig.direction),
     )
-  }, [listaBase, filtroDestino, sortConfig])
+  }, [listaBase, filtroDestino, filtroSemaforo, rangosSemaforo, sortConfig])
+
+  useEffect(() => {
+    setFiltroUT({
+      texto: filtroDestino,
+      semaforo: filtroSemaforo,
+      visibles: listaVisible.map((ut) => ut.key),
+    })
+  }, [filtroDestino, filtroSemaforo, listaVisible, setFiltroUT])
 
   function handleSort(key) {
     setSortConfig((prev) => ({
@@ -147,6 +164,16 @@ function PanelUnidadesTransporte({ ocurrencias, tiempoAnimacion }) {
           onChange={(e) => setFiltroDestino(e.target.value)}
         />
       </div>
+      <select
+        className={styles.filtroSelect}
+        value={filtroSemaforo}
+        onChange={(e) => setFiltroSemaforo(e.target.value)}
+      >
+        <option value="todos">Semaforo: todos</option>
+        <option value="verde">Verde</option>
+        <option value="ambar">Ambar</option>
+        <option value="rojo">Rojo</option>
+      </select>
 
       <div className={styles.tablaWrap}>
         <table className={styles.tabla}>

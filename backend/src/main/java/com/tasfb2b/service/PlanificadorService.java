@@ -28,6 +28,11 @@ public class PlanificadorService {
 
     public enum Estado { IDLE, CARGANDO, PLANIFICANDO, COMPLETADO, ERROR }
 
+    private static final String ESTADO_EN_TRANSITO = "en_transito";
+    private static final String ESTADO_SIN_RUTA = "sin_ruta";
+    private static final String ESTADO_CANCELADO = "cancelado";
+    private static final int PERMANENCIA_MINIMA_AEROPUERTO_MIN = 30;
+
     // ── Rutas de datos ────────────────────────────────────────────────────────
     @Value("${tasf.datos.aeropuertos:datos/aeropuertos.txt}")
     private String rutaAeropuertos;
@@ -879,7 +884,18 @@ public class PlanificadorService {
         }
 
         if (ruta.getVuelos() == null) return null;
+        int tiempoDisponible = ruta.getEnvio().getMinutosRegistro();
         for (Vuelo vuelo : ruta.getVuelos()) {
+            int salidaAbs = GrafoVuelos.proximaSalidaAbsoluta(
+                tiempoDisponible, vuelo.getSalidaMinutos(), PERMANENCIA_MINIMA_AEROPUERTO_MIN);
+            int espera = salidaAbs - tiempoDisponible;
+            if (espera < PERMANENCIA_MINIMA_AEROPUERTO_MIN) {
+                return "permanencia en aeropuerto menor a "
+                    + PERMANENCIA_MINIMA_AEROPUERTO_MIN + " min antes de "
+                    + vuelo.getOrigen() + "->" + vuelo.getDestino();
+            }
+            tiempoDisponible = salidaAbs + vuelo.getDuracionMinutos();
+
             Aeropuerto origen = aeropuertos.get(vuelo.getOrigen());
             Aeropuerto destino = aeropuertos.get(vuelo.getDestino());
             boolean mismoContinente = origen != null && destino != null
@@ -1386,6 +1402,51 @@ public class PlanificadorService {
             .collect(Collectors.toList());
     }
 
+    public synchronized ReplanificacionResultDTO cancelarEnvio(String envioId) {
+        if (envioId == null || envioId.isBlank()) {
+            throw new IllegalStateException("Debe indicar el ID del envío a cancelar.");
+        }
+        if (solucionActual == null) {
+            throw new IllegalStateException("No hay solución activa. Ejecute una planificación primero.");
+        }
+
+        Ruta rutaActual = solucionActual.getRutas().stream()
+            .filter(r -> r.getEnvio() != null && envioId.equals(r.getEnvio().getId()))
+            .findFirst()
+            .orElse(null);
+        if (rutaActual == null) {
+            throw new IllegalStateException("No se encontró la ruta/envío " + envioId + " en la solución actual.");
+        }
+
+        Ruta cancelada = new Ruta(rutaActual.getEnvio());
+        cancelada.setSinSolucion(true);
+        cancelada.setEstado(ESTADO_CANCELADO);
+        solucionActual.agregarRuta(cancelada);
+
+        if (simulacionActualId != null) {
+            rutaRepository.findBySimulacionIdAndEnvioId(simulacionActualId, envioId)
+                .ifPresent(r -> {
+                    r.setSinSolucion(true);
+                    r.setEstado(ESTADO_CANCELADO);
+                    r.sincronizarDatosPersistentes();
+                    rutaRepository.save(r);
+                });
+        }
+
+        publicarSnapshot(solucionActual, aeropuertosCargados, 0);
+        PlanificacionStats stats = statsActual;
+        if (stats != null) {
+            completarStatsDesdeSolucion(stats, solucionActual);
+        }
+
+        String msg = "Envío cancelado: " + envioId;
+        System.out.printf("[cancelacion-envio] id=%s estado=%s sinSolucion=%s%n",
+            envioId, cancelada.getEstado(), cancelada.isSinSolucion());
+        wsPublisher.publicarProgreso(progreso, msg, estado.get().name(), solucionActual.getCostoTotal());
+        return new ReplanificacionResultDTO(1, 0, 1, msg,
+            envioId, List.of(envioId), List.of(envioId));
+    }
+
     public RutaDetalleDTO getRutaDetalle(String envioId) {
         if (solucionActual != null) {
             Ruta ruta = solucionActual.getRutas().stream()
@@ -1402,6 +1463,11 @@ public class PlanificadorService {
 
     public synchronized ReplanificacionResultDTO replanificarPorVueloCancelado(
             String origen, String destino, int horaSalidaMinutos) {
+        return replanificarPorVueloCancelado(origen, destino, horaSalidaMinutos, null);
+    }
+
+    public synchronized ReplanificacionResultDTO replanificarPorVueloCancelado(
+            String origen, String destino, int horaSalidaMinutos, String idEnvioSolicitante) {
 
         if (solucionActual == null) {
             throw new IllegalStateException("No hay solución activa. Ejecute una planificación primero.");
@@ -1425,6 +1491,10 @@ public class PlanificadorService {
                 ") no está siendo utilizado por ningún envío en la solución actual.");
         }
 
+        List<String> enviosAfectadosIds = afectados.stream()
+            .map(Envio::getId)
+            .collect(Collectors.toList());
+
         List<Vuelo> vuelosActivos = vuelosCargados.stream()
             .filter(v -> !(v.getOrigen().equals(origen) &&
                            v.getDestino().equals(destino) &&
@@ -1437,6 +1507,7 @@ public class PlanificadorService {
         SolucionInicial si = new SolucionInicial(grafoReducido, capAeropuertos);
 
         int reasignados = 0, sinRuta = 0;
+        List<String> enviosCancelados = new ArrayList<>();
         for (Envio envio : afectados) {
             Ruta rutaAntigua = solucionActual.getRutas().stream()
                 .filter(r -> r.getEnvio().getId().equals(envio.getId()))
@@ -1483,9 +1554,12 @@ public class PlanificadorService {
             vuelosPrevios.forEach(nueva::agregarVuelo);
             if (!rutaRestante.isSinSolucion()) {
                 rutaRestante.getVuelos().forEach(nueva::agregarVuelo);
+                nueva.setEstado(ESTADO_EN_TRANSITO);
                 reasignados++;
             } else {
                 nueva.setSinSolucion(true);
+                nueva.setEstado(ESTADO_CANCELADO);
+                enviosCancelados.add(envio.getId());
                 sinRuta++;
             }
             
@@ -1504,12 +1578,14 @@ public class PlanificadorService {
             afectados.size(), reasignados, sinRuta);
         wsPublisher.publicarProgreso(progreso, msg, estado.get().name(), solucionActual.getCostoTotal());
 
-        return new ReplanificacionResultDTO(afectados.size(), reasignados, sinRuta, msg);
+        return new ReplanificacionResultDTO(afectados.size(), reasignados, sinRuta, msg,
+            idEnvioSolicitante, enviosAfectadosIds, enviosCancelados);
     }
 
     // ─── Conversión Ruta → DTO ────────────────────────────────────────────────
 
     private boolean esRiesgosa(Ruta r) {
+        if (esCancelada(r)) return true;
         if (r.isSinSolucion()) return true;
         int t = r.calcularTiempoTotal();
         int p = r.getEnvio().getPlazoMaximoMinutos();
@@ -1517,6 +1593,7 @@ public class PlanificadorService {
     }
 
     private String cumplimientoDeRuta(Ruta r) {
+        if (esCancelada(r)) return "rojo";
         if (r.isSinSolucion()) return "rojo";
         int t = r.calcularTiempoTotal();
         if (t == Integer.MAX_VALUE) return "rojo";
@@ -1526,9 +1603,20 @@ public class PlanificadorService {
         return "rojo";
     }
 
+    private boolean esCancelada(Ruta r) {
+        return ESTADO_CANCELADO.equalsIgnoreCase(r.getEstado());
+    }
+
+    private String estadoVisualRuta(Ruta r) {
+        if (esCancelada(r)) return ESTADO_CANCELADO;
+        if (r.isSinSolucion()) return ESTADO_SIN_RUTA;
+        String estadoRuta = r.getEstado();
+        return estadoRuta != null && !estadoRuta.isBlank() ? estadoRuta : ESTADO_EN_TRANSITO;
+    }
+
     private RutaResumenDTO toResumen(Ruta r) {
         Envio e = r.getEnvio();
-        String estado = r.isSinSolucion() ? "sin_ruta" : "en_transito";
+        String estado = estadoVisualRuta(r);
         String tiempo = r.isSinSolucion() ? "—" : formatearTiempoDuracion(r.calcularTiempoTotal());
         DateTimeFormatter dtfR = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
         String fechaIngresoR = e.getFechaHoraRegistro().format(dtfR) + " UTC";
@@ -1574,7 +1662,7 @@ public class PlanificadorService {
         return new RutaDetalleDTO(
             e.getId(), e.getOrigen(), e.getDestino(),
             getCiudad(e.getOrigen()), getCiudad(e.getDestino()),
-            r.isSinSolucion() ? "sin_ruta" : "en_transito",
+            estadoVisualRuta(r),
             cumplimientoDeRuta(r),
             r.isSinSolucion() ? "—" : formatearTiempoDuracion(r.calcularTiempoTotal()),
             0, plazoStr, fechaIngreso, fechaLimite, tramos
@@ -1620,7 +1708,7 @@ public class PlanificadorService {
         return new RutaDetalleDTO(
             e.getId(), e.getOrigen(), e.getDestino(),
             getCiudad(e.getOrigen()), getCiudad(e.getDestino()),
-            r.isSinSolucion() ? "sin_ruta" : r.getEstado(),
+            estadoVisualRuta(r),
             r.getCumplimiento() != null ? r.getCumplimiento() : cumplimientoDeRuta(r),
             r.isSinSolucion() ? "-" : formatearTiempoDuracion(r.calcularTiempoTotal()),
             0, plazoStr, fechaIngreso, fechaLimite, tramos
