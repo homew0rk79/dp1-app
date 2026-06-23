@@ -172,6 +172,7 @@ function BadgeEstado({ estado }) {
     [ESTADOS_ENVIO.TRANSITO]: styles.badgeInfo,
     [ESTADOS_ENVIO.ALMACEN]: styles.badgeNeutral,
     [ESTADOS_ENVIO.REPLANIFICADO]: styles.badgeWarningSoft,
+    [ESTADOS_ENVIO.CANCELADO]: styles.badgeDanger,
     [ESTADOS_ENVIO.DEMORADO]: styles.badgeDanger,
     [ESTADOS_ENVIO.ENTREGADO]: styles.badgeSuccess,
   }
@@ -347,6 +348,7 @@ function ModalFormulario({ modo, formData, onChange, onGuardar, onCerrar }) {
                 <option value={ESTADOS_ENVIO.TRANSITO}>{ESTADOS_ENVIO.TRANSITO}</option>
                 <option value={ESTADOS_ENVIO.ALMACEN}>{ESTADOS_ENVIO.ALMACEN}</option>
                 <option value={ESTADOS_ENVIO.REPLANIFICADO}>{ESTADOS_ENVIO.REPLANIFICADO}</option>
+                <option value={ESTADOS_ENVIO.CANCELADO}>{ESTADOS_ENVIO.CANCELADO}</option>
                 <option value={ESTADOS_ENVIO.DEMORADO}>{ESTADOS_ENVIO.DEMORADO}</option>
                 <option value={ESTADOS_ENVIO.ENTREGADO}>{ESTADOS_ENVIO.ENTREGADO}</option>
                 <option value={ESTADOS_ENVIO.PENDIENTE}>{ESTADOS_ENVIO.PENDIENTE}</option>
@@ -513,9 +515,11 @@ function GestionMaletasPage() {
   }, [query, estado, riesgo, aerolinea, envios])
 
   const kpis = useMemo(() => {
-    const activos = envios.filter((e) => e.estado !== ESTADOS_ENVIO.ENTREGADO).length
+    const activos = envios.filter((e) => e.estado !== ESTADOS_ENVIO.ENTREGADO && e.estado !== ESTADOS_ENVIO.CANCELADO).length
     const enRiesgo = envios.filter((e) => e.riesgo !== 'verde').length
-    const maletasTransito = envios.reduce((acc, e) => acc + Number(e.cantidad), 0)
+    const maletasTransito = envios
+      .filter((e) => e.estado !== ESTADOS_ENVIO.ENTREGADO && e.estado !== ESTADOS_ENVIO.CANCELADO)
+      .reduce((acc, e) => acc + Number(e.cantidad), 0)
     const entregados = envios.filter((e) => e.estado === ESTADOS_ENVIO.ENTREGADO).length
 
     return { activos, enRiesgo, maletasTransito, entregados }
@@ -753,6 +757,7 @@ function GestionMaletasPage() {
                 <option value={ESTADOS_ENVIO.TRANSITO}>{ESTADOS_ENVIO.TRANSITO}</option>
                 <option value={ESTADOS_ENVIO.ALMACEN}>{ESTADOS_ENVIO.ALMACEN}</option>
                 <option value={ESTADOS_ENVIO.REPLANIFICADO}>{ESTADOS_ENVIO.REPLANIFICADO}</option>
+                <option value={ESTADOS_ENVIO.CANCELADO}>{ESTADOS_ENVIO.CANCELADO}</option>
                 <option value={ESTADOS_ENVIO.DEMORADO}>{ESTADOS_ENVIO.DEMORADO}</option>
                 <option value={ESTADOS_ENVIO.ENTREGADO}>{ESTADOS_ENVIO.ENTREGADO}</option>
               </select>

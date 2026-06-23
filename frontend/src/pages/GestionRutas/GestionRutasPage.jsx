@@ -13,15 +13,19 @@ import {
   X,
   RefreshCw,
   Building2,
+  Map,
 } from 'lucide-react'
 
 import ReasignarModal from './ReasignarModal'
+import Modal from '../../components/common/Modal/Modal'
 import Tabla from '../../components/common/Tabla/Tabla'
 import tabStyles from '../../components/common/Tabla/Tabla.module.css'
 import BarraProgreso from '../../components/common/BarraProgreso/BarraProgreso'
 import Semaforo from '../../components/common/Semaforo/Semaforo'
 import Badge from '../../components/common/Badge/Badge'
-import { obtenerRutas, obtenerDetalleRuta, cancelarVuelo } from '../../services/rutasService'
+import { obtenerRutas, obtenerDetalleRuta, cancelarVuelo, cancelarRuta } from '../../services/rutasService'
+import { RUTAS_MOCK, obtenerRutaMockPorId } from '../../mocks/rutas'
+import { TIEMPO_SIMULADO_REFERENCIA } from '../../constants/tiempoSimulado'
 import useConfiguracionStore from '../../store/configuracionStore'
 import usePlanificadorStore from '../../store/planificadorStore'
 import { getColorSemaforo } from '../../utils/semaforo'
@@ -32,8 +36,26 @@ function textoEstado(estado) {
     pendiente: 'Pendiente',
     en_transito: 'En tránsito',
     completado: 'Completado',
+    sin_ruta: 'Sin ruta',
+    cancelado: 'Cancelado',
   }
   return m[estado] ?? estado
+}
+
+function BadgeEstadoRuta({ estado }) {
+  const mapa = {
+    en_transito: styles.badgeInfo,
+    pendiente: styles.badgeNeutral,
+    completado: styles.badgeSuccess,
+    sin_ruta: styles.badgeDanger,
+    cancelado: styles.badgeDanger,
+  }
+
+  return (
+    <span className={`${styles.badge} ${mapa[estado] || styles.badgeNeutral}`}>
+      {textoEstado(estado)}
+    </span>
+  )
 }
 
 function BadgeCumplimiento({ cumplimiento }) {
@@ -76,6 +98,15 @@ function varianteBarra(cumplimiento) {
   return 'azul'
 }
 
+function escalasDeDetalle(detalle, ruta) {
+  if (detalle?.escalas?.length >= 2) return detalle.escalas
+  if (detalle?.tramos?.length > 0) {
+    return [detalle.tramos[0].origen, ...detalle.tramos.map((t) => t.destino)]
+      .filter(Boolean)
+  }
+  return ruta?.escalas ?? [ruta?.origen, ruta?.destino].filter(Boolean)
+}
+
 function GestionRutasPage() {
   const navigate = useNavigate()
   const rangosSemaforo = useConfiguracionStore((s) => s.rangosSemaforo)
@@ -89,16 +120,26 @@ function GestionRutasPage() {
   const [query, setQuery] = useState('')
   const [origen, setOrigen] = useState('Todos')
   const [destino, setDestino] = useState('Todos')
+  const [filtroEntregas, setFiltroEntregas] = useState('todas')
 
   const [selectedId, setSelectedId] = useState(null)
   const [panelAbierto, setPanelAbierto] = useState(false)
   const [modalReasignarId, setModalReasignarId] = useState(null)
+  const [modalCancelarId, setModalCancelarId] = useState(null)
+  const [cancelandoRuta, setCancelandoRuta] = useState(false)
 
   const cargarLista = useCallback(async () => {
     setCargando(true)
     try {
       const data = await obtenerRutas()
-      setRutas(data)
+      const apiIds = new Set(data.map((r) => r.id))
+      const extras = RUTAS_MOCK.filter((m) => !apiIds.has(m.id))
+      const siguienteLista = [...data, ...extras]
+      setRutas(siguienteLista)
+      return siguienteLista
+    } catch {
+      setRutas(RUTAS_MOCK)
+      return RUTAS_MOCK
     } finally {
       setCargando(false)
     }
@@ -114,11 +155,18 @@ function GestionRutasPage() {
       return
     }
     let cancel = false
+    setDetalle(null)
     setCargandoDetalle(true)
-    obtenerDetalleRuta(selectedId).then((d) => {
-      if (!cancel) setDetalle(d)
-      if (!cancel) setCargandoDetalle(false)
-    })
+    obtenerDetalleRuta(selectedId)
+      .then((d) => {
+        if (!cancel) setDetalle(d ?? obtenerRutaMockPorId(selectedId))
+      })
+      .catch(() => {
+        if (!cancel) setDetalle(obtenerRutaMockPorId(selectedId))
+      })
+      .finally(() => {
+        if (!cancel) setCargandoDetalle(false)
+      })
     return () => {
       cancel = true
     }
@@ -136,6 +184,9 @@ function GestionRutasPage() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
+    const ref = new Date(TIEMPO_SIMULADO_REFERENCIA)
+    const horasLimite = filtroEntregas === '4h' ? 4 : filtroEntregas === '12h' ? 12 : filtroEntregas === '24h' ? 24 : null
+
     return rutas.filter((r) => {
       const matchQ =
         !q ||
@@ -148,9 +199,15 @@ function GestionRutasPage() {
       const matchOrigen = origen === 'Todos' || r.origen === origen
       const matchDest = destino === 'Todos' || r.destino === destino
 
-      return matchQ && matchOrigen && matchDest
+      if (!matchQ || !matchOrigen || !matchDest) return false
+
+      if (horasLimite == null) return true
+      if (!r.fechaEntrega) return false
+      const entrega = new Date(r.fechaEntrega)
+      const diffH = (ref.getTime() - entrega.getTime()) / 3600000
+      return diffH >= 0 && diffH <= horasLimite
     })
-  }, [rutas, query, origen, destino])
+  }, [rutas, query, origen, destino, filtroEntregas])
 
   useEffect(() => {
     if (filtered.length === 0) return
@@ -160,20 +217,87 @@ function GestionRutasPage() {
   }, [filtered, selectedId])
 
   const selected = filtered.find((r) => r.id === selectedId) ?? filtered[0]
+  const rutaEnCancelacion = rutas.find((r) => r.id === modalCancelarId) ?? null
 
   const limpiarFiltros = () => {
     setQuery('')
     setOrigen('Todos')
     setDestino('Todos')
+    setFiltroEntregas('todas')
   }
 
-  async function handleConfirmarCancelacion({ origen, destino, horaSalidaMinutos }) {
-    await cancelarVuelo(origen, destino, horaSalidaMinutos)
-    cargarLista()
+  async function verEnMapa(ruta, e) {
+    e?.stopPropagation?.()
+    let escalas = ruta.escalas ?? [ruta.origen, ruta.destino]
+    try {
+      const detalleRuta = await obtenerDetalleRuta(ruta.id)
+      escalas = escalasDeDetalle(detalleRuta, ruta)
+    } catch {
+      escalas = escalasDeDetalle(null, ruta)
+    }
+    navigate('/visualizador', {
+      state: {
+        overlayRuta: {
+          escalas,
+          variante: 'actual',
+          rutaId: ruta.id,
+        },
+      },
+    })
+  }
+
+  async function handleConfirmarReasignacion({ rutaId, origen, destino, horaSalidaMinutos }) {
+    const idObjetivo = rutaId ?? selectedId
+    setSelectedId(idObjetivo)
+    setPanelAbierto(true)
+
+    const resultado = await cancelarVuelo(origen, destino, horaSalidaMinutos, idObjetivo)
+    const listaActualizada = await cargarLista()
+    const idParaDetalle = resultado?.envioSolicitanteId || idObjetivo
+
+    if (idParaDetalle) {
+      setSelectedId(idParaDetalle)
+      const rutaActualizada = listaActualizada.find((r) => r.id === idParaDetalle)
+      try {
+        const d = await obtenerDetalleRuta(idParaDetalle)
+        setDetalle(d ?? rutaActualizada ?? obtenerRutaMockPorId(idParaDetalle))
+      } catch {
+        setDetalle(rutaActualizada ?? obtenerRutaMockPorId(idParaDetalle))
+      }
+    }
+  }
+
+  async function handleConfirmarCancelarRuta() {
+    if (!modalCancelarId) return
+    console.info('[cancelacion-envio] enviando id=', modalCancelarId)
+    setCancelandoRuta(true)
+    setSelectedId(modalCancelarId)
+    setPanelAbierto(true)
+    setDetalle(null)
+    setCargandoDetalle(true)
+    try {
+      const resultado = await cancelarRuta(modalCancelarId)
+      console.info('[cancelacion-envio] respuesta=', resultado)
+      const listaActualizada = await cargarLista()
+      const rutaActualizada = listaActualizada.find((r) => r.id === modalCancelarId)
+      try {
+        const d = await obtenerDetalleRuta(modalCancelarId)
+        console.info('[cancelacion-envio] detalle actualizado=', d)
+        setDetalle(d ?? rutaActualizada ?? obtenerRutaMockPorId(modalCancelarId))
+      } catch (detalleErr) {
+        console.warn('[cancelacion-envio] no se pudo refrescar detalle, usando fila actualizada', detalleErr)
+        setDetalle(rutaActualizada ?? obtenerRutaMockPorId(modalCancelarId))
+      }
+      setSelectedId(modalCancelarId)
+      setModalCancelarId(null)
+    } finally {
+      setCargandoDetalle(false)
+      setCancelandoRuta(false)
+    }
   }
 
   const kpisEstaticos = useMemo(() => {
-    const activas = rutas.filter((r) => r.estado !== 'sin_ruta').length
+    const activas = rutas.filter((r) => r.estado !== 'sin_ruta' && r.estado !== 'cancelado').length
     const riesgo  = rutas.filter((r) => r.cumplimiento === 'rojo').length
     // Usar el porcentaje global del backend (sobre todas las maletas, no solo las 300 mostradas)
     const cumplimiento = completado != null
@@ -319,6 +443,17 @@ function GestionRutasPage() {
                 ))}
               </select>
 
+              <select
+                className={styles.select}
+                value={filtroEntregas}
+                onChange={(e) => setFiltroEntregas(e.target.value)}
+              >
+                <option value="todas">Entregados: Todas</option>
+                <option value="4h">Entregados: Últimas 4 h</option>
+                <option value="12h">Entregados: Últimas 12 h</option>
+                <option value="24h">Entregados: Últimas 24 h</option>
+              </select>
+
               <button type="button" className={styles.botonLimpiar} onClick={limpiarFiltros}>
                 Limpiar
               </button>
@@ -350,6 +485,7 @@ function GestionRutasPage() {
                   <th>ID</th>
                   <th>Origen → Destino</th>
                   <th>Tiempo estimado</th>
+                  <th>Estado</th>
                   <th>Ingreso</th>
                   <th>Límite entrega</th>
                   <th className={styles.thCenter}>Cumplimiento</th>
@@ -359,6 +495,9 @@ function GestionRutasPage() {
               <tbody>
                 {filtered.map((r) => {
                   const isSelected = selected?.id === r.id
+                  const estaCancelado = r.estado === 'cancelado'
+                  const puedeCancelar = r.estado === 'en_transito'
+                  const puedeReasignar = r.estado === 'en_transito' || r.estado === 'sin_ruta'
                   return (
                     <tr
                       key={r.id}
@@ -384,12 +523,22 @@ function GestionRutasPage() {
                         </div>
                       </td>
                       <td>{r.tiempoEstimado}</td>
+                      <td><BadgeEstadoRuta estado={r.estado} /></td>
                       <td>{r.fechaIngreso ?? '—'}</td>
                       <td>{r.fechaLimite ?? '—'}</td>
                       <td className={styles.centerCell}>
                         <BadgeCumplimiento cumplimiento={r.cumplimiento} />
                       </td>
                       <td className={styles.centerCell}>
+                        <button
+                          type="button"
+                          className={styles.linkAccion}
+                          onClick={(e) => verEnMapa(r, e)}
+                          title="Ver ruta en el mapa"
+                        >
+                          <Map size={13} style={{ verticalAlign: 'middle', marginRight: 2 }} />
+                          Ver en mapa
+                        </button>
                         <button
                           type="button"
                           className={styles.linkAccion}
@@ -400,17 +549,43 @@ function GestionRutasPage() {
                         >
                           Ver detalle
                         </button>
+                        {estaCancelado ? (
+                          <span className={styles.accionEstadoCancelado}>Cancelado</span>
+                        ) : (
+                          <>
+                            {puedeCancelar && (
                         <button
                           type="button"
                           className={styles.linkAccionPeligro}
                           onClick={(e) => {
                             e.stopPropagation()
-                            setModalReasignarId(r.id)
+                            setSelectedId(r.id)
+                            setPanelAbierto(true)
+                            setModalCancelarId(r.id)
                           }}
-                          title="Replanificar por vuelo cancelado"
+                          disabled={r.estado === 'cancelado'}
+                          title="Cancelar ruta/envío"
                         >
-                          Reasignar
+                          Cancelar
                         </button>
+                            )}
+                            {puedeReasignar && (
+                              <button
+                                type="button"
+                                className={styles.linkAccionPeligro}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setSelectedId(r.id)
+                                  setPanelAbierto(true)
+                                  setModalReasignarId(r.id)
+                                }}
+                                title="Reasignar ruta/envio"
+                              >
+                                Reasignar
+                              </button>
+                            )}
+                          </>
+                        )}
                       </td>
                     </tr>
                   )
@@ -485,11 +660,49 @@ function GestionRutasPage() {
         </aside>
       </div>
 
+      <Modal
+        titulo="Confirmar cancelacion"
+        abierto={Boolean(modalCancelarId)}
+        onCerrar={() => {
+          if (!cancelandoRuta) setModalCancelarId(null)
+        }}
+        acciones={
+          <>
+            <button
+              type="button"
+              className={styles.botonSecundario}
+              onClick={() => setModalCancelarId(null)}
+              disabled={cancelandoRuta}
+            >
+              Volver / Cancelar accion
+            </button>
+            <button
+              type="button"
+              className={styles.botonPrimario}
+              onClick={handleConfirmarCancelarRuta}
+              disabled={cancelandoRuta}
+            >
+              {cancelandoRuta ? 'Cancelando...' : 'Confirmar cancelacion'}
+            </button>
+          </>
+        }
+      >
+        <p style={{ margin: '0 0 12px', color: '#64748b', fontSize: '0.88rem' }}>
+          Se cancelara la ruta/envio{' '}
+          <strong style={{ color: '#0f172a' }}>{modalCancelarId ?? '-'}</strong>.
+        </p>
+        {rutaEnCancelacion ? (
+          <p style={{ margin: 0, color: '#334155', fontSize: '0.84rem' }}>
+            Ruta: <strong>{rutaEnCancelacion.origen}</strong> {'->'} <strong>{rutaEnCancelacion.destino}</strong>
+          </p>
+        ) : null}
+      </Modal>
+
       <ReasignarModal
         abierto={Boolean(modalReasignarId)}
         rutaId={modalReasignarId}
         onCerrar={() => setModalReasignarId(null)}
-        onConfirmar={handleConfirmarCancelacion}
+        onConfirmar={handleConfirmarReasignacion}
       />
 
       {panelAbierto && detalle && (

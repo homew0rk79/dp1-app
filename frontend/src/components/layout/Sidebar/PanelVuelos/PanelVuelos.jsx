@@ -21,6 +21,7 @@ function PanelVuelos({ ocurrencias, tiempoAnimacion }) {
   const rangosSemaforo = useConfiguracionStore((s) => s.rangosSemaforo)
   const vueloSeleccionado = useSeleccionStore((s) => s.vueloSeleccionado)
   const setVueloSeleccionado = useSeleccionStore((s) => s.setVueloSeleccionado)
+  const setEnvioSeleccionado = useSeleccionStore((s) => s.setEnvioSeleccionado)
 
   const [busqueda, setBusqueda] = useState('')
   const [patronFiltro, setPatronFiltro] = useState('')     // #67 wildcard/regex
@@ -131,12 +132,18 @@ function PanelVuelos({ ocurrencias, tiempoAnimacion }) {
     try {
       const detalle = await obtenerDetalleRuta(rutaId)
       setDetalleEnvio(detalle)
+      const escalas = detalle?.tramos?.length > 0
+        ? [detalle.tramos[0].origen, ...detalle.tramos.map((t) => t.destino)].filter(Boolean)
+        : [detalle?.origen, detalle?.destino].filter(Boolean)
+      if (escalas.length >= 2) {
+        setEnvioSeleccionado(rutaId, { escalas, variante: 'actual', rutaId })
+      }
     } catch {
       setDetalleEnvio(null)
     } finally {
       setCargandoDetalle(false)
     }
-  }, [envioExpandido])
+  }, [envioExpandido, setEnvioSeleccionado])
 
   if (!ocurrencias) {
     return (

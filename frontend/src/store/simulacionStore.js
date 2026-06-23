@@ -27,6 +27,7 @@ const useSimulacionStore = create((set) => ({
     set((s) => ({ parametros: { ...s.parametros, ...parametros } })),
   incrementarTiempo: () => set((s) => ({ tiempoSegundos: s.tiempoSegundos + 1 })),
   setManifest: (manifest) => set({ manifest, tiempoAnimacion: 0, playingAnimacion: false }),
+  updateManifest: (manifest) => set((s) => ({ manifest, wsVersion: s.wsVersion + 1 })),
   clearManifest: () => set({ manifest: null, tiempoAnimacion: 0, playingAnimacion: false }),
   setTiempoAnimacion: (t) => set({ tiempoAnimacion: t }),
   setVelocidadAnimacion: (v) => set({ velocidadAnimacion: v }),

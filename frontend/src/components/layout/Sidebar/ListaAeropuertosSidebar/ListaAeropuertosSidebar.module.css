@@ -1,0 +1,167 @@
+.contenedor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.controles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.searchWrap {
+  position: relative;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 7px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 0.3rem 0.5rem 0.3rem 1.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.75rem;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.searchInput:focus {
+  border-color: var(--color-accent);
+}
+
+.select {
+  width: 100%;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.ordenRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.ordenBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  font-size: 0.62rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.ordenBtn:hover {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.ordenBtnActivo {
+  background: var(--color-accent);
+  color: #fff;
+  border-color: var(--color-accent);
+}
+
+.sortNeutral {
+  font-size: 0.6rem;
+  opacity: 0.5;
+  margin-left: 0.1rem;
+}
+
+.notaMock {
+  margin: 0;
+  font-size: 0.62rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.vacio {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
+
+.lista {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 0.42rem 0.5rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.12s;
+  gap: 0.4rem;
+}
+
+.item:hover {
+  background: var(--color-bg);
+}
+
+.itemSeleccionado {
+  background: #eff6ff;
+  outline: 1px solid #bfdbfe;
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.codigo {
+  font-size: 0.72rem;
+  font-weight: 800;
+  font-family: ui-monospace, monospace;
+  color: var(--color-accent);
+}
+
+.nombre {
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.continente {
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+}
+
+.proximas {
+  font-size: 0.6rem;
+  color: #64748b;
+  margin-top: 0.1rem;
+}
+
+.ocupacion {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+}

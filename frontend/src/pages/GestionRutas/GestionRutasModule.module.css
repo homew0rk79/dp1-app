@@ -707,6 +707,15 @@
   text-decoration: underline;
 }
 
+.accionEstadoCancelado {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #b91c1c;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
 .exitoBanner {
   background: #ecfdf5;
   border: 1px solid #bbf7d0;

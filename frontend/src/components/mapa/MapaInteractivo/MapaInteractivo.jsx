@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css'
 import LeyendaMapa from '../LeyendaMapa/LeyendaMapa'
 import CanvasVuelos from '../CanvasVuelos/CanvasVuelos'
 import DetalleMaletasAeropuerto from '../DetalleMaletasAeropuerto/DetalleMaletasAeropuerto'
+import PanelDetalleAeropuerto from '../PanelDetalleAeropuerto/PanelDetalleAeropuerto'
 import MapController from './MapController'
 import SimulacionControles from '../../SimulacionControles/SimulacionControles'
 import { getColorSemaforo, COLORES_SEMAFORO } from '../../../utils/semaforo'
@@ -29,9 +30,11 @@ function MapaInteractivo() {
   const fechaInicio = useSimulacionStore((s) => s.parametros.fechaInicio)
   const tiempoSegundos = useSimulacionStore((s) => s.tiempoSegundos)
   const inicioEjecucionReal = useSimulacionStore((s) => s.inicioEjecucionReal)
+  const wsVersion = useSimulacionStore((s) => s.wsVersion)
 
   const aeropuertoSeleccionado = useSeleccionStore((s) => s.aeropuertoSeleccionado)
   const setAeropuertoSeleccionado = useSeleccionStore((s) => s.setAeropuertoSeleccionado)
+  const filtrosMapa = useSeleccionStore((s) => s.filtrosMapa)
 
   const offsetMinutos = (() => {
     const base = new Date(FECHA_INICIO_SIMULACION_ALGORITMO)
@@ -47,6 +50,7 @@ function MapaInteractivo() {
   // Ocupación real al minuto exacto de la animación (actualizada c/hora simulada)
   const [ocupacionRealtime, setOcupacionRealtime] = useState({})
   const ultimaHoraRef = useRef(-1)
+  const ultimaVersionRef = useRef(-1)
 
   const snapshot = usePlanificadorStore((s) => s.snapshot)
   const completado = usePlanificadorStore((s) => s.completado)
@@ -80,7 +84,34 @@ function MapaInteractivo() {
     seekTo,
     setVelocidad,
     onTick,
+    actualizarManifest,
   } = useAnimacionTimeline()
+
+  const handleCancelVuelo = async (vuelo) => {
+    const horaSalida = sumarMinutos(fechaInicio, vuelo.salidaAbs)
+    if (!window.confirm(`¿Seguro que desea cancelar el vuelo de ${vuelo.origen} a ${vuelo.destino} (salida: ${formatearFechaHora(horaSalida)})?`)) {
+      return
+    }
+
+    const wasPlaying = playing
+    pause()
+
+    try {
+      await simulacionService.cancelarVuelo({
+        origen: vuelo.origen,
+        destino: vuelo.destino,
+        horaSalidaMinutos: vuelo.horaSalidaMinutos,
+      })
+      const res = await simulacionService.obtenerManifestAnimacion()
+      if (res.data) {
+        actualizarManifest(res.data)
+      }
+    } catch (err) {
+      alert("No se pudo cancelar el vuelo: " + (err.response?.data?.error || err.response?.data || err.message))
+    } finally {
+      if (wasPlaying) play()
+    }
+  }
 
   const hayDatosSimulacion = Boolean(manifest || snapshot || completado)
   const fechaSimulada = sumarMinutos(fechaInicio, tiempoDisplay)
@@ -157,14 +188,17 @@ function MapaInteractivo() {
       return
     }
     const saltoSimulado = Math.floor(tiempoDisplay / SA_SALTO_ALGORITMO_MIN)
-    if (saltoSimulado === ultimaHoraRef.current) return
+    const versionCambio = wsVersion !== ultimaVersionRef.current
+    if (!versionCambio && saltoSimulado === ultimaHoraRef.current) return
+    
     ultimaHoraRef.current = saltoSimulado
+    ultimaVersionRef.current = wsVersion
 
     const tiempoMin = Math.floor(tiempoDisplay) + offsetMinutos
     simulacionService.obtenerOcupacionActual(tiempoMin)
       .then(res => setOcupacionRealtime(res.data ?? {}))
       .catch(() => {})
-  }, [tiempoDisplay, manifest, offsetMinutos])
+  }, [tiempoDisplay, manifest, offsetMinutos, wsVersion])
 
   // Ocupación en tiempo real al minuto exacto de la animación
   function getOcupacion(codigo) {
@@ -179,6 +213,23 @@ function MapaInteractivo() {
       }
     }
     return ocupacionWS[codigo] ?? null
+  }
+
+  function aeropuertoPasaFiltros(aeropuerto, pctOcup) {
+    const filtros = filtrosMapa?.almacenes
+    if (!filtros) return true
+    const hayFiltro =
+      Boolean(filtros.texto?.trim()) ||
+      filtros.continente !== 'Todos' ||
+      filtros.semaforo !== 'todos'
+    if (!hayFiltro) return true
+    if (Array.isArray(filtros.visibles)) {
+      return filtros.visibles.includes(aeropuerto.codigo)
+    }
+    if (filtros.semaforo !== 'todos' && getColorSemaforo(pctOcup, rangosSemaforo) !== filtros.semaforo) return false
+    if (filtros.continente !== 'Todos' && aeropuerto.continente !== filtros.continente) return false
+    const q = filtros.texto.trim().toLowerCase()
+    return !q || aeropuerto.codigo.toLowerCase().includes(q) || aeropuerto.ciudad.toLowerCase().includes(q)
   }
 
   const maxConsumo = consumoBloques.reduce((max, item) => Math.max(max, item.maletas || 0), 0)
@@ -211,6 +262,8 @@ function MapaInteractivo() {
             playing={playing}
             onTick={onTick}
             avanceTickMin={TA_EJECUCION_ALGORITMO_MIN}
+            onCancelVuelo={handleCancelVuelo}
+            filtrosUT={filtrosMapa?.ut}
           />
         )}
 
@@ -221,6 +274,8 @@ function MapaInteractivo() {
           const color     = getColorSemaforo(pctOcup, rangosSemaforo)
           const colorHex  = COLORES_SEMAFORO[color]
           const seleccionado = aeropuertoSeleccionado === aeropuerto.codigo
+          const visiblePorFiltro = aeropuertoPasaFiltros(aeropuerto, pctOcup)
+          if (!visiblePorFiltro && !seleccionado) return null
 
           const icon = L.divIcon({
             className: styles.aeropuertoMarker,
@@ -246,7 +301,7 @@ function MapaInteractivo() {
                 ),
               }}
             >
-              <Popup className={styles.popupWrapper} maxWidth={360} minWidth={240}>
+              <Popup className={styles.popupWrapper} maxWidth={400} minWidth={280}>
                 <div className={styles.popup}>
                   <h4 className={styles.popupTitulo}>
                     {aeropuerto.ciudad}
@@ -269,7 +324,12 @@ function MapaInteractivo() {
                     </span>
                   </div>
 
-                  {/* Detalle desplegable de envíos en este aeropuerto */}
+                  <PanelDetalleAeropuerto 
+                    codigo={aeropuerto.codigo} 
+                    onCancelVuelo={handleCancelVuelo}
+                  />
+
+                  {/* Detalle desplegable de envíos en este aeropuerto (simulación activa) */}
                   {manifest && (
                     <DetalleMaletasAeropuerto
                       codigo={aeropuerto.codigo}

@@ -4,6 +4,7 @@ import lombok.Data;
 
 @Data
 public class CancelacionVueloRequestDTO {
+    private String idEnvio;
     private String origen;
     private String destino;
     private int horaSalidaMinutos;
