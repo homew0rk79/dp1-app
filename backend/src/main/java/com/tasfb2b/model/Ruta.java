@@ -68,6 +68,14 @@ public class Ruta {
         this.envio = otra.envio;
         this.vuelos = new ArrayList<>(otra.vuelos);
         this.sinSolucion = otra.sinSolucion;
+        this.estado = otra.estado;
+        this.idEnvioOriginal = otra.idEnvioOriginal;
+        this.origen = otra.origen;
+        this.destino = otra.destino;
+        this.cantidad = otra.cantidad;
+        this.tiempoTotalMinutos = otra.tiempoTotalMinutos;
+        this.plazoMaximoMinutos = otra.plazoMaximoMinutos;
+        this.cumplimiento = otra.cumplimiento;
     }
 
     public void agregarVuelo(Vuelo v) {
@@ -187,7 +195,9 @@ public class Ruta {
         this.cantidad = envio.getCantidad();
         this.plazoMaximoMinutos = envio.getPlazoMaximoMinutos();
         this.tiempoTotalMinutos = sinSolucion ? Integer.MAX_VALUE : calcularTiempoTotal();
-        this.estado = sinSolucion ? "sin_ruta" : "en_transito";
+        this.estado = "cancelado".equalsIgnoreCase(this.estado)
+                ? "cancelado"
+                : (sinSolucion ? "sin_ruta" : "en_transito");
         if (sinSolucion || tiempoTotalMinutos == Integer.MAX_VALUE) {
             this.cumplimiento = "rojo";
         } else if (plazoMaximoMinutos == null || plazoMaximoMinutos <= 0 || tiempoTotalMinutos <= plazoMaximoMinutos) {

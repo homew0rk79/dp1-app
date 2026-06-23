@@ -20,6 +20,9 @@ function textoEstado(estado) {
     pendiente: 'Pendiente',
     en_transito: 'En tránsito',
     completado: 'Completado',
+    sin_ruta: 'Sin ruta',
+    cancelado: 'Cancelado',
+    PROGRAMADO: 'Programado',
   }
   return m[estado] ?? estado
 }
@@ -28,6 +31,21 @@ function varianteBarra(cumplimiento) {
   if (cumplimiento === 'rojo') return 'rojo'
   if (cumplimiento === 'ambar') return 'ambar'
   return 'azul'
+}
+
+function tipoBadgeEstado(estado) {
+  if (estado === 'cancelado' || estado === 'sin_ruta') return 'rojo'
+  if (estado === 'completado') return 'verde'
+  return 'info'
+}
+
+function escalasDeDetalle(detalle) {
+  if (detalle?.escalas?.length >= 2) return detalle.escalas
+  if (detalle?.tramos?.length > 0) {
+    return [detalle.tramos[0].origen, ...detalle.tramos.map((t) => t.destino)]
+      .filter(Boolean)
+  }
+  return [detalle?.origen, detalle?.destino].filter(Boolean)
 }
 
 function FilaDetalle({ icono, label, value }) {
@@ -89,6 +107,9 @@ function DetalleRuta() {
     )
   }
 
+  const escalasRuta = escalasDeDetalle(detalle)
+  const rutaAnterior = detalle.rutaAnterior?.length >= 2 ? detalle.rutaAnterior : null
+
   return (
     <div className={styles.page}>
       <div className={styles.singleColumn}>
@@ -120,7 +141,7 @@ function DetalleRuta() {
         <section className={styles.infoCard} style={{ marginBottom: 16 }}>
           <div className={styles.infoHeader}>
             <h3>Información general</h3>
-            <Badge tipo="info">{textoEstado(detalle.estado)}</Badge>
+            <Badge tipo={tipoBadgeEstado(detalle.estado)}>{textoEstado(detalle.estado)}</Badge>
           </div>
           <div className={styles.detailGrid}>
             <FilaDetalle
@@ -182,7 +203,7 @@ function DetalleRuta() {
             Resumen de la secuencia
           </h3>
           <div className={styles.tramos}>
-            {(detalle.escalas ?? [detalle.origen, detalle.destino]).map((codigo, i, arr) => (
+            {escalasRuta.map((codigo, i, arr) => (
               <span key={`${codigo}-${i}`} style={{ display: 'contents' }}>
                 <span className={styles.rutaPill}>{codigo}</span>
                 {i < arr.length - 1 && <ChevronRight size={14} color="#94a3b8" />}
@@ -196,7 +217,7 @@ function DetalleRuta() {
               onClick={() => navigate('/visualizador', {
                 state: {
                   overlayRuta: {
-                    escalas: detalle.escalas ?? [detalle.origen, detalle.destino],
+                    escalas: escalasRuta,
                     variante: 'actual',
                     rutaId: detalle.id,
                   },
@@ -206,22 +227,22 @@ function DetalleRuta() {
               <Map size={16} style={{ verticalAlign: 'middle', marginRight: 4 }} />
               Ver en mapa
             </button>
-            {detalle.rutaAnterior?.length >= 2 && (
+            {(rutaAnterior || escalasRuta.length >= 2) && (
               <button
                 type="button"
                 className={styles.botonSecundario}
                 onClick={() => navigate('/visualizador', {
                   state: {
                     overlayRuta: {
-                      escalas: detalle.rutaAnterior,
-                      variante: 'anterior',
+                      escalas: rutaAnterior ?? escalasRuta,
+                      variante: rutaAnterior ? 'anterior' : 'actual',
                       rutaId: detalle.id,
                     },
                   },
                 })}
               >
                 <Map size={16} style={{ verticalAlign: 'middle', marginRight: 4 }} />
-                Ver ruta anterior en mapa
+                {rutaAnterior ? 'Ver ruta anterior en mapa' : 'Ver escalas en mapa'}
               </button>
             )}
           </div>

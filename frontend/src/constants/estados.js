@@ -25,6 +25,7 @@ export const ESTADOS_ENVIO = {
   ALMACEN: 'En almacén',
   TRANSITO: 'En tránsito',
   REPLANIFICADO: 'Replanificado',
+  CANCELADO: 'Cancelado',
   ENTREGADO: 'Entregado',
   DEMORADO: 'Demorado',
   RIESGO: 'En Riesgo',

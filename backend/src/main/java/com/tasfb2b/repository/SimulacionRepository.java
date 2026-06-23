@@ -8,4 +8,5 @@ import java.util.Optional;
 public interface SimulacionRepository extends JpaRepository<Simulacion, Long> {
     Optional<Simulacion> findTopByOrderByFechaCreacionDesc();
     Optional<Simulacion> findTopByEstadoOrderByFechaCreacionDesc(String estado);
+    Optional<Simulacion> findTopByEstadoAndEscenarioOrderByFechaCreacionDesc(String estado, String escenario);
 }

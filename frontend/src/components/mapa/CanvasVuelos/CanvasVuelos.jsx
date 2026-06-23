@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { useMap } from 'react-leaflet'
+import useSeleccionStore from '../../../store/seleccionStore'
 
 /**
  * Canvas overlay sobre Leaflet que anima las ocurrencias de vuelo activas en tiempo T.
@@ -53,7 +54,7 @@ function drawAirplaneIcon(ctx, size, fillColor) {
   ctx.stroke()
 }
 
-function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avanceTickMin = 1, onCancelVuelo }) {
+function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avanceTickMin = 1, onCancelVuelo, filtrosUT }) {
   const map          = useRef(null)
   const mapInstance  = useMap()
   const canvasRef    = useRef(null)
@@ -64,6 +65,8 @@ function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avan
   // Hit areas para tooltip: [{ x, y, o, bearing }]
   const hitAreasRef  = useRef([])
   const tooltipRef   = useRef(null)
+  const vueloSeleccionado = useSeleccionStore((s) => s.vueloSeleccionado)
+  const setVueloSeleccionado = useSeleccionStore((s) => s.setVueloSeleccionado)
 
   map.current = mapInstance
 
@@ -152,7 +155,7 @@ function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avan
           <div>Maletas: <strong>${found.o.maletas} / ${found.o.capacidadMax}</strong></div>
           <div>Ocupación: <strong style="color:${c}">${pct.toFixed(1)}%</strong></div>
           <div style="margin-top:6px; font-size:10px; color:#94a3b8; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 4px;">
-            Haga clic para cancelar vuelo
+            Clic: seleccionar UT Â· doble clic: cancelar vuelo
           </div>
         `
         tip.style.display = 'block'
@@ -163,15 +166,26 @@ function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avan
       }
     }
 
-    const handleClick = (e) => {
+    const buscarHit = (e) => {
       const cp = mapInstance.mouseEventToContainerPoint(e.originalEvent)
       const { x, y } = cp
-      let found = null
       for (const hit of hitAreasRef.current) {
         const dx = hit.x - x
         const dy = hit.y - y
-        if (dx * dx + dy * dy <= RADIUS * RADIUS) { found = hit; break }
+        if (dx * dx + dy * dy <= RADIUS * RADIUS) return hit
       }
+      return null
+    }
+
+    const handleClick = (e) => {
+      const found = buscarHit(e)
+      if (found) {
+        setVueloSeleccionado(found.key)
+      }
+    }
+
+    const handleDblClick = (e) => {
+      const found = buscarHit(e)
       if (found && onCancelVuelo) {
         onCancelVuelo(found.o)
       }
@@ -183,13 +197,15 @@ function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avan
 
     mapInstance.on('mousemove', handleMove)
     mapInstance.on('click', handleClick)
+    mapInstance.on('dblclick', handleDblClick)
     mapInstance.getContainer().addEventListener('mouseleave', handleLeave)
     return () => {
       mapInstance.off('mousemove', handleMove)
       mapInstance.off('click', handleClick)
+      mapInstance.off('dblclick', handleDblClick)
       mapInstance.getContainer().removeEventListener('mouseleave', handleLeave)
     }
-  }, [mapInstance, onCancelVuelo])
+  }, [mapInstance, onCancelVuelo, setVueloSeleccionado])
 
   // Función de dibujo pura — lee tiempoRef.current directamente
   const draw = useCallback(() => {
@@ -214,9 +230,16 @@ function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avan
     const iconSize = Math.max(3.5, Math.min(9, (zoom - 1) * 0.9))
 
     const newHits = []
+    const hayFiltroUT = Boolean(
+      filtrosUT && (filtrosUT.semaforo !== 'todos' || filtrosUT.texto?.trim())
+    )
+    const utVisibles = hayFiltroUT ? new Set(filtrosUT?.visibles ?? []) : null
 
     for (const o of manifest.ocurrencias) {
       if (o.salidaAbs > T || T > o.llegadaAbs) continue  // vuelo no activo o ya llegó (#56)
+
+      const vueloKey = `${o.origen}-${o.destino}-${o.salidaAbs}`
+      if (utVisibles && !utVisibles.has(vueloKey)) continue
 
       const a = aerosRef.current[o.origen]
       const b = aerosRef.current[o.destino]
@@ -237,14 +260,17 @@ function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avan
 
       const fillRatio = Math.min(1, o.maletas / (o.capacidadMax || 1))
       const alpha     = 0.35 + fillRatio * 0.45
+      const seleccionado = vueloSeleccionado === vueloKey
 
       const color =
-        fillRatio > 0.9 ? `rgba(220,38,38,${alpha})`
+        seleccionado ? 'rgba(14,165,233,0.95)'
+        : fillRatio > 0.9 ? `rgba(220,38,38,${alpha})`
         : fillRatio > 0.7 ? `rgba(234,179,8,${alpha})`
         : `rgba(37,99,235,${alpha})`
 
       const dotColor =
-        fillRatio > 0.9 ? 'rgba(220,38,38,0.95)'
+        seleccionado ? 'rgba(14,165,233,1)'
+        : fillRatio > 0.9 ? 'rgba(220,38,38,0.95)'
         : fillRatio > 0.7 ? 'rgba(234,179,8,0.95)'
         : 'rgba(37,99,235,0.95)'
 
@@ -253,7 +279,7 @@ function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avan
       ctx.moveTo(p1.x, p1.y)
       ctx.quadraticCurveTo(cpX, cpY, p2.x, p2.y)
       ctx.strokeStyle = color
-      ctx.lineWidth   = Math.max(1.2, Math.min(3.5, o.maletas / 70))
+      ctx.lineWidth   = seleccionado ? 4.5 : Math.max(1.2, Math.min(3.5, o.maletas / 70))
       ctx.stroke()
 
       // Posición del avión sobre el arco (paramétrico Bézier) — #53 bearing
@@ -273,11 +299,11 @@ function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avan
       drawAirplaneIcon(ctx, iconSize, dotColor)
       ctx.restore()
 
-      newHits.push({ x: bx, y: by, o })
+      newHits.push({ x: bx, y: by, o, key: vueloKey })
     }
 
     hitAreasRef.current = newHits
-  }, [manifest, tiempoRef])
+  }, [manifest, tiempoRef, filtrosUT, vueloSeleccionado])
 
   // RAF loop — avanza T y dibuja cada frame
   useEffect(() => {

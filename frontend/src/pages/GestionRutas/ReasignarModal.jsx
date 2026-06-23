@@ -31,11 +31,11 @@ function ReasignarModal({ abierto, rutaId, onCerrar, onConfirmar }) {
     setCargando(true)
     try {
       await onConfirmar({
+        rutaId,
         origen: tramo.origen,
         destino: tramo.destino,
         horaSalidaMinutos: tramo.horaSalidaMinutos,
       })
-      // Disparar alerta visual en el mapa sobre los aeropuertos afectados (#57)
       addAlertaCancelacion({ origen: tramo.origen, destino: tramo.destino })
       onCerrar()
     } finally {
@@ -45,7 +45,7 @@ function ReasignarModal({ abierto, rutaId, onCerrar, onConfirmar }) {
 
   return (
     <Modal
-      titulo="Replanificar por vuelo cancelado"
+      titulo="Confirmar reasignacion"
       abierto={abierto}
       onCerrar={onCerrar}
       acciones={
@@ -56,7 +56,7 @@ function ReasignarModal({ abierto, rutaId, onCerrar, onConfirmar }) {
             onClick={onCerrar}
             disabled={cargando}
           >
-            Cancelar
+            Volver / Cancelar accion
           </button>
           <button
             type="button"
@@ -64,34 +64,33 @@ function ReasignarModal({ abierto, rutaId, onCerrar, onConfirmar }) {
             onClick={confirmar}
             disabled={cargando || seleccion === null || tramos.length === 0}
           >
-            {cargando ? 'Replanificando…' : 'Confirmar cancelación'}
+            {cargando ? 'Reasignando...' : 'Confirmar reasignacion'}
           </button>
         </>
       }
     >
       <p style={{ margin: '0 0 14px', color: '#64748b', fontSize: '0.88rem' }}>
-        Selecciona el tramo de vuelo cancelado para el envío{' '}
-        <strong style={{ color: '#0f172a' }}>{rutaId ?? '—'}</strong>. El sistema
-        buscará rutas alternativas para todos los envíos afectados por ese vuelo.
+        Se reasignara la ruta/envio <strong style={{ color: '#0f172a' }}>{rutaId ?? '-'}</strong>.
+        Selecciona el tramo de referencia para buscar rutas alternativas.
       </p>
 
       {cargandoDetalle ? (
-        <p style={{ color: '#64748b', fontSize: '0.85rem' }}>Cargando tramos…</p>
+        <p style={{ color: '#64748b', fontSize: '0.85rem' }}>Cargando tramos...</p>
       ) : tramos.length === 0 ? (
         <p style={{ color: '#94a3b8', fontSize: '0.85rem' }}>
-          No hay tramos disponibles para este envío.
+          No hay tramos disponibles para este envio.
         </p>
       ) : (
         <>
           <label
             className={styles.detailLabel}
-            htmlFor="tramo-cancelado"
+            htmlFor="tramo-reasignado"
             style={{ display: 'block', marginBottom: 6 }}
           >
-            Vuelo a cancelar
+            Vuelo de referencia
           </label>
           <select
-            id="tramo-cancelado"
+            id="tramo-reasignado"
             className={styles.select}
             value={seleccion ?? ''}
             onChange={(e) => setSeleccion(Number(e.target.value))}
@@ -118,8 +117,7 @@ function ReasignarModal({ abierto, rutaId, onCerrar, onConfirmar }) {
           >
             <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
             <span>
-              Esta acción cancelará el vuelo seleccionado y replanificará todos los
-              envíos que lo usen, no solo este.
+              Esta accion replanificara los envios que usan el vuelo seleccionado.
             </span>
           </div>
         </>

@@ -10,9 +10,14 @@ export async function obtenerDetalleRuta(id) {
   return resp.data
 }
 
-export async function cancelarVuelo(origen, destino, horaSalidaMinutos) {
+export async function cancelarVuelo(origen, destino, horaSalidaMinutos, idEnvio) {
   const resp = await api.post('/replanificacion/vuelo-cancelado', {
-    origen, destino, horaSalidaMinutos,
+    idEnvio, origen, destino, horaSalidaMinutos,
   })
+  return resp.data
+}
+
+export async function cancelarRuta(idEnvio) {
+  const resp = await api.post(`/rutas/${idEnvio}/cancelar`)
   return resp.data
 }

@@ -109,6 +109,18 @@ public class ReportesController {
         );
     }
 
+    @GetMapping("/estable")
+    public Map<String, Object> reporteEstable(@RequestParam(required = false) String escenario) {
+        Optional<Simulacion> sim = escenario != null && !escenario.isBlank()
+            ? simulacionRepository.findTopByEstadoAndEscenarioOrderByFechaCreacionDesc("COMPLETADO", escenario)
+            : ultimaSimulacionCompletada();
+        return sim.map(this::toReporteEstable)
+            .orElseGet(() -> Map.of(
+                "disponible", false,
+                "mensaje", "No existe una simulacion completada para generar reporte estable"
+            ));
+    }
+
     @GetMapping("/demorados")
     public List<Map<String, Object>> demorados() {
         return topDemorados(rutasUltimaSimulacion());
@@ -134,6 +146,35 @@ public class ReportesController {
         return ultimaSimulacionCompletada()
             .map(s -> s.getEscenario() + " - " + s.getNumDias() + " dias")
             .orElse("Sin simulacion");
+    }
+
+    private Map<String, Object> toReporteEstable(Simulacion s) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("disponible", true);
+        data.put("simulacionId", s.getId());
+        data.put("escenario", s.getEscenario());
+        data.put("tipoCierre", tipoCierre(s));
+        data.put("estado", s.getEstado());
+        data.put("fechaInicio", s.getFechaInicio());
+        data.put("fechaFin", s.getFechaFin());
+        data.put("fechaGeneracion", s.getFechaActualizacion());
+        data.put("totalEnvios", s.getTotalEnvios());
+        data.put("enviosConRuta", s.getEnviosConRuta());
+        data.put("enviosSinRuta", s.getEnviosSinRuta());
+        data.put("cumplimiento", redondear(s.getPorcentajeCumplimiento()));
+        data.put("vuelosSaturados", s.getVuelosSaturados());
+        data.put("aeropuertosSaturados", s.getAeropuertosSaturados());
+        data.put("eventosFueraRangoTemporal", s.getEventosFueraRangoTemporal());
+        data.put("replanificaciones", s.getReplanificacionesEjecutadas());
+        data.put("semaforo", s.getSemaforo());
+        return data;
+    }
+
+    private static String tipoCierre(Simulacion s) {
+        String escenario = s.getEscenario() != null ? s.getEscenario() : "";
+        if ("COLAPSO".equalsIgnoreCase(escenario)) return "FINALIZACION_COLAPSO";
+        if ("DIA_A_DIA".equalsIgnoreCase(escenario)) return "CIERRE_DIA";
+        return "FINALIZACION_SIMULACION";
     }
 
     private List<Map<String, Object>> serieBarras(List<Ruta> rutas) {

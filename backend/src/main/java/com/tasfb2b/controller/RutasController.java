@@ -34,11 +34,21 @@ public class RutasController {
         return ResponseEntity.ok(detalle);
     }
 
+    @PostMapping("/rutas/{id}/cancelar")
+    public ResponseEntity<?> cancelarEnvio(@PathVariable String id) {
+        try {
+            System.out.printf("[cancelacion-envio] endpoint invocado id=%s%n", id);
+            return ResponseEntity.ok(service.cancelarEnvio(id));
+        } catch (IllegalStateException ex) {
+            return ResponseEntity.badRequest().body(ex.getMessage());
+        }
+    }
+
     @PostMapping("/replanificacion/vuelo-cancelado")
     public ResponseEntity<?> replanificar(@RequestBody CancelacionVueloRequestDTO req) {
         try {
             ReplanificacionResultDTO result = service.replanificarPorVueloCancelado(
-                req.getOrigen(), req.getDestino(), req.getHoraSalidaMinutos());
+                req.getOrigen(), req.getDestino(), req.getHoraSalidaMinutos(), req.getIdEnvio());
             return ResponseEntity.ok(result);
         } catch (IllegalStateException ex) {
             return ResponseEntity.badRequest().body(ex.getMessage());
