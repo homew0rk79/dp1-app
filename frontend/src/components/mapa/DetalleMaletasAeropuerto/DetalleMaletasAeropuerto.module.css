@@ -199,6 +199,13 @@
   margin: 0 0.2rem;
 }
 
+.estadoLabel {
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+  margin-top: 0.1rem;
+  font-style: italic;
+}
+
 .tiempos {
   font-size: 0.7rem;
   color: var(--color-text-muted);

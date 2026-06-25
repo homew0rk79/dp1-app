@@ -18,7 +18,7 @@ const ETIQUETA_ESTADO = {
 
 function formatearMinutosAbs(min) {
   if (min == null || min < 0) return '—'
-  const base  = new Date(`${FECHA_INICIO_SIMULACION_ALGORITMO}T00:00:00Z`)
+  const base  = new Date(`${FECHA_INICIO_SIMULACION_ALGORITMO.slice(0, 10)}T00:00:00Z`)
   const fecha = new Date(base.getTime() + min * 60000)
   const dd    = fecha.getUTCDate().toString().padStart(2, '0')
   const mo    = (fecha.getUTCMonth() + 1).toString().padStart(2, '0')
@@ -50,6 +50,9 @@ function ItemMaleta({ m, onSelect }) {
       <div className={styles.ruta}>
         {m.ciudadOrigen} <span className={styles.flecha}>→</span> {m.ciudadDestino}
       </div>
+      {ETIQUETA_ESTADO[m.estado] && (
+        <div className={styles.estadoLabel}>{ETIQUETA_ESTADO[m.estado]}</div>
+      )}
       <div className={styles.tiempos}>
         {esEntregada
           ? <>
@@ -99,7 +102,7 @@ function DetalleMaletasAeropuerto({ codigo, tiempoMin = 0 }) {
     setAbierto(nuevoEstado)
     if (!nuevoEstado) {
       setVisibles(PAGE_SIZE)
-      setFiltro('ALMACEN_HOY')
+      setFiltro('AHORA')
     }
   }
 
