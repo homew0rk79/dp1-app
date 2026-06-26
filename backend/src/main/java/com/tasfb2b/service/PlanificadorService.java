@@ -196,6 +196,12 @@ public class PlanificadorService {
         t.start();
     }
 
+    public void detener() {
+        ejecutandoColapso = false;
+        setEstado(Estado.COMPLETADO, 100, "Simulación detenida por el usuario",
+            solucionActual != null ? solucionActual.getCostoTotal() : 0);
+    }
+
     // =========================================================================
     // Lógica de planificación (hilo de fondo)
     // =========================================================================
@@ -364,8 +370,12 @@ public class PlanificadorService {
             final int DIAS_CHUNK = 14;
             LocalDate fechaActual = fechaBase;
             int chunk = 0;
+            int totalEnvios = 0;
             ColapsoEventDTO colapsoDetectado = null;
             ejecutandoColapso = true;
+
+            Solucion solucionAcumulada = new Solucion(capAeropuertos);
+            SolucionInicial si = new SolucionInicial(grafo, capAeropuertos);
 
             while (ejecutandoColapso) {
                 List<Envio> enviosChunk = cargarEnviosDbPorPeriodo(fechaActual.atStartOfDay(), DIAS_CHUNK);
@@ -380,36 +390,22 @@ public class PlanificadorService {
                     }
                 }
                 chunk++;
+                totalEnvios += enviosChunk.size();
 
                 LocalDate fechaFin = fechaActual.plusDays(DIAS_CHUNK - 1);
                 setEstado(Estado.PLANIFICANDO, Math.min(10 + chunk * 2, 90),
-                    "COLAPSO — chunk " + chunk + " | " + fechaActual + " → " + fechaFin
-                        + " | " + enviosChunk.size() + " envíos", 0);
+                    "COLAPSO — chunk " + chunk + " | " + fechaBase + " → " + fechaFin
+                        + " | " + totalEnvios + " envíos acumulados", 0);
 
-                SolucionInicial si = new SolucionInicial(grafo, capAeropuertos);
-                Solucion inicial = si.construir(enviosChunk);
-                publicarSnapshot(inicial, aeropuertos, 0);
-
-                // Detectar colapso en la solución greedy antes de gastar tiempo en Tabu Search.
-                // Si el sistema ya colapsó con la mejor solución greedy posible, Tabu no lo va a salvar.
-                Optional<ColapsoEventDTO> colapsoGreedy =
-                    detectarPrimerColapsoNuevo(inicial, aeropuertos, fechaActual, new HashSet<>());
-                if (colapsoGreedy.isPresent()) {
-                    solucionActual = inicial;
-                    colapsoDetectado = colapsoGreedy.get();
-                    wsPublisher.publicarColapso(colapsoDetectado);
-                    break;
+                for (Envio envio : enviosChunk) {
+                    si.agregarEnvioASolucion(solucionAcumulada, envio);
                 }
 
-                TabuSearch ts = new TabuSearch(grafo, iteraciones, tenencia, muestra);
-                Solucion mejor = ts.ejecutar(inicial, enviosChunk, (iter, s) ->
-                    publicarSnapshot(s, aeropuertos, iter));
-
-                solucionActual = mejor;
-                publicarSnapshot(mejor, aeropuertos, -1);
+                solucionActual = solucionAcumulada;
+                publicarSnapshot(solucionAcumulada, aeropuertos, 0);
 
                 Optional<ColapsoEventDTO> colapsoOpt =
-                    detectarPrimerColapsoNuevo(mejor, aeropuertos, fechaActual, new HashSet<>());
+                    detectarPrimerColapsoNuevo(solucionAcumulada, aeropuertos, fechaActual, new HashSet<>());
                 if (colapsoOpt.isPresent()) {
                     colapsoDetectado = colapsoOpt.get();
                     wsPublisher.publicarColapso(colapsoDetectado);
@@ -420,21 +416,18 @@ public class PlanificadorService {
             }
 
             if (solucionActual != null && simulacion != null) {
-                // La animación arranca desde el chunk del colapso, no desde el día 1
-                simulacion.setFechaInicio(fechaActual);
-                fechaInicioSimulacion = fechaActual;
-                fechaHoraInicioSimulacion = fechaActual.atStartOfDay();
-                simulacion.setNumDias(DIAS_CHUNK);
-                guardarRutasEnDb(solucionActual, simulacion);
+                int diasTotales = (int) java.time.temporal.ChronoUnit.DAYS.between(fechaBase, fechaActual) + DIAS_CHUNK;
+                simulacion.setFechaInicio(fechaBase);
+                simulacion.setNumDias(diasTotales);
                 guardarMetricasEnSimulacion(simulacion, solucionActual);
                 simulacion.setEstado(Estado.COMPLETADO.name());
                 simulacion.setFechaActualizacion(LocalDateTime.now());
                 simulacionRepository.save(simulacion);
             }
-            // setEstado DESPUÉS de guardar rutas para que el frontend no pida el manifest antes de que estén en DB
             String msgFinal = colapsoDetectado != null
                 ? "Colapso detectado (" + colapsoDetectado.getTipo() + ") — " + fechaActual
-                : "Dataset agotado sin colapso — último chunk desde " + fechaActual;
+                    + " | " + totalEnvios + " envíos acumulados en " + chunk + " chunks"
+                : "Dataset agotado sin colapso — " + totalEnvios + " envíos en " + chunk + " chunks";
             double costoFinal = solucionActual != null ? solucionActual.getCostoTotal() : 0;
             setEstado(Estado.COMPLETADO, 100, msgFinal, costoFinal);
             wsPublisher.publicarCompletado(getMetricas());
@@ -450,6 +443,53 @@ public class PlanificadorService {
         } finally {
             ejecutandoColapso = false;
         }
+    }
+
+    private ColapsoEventDTO detectarColapsoDesdeMetricas(
+            Solucion solucion, Map<String, Aeropuerto> aeropuertos, LocalDate fecha) {
+        Map<String, Map<Integer, Integer>> ocupDiaria = solucion.getOcupacionDiariaAeropuerto();
+        for (Map.Entry<String, Map<Integer, Integer>> ae : ocupDiaria.entrySet()) {
+            String codigo = ae.getKey();
+            Aeropuerto a = aeropuertos.get(codigo);
+            if (a == null) continue;
+            int cap = a.getCapacidadMax();
+            if (cap <= 0) continue;
+            for (Map.Entry<Integer, Integer> de : ae.getValue().entrySet()) {
+                if (de.getValue() > cap) {
+                    int pct = Math.round(de.getValue() * 100f / cap);
+                    return new ColapsoEventDTO("AEROPUERTO", codigo,
+                        String.format("Aeropuerto %s (%s) saturado: %d%% — %d/%d maletas (día %d)",
+                            codigo, a.getCiudad(), pct, de.getValue(), cap, de.getKey()),
+                        fecha.toString(), de.getKey() * 1440);
+                }
+            }
+        }
+        Map<String, Integer> ocupVuelos = solucion.getOcupacionVuelos();
+        Map<String, Integer> capVuelos = solucion.getCapacidadMaxVuelos();
+        for (Map.Entry<String, Integer> e : ocupVuelos.entrySet()) {
+            Integer cap = capVuelos.get(e.getKey());
+            if (cap == null || cap <= 0) continue;
+            if (e.getValue() > cap) {
+                String[] parts = e.getKey().split("-");
+                String desc = parts.length >= 2
+                    ? String.format("Vuelo %s→%s superó capacidad: %d/%d maletas", parts[0], parts[1], e.getValue(), cap)
+                    : String.format("Vuelo %s superó capacidad: %d/%d", e.getKey(), e.getValue(), cap);
+                return new ColapsoEventDTO("VUELO", e.getKey(), desc, fecha.toString(), 0);
+            }
+        }
+        for (Ruta ruta : solucion.getRutas()) {
+            if (ruta.isSinSolucion() || ruta.getEnvio() == null) continue;
+            int t = ruta.calcularTiempoTotal();
+            int plazo = ruta.getEnvio().getPlazoMaximoMinutos();
+            if (plazo > 0 && t != Integer.MAX_VALUE && t > plazo) {
+                return new ColapsoEventDTO("SLA", ruta.getEnvio().getId(),
+                    String.format("Envío %s superó plazo: %d min (máx %d) — %s→%s",
+                        ruta.getEnvio().getId(), t, plazo,
+                        ruta.getEnvio().getOrigen(), ruta.getEnvio().getDestino()),
+                    fecha.toString(), 0);
+            }
+        }
+        return null;
     }
 
     private Optional<ColapsoEventDTO> detectarPrimerColapsoNuevo(
@@ -1037,8 +1077,7 @@ public class PlanificadorService {
     // =========================================================================
 
     public AnimacionManifestDTO getAnimacionManifest() {
-        if (solucionActual == null || vuelosCargados == null || aeropuertosCargados == null
-                || "COLAPSO".equalsIgnoreCase(escenarioActual)) {
+        if (solucionActual == null || vuelosCargados == null || aeropuertosCargados == null) {
             return getAnimacionManifestPersistida().orElse(null);
         }
         Optional<Simulacion> simOpt = getUltimaSimulacion();
@@ -1103,7 +1142,7 @@ public class PlanificadorService {
                     diaInicio, duracionVentana)))
             .collect(Collectors.toList());
 
-        return new AnimacionManifestDTO(duracionManifest(maxLlegada, duracionVentana), 0, ocurrencias, aeropuertos);
+        return new AnimacionManifestDTO(duracionManifest(maxLlegada, duracionVentana), inicioAbs, ocurrencias, aeropuertos);
     }
 
     public List<Map<String, Object>> getConsumoBloques() {
@@ -1188,7 +1227,7 @@ public class PlanificadorService {
 
         return Optional.of(new AnimacionManifestDTO(
             duracionManifest(maxLlegada, duracionVentana),
-            0,
+            inicioAbs,
             ocurrencias,
             aeropuertos
         ));

@@ -28,6 +28,9 @@ import { RUTAS_MOCK, obtenerRutaMockPorId } from '../../mocks/rutas'
 import { TIEMPO_SIMULADO_REFERENCIA } from '../../constants/tiempoSimulado'
 import useConfiguracionStore from '../../store/configuracionStore'
 import usePlanificadorStore from '../../store/planificadorStore'
+import useSimulacionStore from '../../store/simulacionStore'
+import { simulacionService } from '../../services/simulacionService'
+import { FECHA_INICIO_SIMULACION_ALGORITMO, SA_SALTO_ALGORITMO_MIN } from '../../constants/restricciones'
 import { getColorSemaforo } from '../../utils/semaforo'
 import styles from './GestionRutasModule.module.css'
 
@@ -112,6 +115,9 @@ function GestionRutasPage() {
   const rangosSemaforo = useConfiguracionStore((s) => s.rangosSemaforo)
   const snapshot = usePlanificadorStore((s) => s.snapshot)
   const completado = usePlanificadorStore((s) => s.completado)
+  const manifest = useSimulacionStore((s) => s.manifest)
+  const tiempoAnimacion = useSimulacionStore((s) => s.tiempoAnimacion)
+  const fechaInicioParam = useSimulacionStore((s) => s.parametros.fechaInicio)
   const [rutas, setRutas] = useState([])
   const [cargando, setCargando] = useState(true)
   const [detalle, setDetalle] = useState(null)
@@ -306,15 +312,39 @@ function GestionRutasPage() {
     return { activas, cumplimiento, vuelos: rutas.length, riesgo }
   }, [rutas, completado])
 
+  const [ocupacionRealtime, setOcupacionRealtime] = useState({})
+
+  useEffect(() => {
+    if (!manifest) { setOcupacionRealtime({}); return }
+    const offsetMinutos = manifest.fechaInicioMinutos > 0
+      ? manifest.fechaInicioMinutos
+      : (() => {
+          const base = new Date(FECHA_INICIO_SIMULACION_ALGORITMO)
+          const inicio = new Date(fechaInicioParam || FECHA_INICIO_SIMULACION_ALGORITMO)
+          return Math.round((inicio - base) / 60000)
+        })()
+    const tiempoMin = Math.floor(tiempoAnimacion) + offsetMinutos
+    simulacionService.obtenerOcupacionActual(tiempoMin)
+      .then(res => setOcupacionRealtime(res.data ?? {}))
+      .catch(() => {})
+  }, [Math.floor(tiempoAnimacion / SA_SALTO_ALGORITMO_MIN), manifest, fechaInicioParam])
+
   const aeropuertosVista = useMemo(() => {
     if (!snapshot?.aeropuertos?.length) return []
-    return snapshot.aeropuertos.slice(0, 6).map((a) => ({
-      id: a.codigo,
-      nombre: a.ciudad,
-      continente: a.continente,
-      ocupacion: a.porcentajeOcupacion ?? 0,
-    }))
-  }, [snapshot])
+    return snapshot.aeropuertos.slice(0, 6).map((a) => {
+      const cap = a.capacidadMax || 1
+      const maletas = manifest ? (ocupacionRealtime[a.codigo] ?? 0) : a.ocupacion
+      const pct = manifest
+        ? Math.round((maletas / cap) * 1000) / 10
+        : (a.porcentajeOcupacion ?? 0)
+      return {
+        id: a.codigo,
+        nombre: a.ciudad,
+        continente: a.continente,
+        ocupacion: pct,
+      }
+    })
+  }, [snapshot, manifest, ocupacionRealtime])
 
   return (
     <div className={styles.page}>

@@ -75,11 +75,14 @@ function Sidebar() {
   const completado = usePlanificadorStore((s) => s.completado)
   const resetPlanificador = usePlanificadorStore((s) => s.resetPlanificador)
 
-  const offsetMinutos = (() => {
+  const offsetMinutosFecha = (() => {
     const base   = new Date(FECHA_INICIO_SIMULACION_ALGORITMO)
     const inicio = new Date(parametros.fechaInicio || FECHA_INICIO_SIMULACION_ALGORITMO)
     return Math.round((inicio - base) / 60000)
   })()
+  const offsetMinutos = manifest?.fechaInicioMinutos > 0
+    ? manifest.fechaInicioMinutos
+    : offsetMinutosFecha
 
   // Sincronizar estado local con eventos del backend
   useEffect(() => {
@@ -266,11 +269,16 @@ function Sidebar() {
   async function handleDetener() {
     clearInterval(intervalRef.current)
     try {
-      const estadoRes = await simulacionService.obtenerEstado()
-      setEstado(estadoRes.data?.estado ?? 'ERROR')
+      await simulacionService.detener()
+      setEstado('COMPLETADO')
     } catch (err) {
-      console.error('No se pudo sincronizar el estado del backend:', err)
-      setEstado('ERROR')
+      console.error('No se pudo detener la simulación:', err)
+      try {
+        const estadoRes = await simulacionService.obtenerEstado()
+        setEstado(estadoRes.data?.estado ?? 'ERROR')
+      } catch {
+        setEstado('ERROR')
+      }
     }
   }
 

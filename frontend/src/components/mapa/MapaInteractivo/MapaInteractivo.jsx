@@ -36,12 +36,6 @@ function MapaInteractivo() {
   const setAeropuertoSeleccionado = useSeleccionStore((s) => s.setAeropuertoSeleccionado)
   const filtrosMapa = useSeleccionStore((s) => s.filtrosMapa)
 
-  const offsetMinutos = (() => {
-    const base = new Date(FECHA_INICIO_SIMULACION_ALGORITMO)
-    const inicio = new Date(fechaInicio || FECHA_INICIO_SIMULACION_ALGORITMO)
-    return Math.round((inicio - base) / 60000)
-  })()
-
   const [aeropuertos, setAeropuertos] = useState([])
   const [ahoraReal, setAhoraReal] = useState(() => new Date())
   const [consumoBloques, setConsumoBloques] = useState([])
@@ -54,6 +48,7 @@ function MapaInteractivo() {
 
   const snapshot = usePlanificadorStore((s) => s.snapshot)
   const completado = usePlanificadorStore((s) => s.completado)
+  const colapso = usePlanificadorStore((s) => s.colapso)
   const progreso = usePlanificadorStore((s) => s.progreso)
   const alertasCancelacion = usePlanificadorStore((s) => s.alertasCancelacion)
   const removeAlertaCancelacion = usePlanificadorStore((s) => s.removeAlertaCancelacion)
@@ -87,6 +82,13 @@ function MapaInteractivo() {
     actualizarManifest,
   } = useAnimacionTimeline()
 
+  const offsetMinutos = (() => {
+    if (manifest?.fechaInicioMinutos > 0) return manifest.fechaInicioMinutos
+    const base = new Date(FECHA_INICIO_SIMULACION_ALGORITMO)
+    const inicio = new Date(fechaInicio || FECHA_INICIO_SIMULACION_ALGORITMO)
+    return Math.round((inicio - base) / 60000)
+  })()
+
   const handleCancelVuelo = async (vuelo) => {
     const horaSalida = sumarMinutos(fechaInicio, vuelo.salidaAbs)
     if (!window.confirm(`¿Seguro que desea cancelar el vuelo de ${vuelo.origen} a ${vuelo.destino} (salida: ${formatearFechaHora(horaSalida)})?`)) {
@@ -114,7 +116,9 @@ function MapaInteractivo() {
   }
 
   const hayDatosSimulacion = Boolean(manifest || snapshot || completado)
-  const fechaSimulada = sumarMinutos(fechaInicio, tiempoDisplay)
+  const fechaSimulada = manifest?.fechaInicioMinutos > 0
+    ? sumarMinutos(FECHA_INICIO_SIMULACION_ALGORITMO, manifest.fechaInicioMinutos + tiempoDisplay)
+    : sumarMinutos(fechaInicio, tiempoDisplay)
   const segundosReales = inicioEjecucionReal
     ? Math.max(0, Math.floor((ahoraReal.getTime() - inicioEjecucionReal) / 1000))
     : tiempoSegundos
@@ -405,6 +409,19 @@ function MapaInteractivo() {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Botón ir al colapso */}
+      {colapso && manifest && colapso.minutosColapso > 0 && (
+        <button
+          className={styles.btnColapso}
+          onClick={() => {
+            const tiempoRel = colapso.minutosColapso - (manifest.fechaInicioMinutos || 0)
+            seekTo(Math.max(0, Math.min(tiempoRel, manifest.duracionTotalMinutos)))
+          }}
+        >
+          ⚡ Ir al momento del colapso
+        </button>
       )}
 
       {/* Controles de animación — aparecen solo cuando hay manifest */}
