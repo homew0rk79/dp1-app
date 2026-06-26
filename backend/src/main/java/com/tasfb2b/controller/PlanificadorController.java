@@ -63,6 +63,12 @@ public class PlanificadorController {
         return ResponseEntity.ok(manifest);
     }
 
+    @PostMapping("/detener")
+    public ResponseEntity<Map<String, String>> detener() {
+        service.detener();
+        return ResponseEntity.ok(Map.of("mensaje", "Planificación detenida"));
+    }
+
     @GetMapping("/consumo-bloques")
     public ResponseEntity<java.util.List<Map<String, Object>>> getConsumoBloques() {
         return ResponseEntity.ok(service.getConsumoBloques());

@@ -84,6 +84,12 @@ public class SolucionInicial {
         return tiempoDijkstra < tiempoBFS ? rutaDijkstra : rutaBFS;
     }
 
+    public void agregarEnvioASolucion(Solucion solucion, Envio envio) {
+        Map<String, Integer> ocupacion = solucion.getOcupacionMaximaPorAeropuerto();
+        Ruta ruta = construirRutaConOcupacion(envio, ocupacion);
+        solucion.agregarRuta(ruta);
+    }
+
     // -------------------------------------------------------------------------
     // Construcción con conciencia de capacidad (uso interno en construir())
     // -------------------------------------------------------------------------

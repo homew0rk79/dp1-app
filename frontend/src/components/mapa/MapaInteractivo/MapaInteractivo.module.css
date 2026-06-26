@@ -195,6 +195,28 @@
   animation: cancelPulse 1.15s ease-out infinite;
 }
 
+.btnColapso {
+  position: absolute;
+  bottom: 5.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  padding: 0.55rem 1.2rem;
+  background: #dc2626;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 12px rgba(220, 38, 38, 0.4);
+  transition: background 0.2s;
+}
+
+.btnColapso:hover {
+  background: #b91c1c;
+}
+
 @media (max-width: 720px) {
   .panelTiempos {
     grid-template-columns: 1fr;

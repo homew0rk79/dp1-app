@@ -2,7 +2,7 @@ import { useState } from 'react'
 import styles from './SimulacionControles.module.css'
 import useSimulacionStore from '../../store/simulacionStore'
 import { formatearFechaHora, sumarMinutos } from '../../utils/tiempos'
-import { TA_EJECUCION_ALGORITMO_MIN } from '../../constants/restricciones'
+import { TA_EJECUCION_ALGORITMO_MIN, FECHA_INICIO_SIMULACION_ALGORITMO } from '../../constants/restricciones'
 
 const PRESETS = [
   { label: 'x30', valor: 30 },
@@ -39,7 +39,10 @@ function SimulacionControles({
   onVelocidad,
 }) {
   const [duracionMin, setDuracionMin] = useState('')
-  const fechaInicio = useSimulacionStore((s) => s.parametros.fechaInicio)
+  const fechaInicioParam = useSimulacionStore((s) => s.parametros.fechaInicio)
+  const fechaInicio = manifest?.fechaInicioMinutos > 0
+    ? sumarMinutos(FECHA_INICIO_SIMULACION_ALGORITMO, manifest.fechaInicioMinutos)?.toISOString()
+    : fechaInicioParam
 
   if (!manifest) return null
 
