@@ -3,6 +3,7 @@ package com.tasfb2b.controller;
 import com.tasfb2b.dto.AeropuertoDTO;
 import com.tasfb2b.dto.MaletaEnAeropuertoDTO;
 import com.tasfb2b.dto.VueloDTO;
+import com.tasfb2b.dto.VueloProximoDTO;
 import com.tasfb2b.service.PlanificadorService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -64,5 +65,19 @@ public class DatosController {
     public ResponseEntity<Map<String, Integer>> getOcupacionActual(
             @RequestParam(defaultValue = "0") int tiempoMin) {
         return ResponseEntity.ok(service.getOcupacionActual(tiempoMin));
+    }
+
+    /**
+     * Vuelos próximos a salir según la solución actual, ordenados por hora de salida.
+     * Usado por el panel de cancelación interactiva del visualizador.
+     *
+     * @param tiempoMin minuto absoluto desde el inicio del periodo (default 0)
+     * @param limite    cantidad máxima de vuelos a devolver (default 20)
+     */
+    @GetMapping("/vuelos/proximos")
+    public ResponseEntity<List<VueloProximoDTO>> getVuelosProximos(
+            @RequestParam(defaultValue = "0") int tiempoMin,
+            @RequestParam(defaultValue = "20") int limite) {
+        return ResponseEntity.ok(service.getVuelosProximos(tiempoMin, limite));
     }
 }

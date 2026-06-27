@@ -1,0 +1,247 @@
+.contenedor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.25rem 0;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.contador {
+  margin-left: auto;
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
+.estado {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+  padding: 0.3rem 0;
+}
+
+.alerta {
+  font-size: 0.72rem;
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.25);
+  padding: 0.25rem 0.4rem;
+  border-radius: 4px;
+}
+
+.toastOk,
+.toastError {
+  font-size: 0.72rem;
+  padding: 0.3rem 0.4rem;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.toastOk {
+  background: rgba(22, 163, 74, 0.1);
+  border: 1px solid rgba(22, 163, 74, 0.3);
+  color: #16a34a;
+}
+
+.toastError {
+  background: rgba(220, 38, 38, 0.1);
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  color: #dc2626;
+}
+
+.lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.lista::-webkit-scrollbar       { width: 5px; }
+.lista::-webkit-scrollbar-track { background: transparent; }
+.lista::-webkit-scrollbar-thumb { background: #c0c4cc; border-radius: 999px; }
+
+.item {
+  background: rgba(0, 0, 0, 0.025);
+  border-radius: 4px;
+  border-left: 3px solid #94a3b8;
+  padding: 0.35rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.itemHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  font-size: 0.74rem;
+}
+
+.ruta {
+  font-weight: 600;
+  color: var(--color-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.flecha {
+  color: var(--color-text-muted);
+  margin: 0 0.15rem;
+}
+
+.hora {
+  color: var(--color-text-muted);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.itemFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+}
+
+.ocup {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.bajo  { color: #16a34a; }
+.medio { color: #d97706; }
+.lleno { color: #dc2626; }
+
+.btnCancelar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.68rem;
+  padding: 0.15rem 0.4rem;
+  background: transparent;
+  color: #dc2626;
+  border: 1px solid rgba(220, 38, 38, 0.4);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btnCancelar:hover:not(:disabled) {
+  background: rgba(220, 38, 38, 0.08);
+}
+
+.btnCancelar:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Modal de confirmación ───────────────────────────────────────────── */
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modalCard {
+  background: white;
+  border-radius: 8px;
+  padding: 1.1rem;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+.iconoAlerta {
+  color: #d97706;
+}
+
+.modalBody {
+  font-size: 0.82rem;
+  color: var(--color-text);
+}
+
+.modalBody p {
+  margin: 0.2rem 0;
+}
+
+.modalRuta {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 0.3rem 0.5rem;
+  border-radius: 4px;
+}
+
+.modalNota {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.modalAcciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  margin-top: 0.3rem;
+}
+
+.btnSecundario {
+  font-size: 0.78rem;
+  padding: 0.35rem 0.8rem;
+  background: transparent;
+  border: 1px solid var(--color-border, #d0d4dc);
+  color: var(--color-text);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btnSecundario:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.btnPrimario {
+  font-size: 0.78rem;
+  padding: 0.35rem 0.8rem;
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.btnPrimario:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.btnPrimario:disabled,
+.btnSecundario:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

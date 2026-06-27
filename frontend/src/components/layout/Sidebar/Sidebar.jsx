@@ -18,6 +18,7 @@ import Badge from '../../common/Badge/Badge'
 import Semaforo from '../../common/Semaforo/Semaforo'
 import PanelUnidadesTransporte from './PanelUnidadesTransporte/PanelUnidadesTransporte'
 import ListaAeropuertosSidebar from './ListaAeropuertosSidebar/ListaAeropuertosSidebar'
+import PanelVuelosProximos from '../../simulacion/PanelVuelosProximos/PanelVuelosProximos'
 import useSimulacionStore from '../../../store/simulacionStore'
 import useConfiguracionStore from '../../../store/configuracionStore'
 import useSeleccionStore from '../../../store/seleccionStore'
@@ -386,6 +387,13 @@ function Sidebar() {
               >
                 UT
               </button>
+              <button
+                className={`${styles.tab} ${tabActivo === 'cancelar' ? styles.tabActivo : ''}`}
+                onClick={() => setTabActivo('cancelar')}
+                title="Cancelar un vuelo planificado"
+              >
+                Cancelar
+              </button>
             </div>
 
             {tabActivo === 'aeropuertos' && (
@@ -404,6 +412,8 @@ function Sidebar() {
                 tiempoAnimacion={tiempoAnimacion}
               />
             )}
+
+            {tabActivo === 'cancelar' && <PanelVuelosProximos />}
           </section>
 
           {/* Panel de simulación */}

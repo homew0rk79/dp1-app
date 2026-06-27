@@ -18,6 +18,10 @@ import java.time.temporal.ChronoUnit;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.HashSet;
@@ -55,6 +59,19 @@ public class PlanificadorService {
 
     @Value("${tasf.colapso.dias-busqueda:14}")
     private int diasBusquedaColapso;
+
+    // ── Parámetros del escenario DIA_A_DIA ────────────────────────────────────
+    /** Iteraciones reducidas para que el tick periódico quepa en el intervalo. */
+    @Value("${tasf.algoritmo.iteraciones.diaadia:50}")
+    private int iteracionesDiaADia;
+
+    /** Cada cuántos minutos reales se replanifica en día a día. */
+    @Value("${tasf.diaadia.intervalo-minutos:5}")
+    private int intervaloDiaADiaMin;
+
+    /** Horas simuladas que cubre cada bloque (5 min real × 60× = 5 horas simuladas). */
+    @Value("${tasf.diaadia.bloque-horas-simuladas:5}")
+    private int bloqueHorasSimuladas;
 
     // ── Umbrales del semáforo global ──────────────────────────────────────────
     @Value("${tasf.semaforo.umbral-verde:90.0}")
@@ -97,6 +114,12 @@ public class PlanificadorService {
     private volatile Long simulacionActualId = null;
     private volatile int replanificacionesEjecutadas = 0;
     private volatile boolean ejecutandoColapso = false;
+
+    // ── Scheduler de replanificación periódica para DIA_A_DIA ─────────────────
+    private volatile ScheduledExecutorService schedulerDiaADia = null;
+    private volatile ScheduledFuture<?> tareaDiaADia = null;
+    /** Cursor del último bloque ya procesado por el scheduler. */
+    private volatile LocalDateTime cursorDiaADia = null;
 
     public PlanificadorService(
             WebSocketEventPublisher wsPublisher,
@@ -198,8 +221,22 @@ public class PlanificadorService {
 
     public void detener() {
         ejecutandoColapso = false;
+        detenerSchedulerDiaADia();
         setEstado(Estado.COMPLETADO, 100, "Simulación detenida por el usuario",
             solucionActual != null ? solucionActual.getCostoTotal() : 0);
+    }
+
+    /** Cancela y libera el scheduler de día a día si está activo. */
+    private void detenerSchedulerDiaADia() {
+        if (tareaDiaADia != null) {
+            tareaDiaADia.cancel(true);
+            tareaDiaADia = null;
+        }
+        if (schedulerDiaADia != null) {
+            schedulerDiaADia.shutdownNow();
+            schedulerDiaADia = null;
+        }
+        cursorDiaADia = null;
     }
 
     // =========================================================================
@@ -317,17 +354,32 @@ public class PlanificadorService {
             completarStatsDesdeSolucion(stats, mejor);
             persistirStats(simulacion, stats);
             logStats("final", stats);
-            setEstado(Estado.COMPLETADO, 100, "Planificación completada", mejor.getCostoTotal());
+            boolean esDiaADia = "DIA_A_DIA".equalsIgnoreCase(escenario);
+
+            if (esDiaADia) {
+                // Mantener PLANIFICANDO porque el scheduler seguirá replanificando cada 5 min reales.
+                setEstado(Estado.PLANIFICANDO, 100,
+                    "Día a día activo — próxima replanificación en " + intervaloDiaADiaMin + " min",
+                    mejor.getCostoTotal());
+            } else {
+                setEstado(Estado.COMPLETADO, 100, "Planificación completada", mejor.getCostoTotal());
+            }
 
             // Snapshot y métricas finales
             if (simulacion != null) {
-                simulacion.setEstado(Estado.COMPLETADO.name());
+                simulacion.setEstado(esDiaADia ? Estado.PLANIFICANDO.name() : Estado.COMPLETADO.name());
                 simulacion.setFechaActualizacion(LocalDateTime.now());
                 aplicarStats(simulacion, stats);
                 simulacionRepository.save(simulacion);
             }
             publicarSnapshot(mejor, aeropuertos, iteraciones);
-            wsPublisher.publicarCompletado(getMetricas());
+            if (!esDiaADia) wsPublisher.publicarCompletado(getMetricas());
+
+            // Arrancar el scheduler de replanificación periódica para día a día.
+            if (esDiaADia) {
+                cursorDiaADia = fechaBase.plusDays(1);
+                iniciarSchedulerDiaADia(aeropuertos);
+            }
 
         } catch (Exception ex) {
             if (simulacion != null) {
@@ -336,6 +388,93 @@ public class PlanificadorService {
                 simulacionRepository.save(simulacion);
             }
             setEstado(Estado.ERROR, progreso, "Error: " + ex.getMessage(), 0);
+            ex.printStackTrace();
+        }
+    }
+
+    // =========================================================================
+    // Escenario DIA_A_DIA — scheduler de replanificación periódica
+    // =========================================================================
+
+    /** Arranca el scheduler que ejecuta tickDiaADia cada {@code intervaloDiaADiaMin} min reales. */
+    private void iniciarSchedulerDiaADia(final Map<String, Aeropuerto> aeropuertos) {
+        detenerSchedulerDiaADia();
+        schedulerDiaADia = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "scheduler-dia-a-dia");
+            t.setDaemon(true);
+            return t;
+        });
+        tareaDiaADia = schedulerDiaADia.scheduleAtFixedRate(
+            () -> tickDiaADia(aeropuertos),
+            intervaloDiaADiaMin,
+            intervaloDiaADiaMin,
+            TimeUnit.MINUTES
+        );
+        System.out.printf(
+            "[DIA_A_DIA] Scheduler iniciado: replanificación cada %d min reales (bloque %d h simuladas)%n",
+            intervaloDiaADiaMin, bloqueHorasSimuladas);
+    }
+
+    /**
+     * Tick periódico del escenario día a día: avanza el cursor del bloque,
+     * carga envíos nuevos del periodo simulado transcurrido y vuelve a planificar.
+     */
+    private void tickDiaADia(Map<String, Aeropuerto> aeropuertos) {
+        try {
+            if (cursorDiaADia == null || solucionActual == null || vuelosCargados == null) return;
+
+            LocalDateTime cursorAnterior = cursorDiaADia;
+            cursorDiaADia = cursorDiaADia.plusHours(bloqueHorasSimuladas);
+            long minutosBloque = ChronoUnit.MINUTES.between(cursorAnterior, cursorDiaADia);
+            int diasBloque = (int) Math.max(1, Math.ceil(minutosBloque / 1440.0));
+
+            List<Envio> nuevosEnvios = cargarEnviosDbPorPeriodo(cursorAnterior, diasBloque);
+            if (nuevosEnvios.isEmpty()) {
+                wsPublisher.publicarProgreso(100,
+                    "Día a día: sin envíos nuevos en bloque " + cursorAnterior + " → " + cursorDiaADia,
+                    "PLANIFICANDO", solucionActual.getCostoTotal());
+                return;
+            }
+
+            for (Envio e : nuevosEnvios) {
+                Aeropuerto orig = aeropuertos.get(e.getOrigen());
+                Aeropuerto dest = aeropuertos.get(e.getDestino());
+                if (orig != null && dest != null) {
+                    boolean mismoC = orig.getContinente().equals(dest.getContinente());
+                    e.setPlazoMaximoMinutos(mismoC ? 1440 : 2880);
+                }
+            }
+
+            // Universo de envíos a re-planificar: los nuevos + los ya pendientes en la solución actual.
+            List<Envio> universo = new ArrayList<>(nuevosEnvios);
+            for (Ruta r : solucionActual.getRutas()) {
+                if (!r.isSinSolucion()) universo.add(r.getEnvio());
+            }
+
+            Map<String, Integer> capAeropuertos = new HashMap<>();
+            aeropuertos.forEach((k, v) -> capAeropuertos.put(k, v.getCapacidadMax()));
+
+            GrafoVuelos grafo = new GrafoVuelos(vuelosCargados);
+            SolucionInicial si = new SolucionInicial(grafo, capAeropuertos);
+            Solucion inicial = si.construir(universo);
+
+            TabuSearch ts = new TabuSearch(grafo, iteracionesDiaADia, tenencia, muestra);
+            Solucion mejor = ts.ejecutar(inicial, universo, null);
+
+            solucionActual = mejor;
+            publicarSnapshot(mejor, aeropuertos, 0);
+            setEstado(Estado.PLANIFICANDO, 100,
+                String.format(
+                    "Día a día: bloque %s → %s replanificado (+%d envíos, costo %.0f)",
+                    cursorAnterior, cursorDiaADia, nuevosEnvios.size(), mejor.getCostoTotal()),
+                mejor.getCostoTotal());
+
+            System.out.printf(
+                "[DIA_A_DIA] tick: +%d envíos del bloque %s..%s | universo=%d | costo=%.0f%n",
+                nuevosEnvios.size(), cursorAnterior, cursorDiaADia, universo.size(), mejor.getCostoTotal());
+
+        } catch (Exception ex) {
+            System.err.println("[DIA_A_DIA] Error en replanificación periódica: " + ex.getMessage());
             ex.printStackTrace();
         }
     }
@@ -1273,6 +1412,64 @@ public class PlanificadorService {
             relativa.put(diaRel, entry.getValue());
         }
         return relativa;
+    }
+
+    // =========================================================================
+    // Vuelos próximos a salir (panel de cancelación interactiva)
+    // =========================================================================
+
+    /**
+     * Devuelve los próximos vuelos en salir según la solución actual,
+     * ordenados por hora de salida y filtrados desde {@code tiempoMin}.
+     */
+    public List<VueloProximoDTO> getVuelosProximos(int tiempoMin, int limite) {
+        if (solucionActual == null || vuelosCargados == null) return Collections.emptyList();
+
+        Map<String, Vuelo> mapaVuelos = new HashMap<>();
+        for (Vuelo v : vuelosCargados) {
+            mapaVuelos.put(v.getClave(), v);
+        }
+
+        List<VueloProximoDTO> resultado = new ArrayList<>();
+        for (Map.Entry<String, Integer> e : solucionActual.getOcupacionVuelos().entrySet()) {
+            int maletas = e.getValue();
+            if (maletas <= 0) continue;
+            String[] k = e.getKey().split("-");
+            if (k.length < 4) continue;
+
+            String origen = k[0];
+            String destino = k[1];
+            int salidaMinutos;
+            int dia;
+            try {
+                salidaMinutos = Integer.parseInt(k[2]);
+                dia = Integer.parseInt(k[3].substring(1));
+            } catch (NumberFormatException ex) {
+                continue;
+            }
+
+            Vuelo vuelo = mapaVuelos.get(origen + "-" + destino + "-" + salidaMinutos);
+            if (vuelo == null) continue;
+
+            int salidaAbs = dia * 1440 + salidaMinutos;
+            if (salidaAbs < tiempoMin) continue;
+
+            int llegadaAbs = salidaAbs + vuelo.getDuracionMinutos();
+            String salidaFmt = String.format("Día %d · %02d:%02d",
+                    dia + 1, salidaMinutos / 60, salidaMinutos % 60);
+            String clave = origen + "|" + destino + "|" + salidaMinutos;
+
+            resultado.add(new VueloProximoDTO(
+                    origen, destino, salidaAbs, llegadaAbs,
+                    salidaMinutos, dia, maletas, vuelo.getCapacidadMax(),
+                    salidaFmt, clave));
+        }
+
+        resultado.sort(Comparator.comparingInt(VueloProximoDTO::getSalidaAbsMin));
+        if (resultado.size() > limite) {
+            return resultado.subList(0, limite);
+        }
+        return resultado;
     }
 
     // =========================================================================
