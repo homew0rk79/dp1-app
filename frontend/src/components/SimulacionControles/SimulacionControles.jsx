@@ -40,11 +40,18 @@ function SimulacionControles({
 }) {
   const [duracionMin, setDuracionMin] = useState('')
   const fechaInicioParam = useSimulacionStore((s) => s.parametros.fechaInicio)
+  const escenarioActivo = useSimulacionStore((s) => s.escenarioActivo)
   const fechaInicio = manifest?.fechaInicioMinutos > 0
     ? sumarMinutos(FECHA_INICIO_SIMULACION_ALGORITMO, manifest.fechaInicioMinutos)?.toISOString()
     : fechaInicioParam
 
   if (!manifest) return null
+
+  /**
+   * En "día a día" la velocidad queda fija en 60× (1 s real = 1 min simulado).
+   * Se oculta el selector de presets y el input "completar en X min reales".
+   */
+  const velocidadFija = escenarioActivo === 'DIA_A_DIA'
 
   function handleDuracionBlur() {
     const n = parseFloat(duracionMin)
@@ -88,35 +95,43 @@ function SimulacionControles({
         </span>
       </div>
 
-      <div className={styles.fila}>
-        <span className={styles.velocidadLabel}>Velocidad:</span>
-        <div className={styles.chips}>
-          {PRESETS.map((p) => (
-            <button
-              key={p.valor}
-              className={`${styles.chip} ${velocidad === p.valor ? styles.chipActivo : ''}`}
-              onClick={() => onVelocidad(p.valor)}
-              type="button"
-            >
-              {p.label}
-            </button>
-          ))}
+      {velocidadFija ? (
+        <div className={styles.fila}>
+          <span className={styles.velocidadLabel}>
+            Velocidad fija: 1 s real = 1 min simulado (60x) · día a día
+          </span>
         </div>
+      ) : (
+        <div className={styles.fila}>
+          <span className={styles.velocidadLabel}>Velocidad:</span>
+          <div className={styles.chips}>
+            {PRESETS.map((p) => (
+              <button
+                key={p.valor}
+                className={`${styles.chip} ${velocidad === p.valor ? styles.chipActivo : ''}`}
+                onClick={() => onVelocidad(p.valor)}
+                type="button"
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
 
-        <span className={styles.separador}>|</span>
-        <span className={styles.velocidadLabel}>Completar en</span>
-        <input
-          type="number"
-          className={styles.inputDuracion}
-          placeholder="min"
-          min={1}
-          value={duracionMin}
-          onChange={(e) => setDuracionMin(e.target.value)}
-          onBlur={handleDuracionBlur}
-          onKeyDown={(e) => e.key === 'Enter' && handleDuracionBlur()}
-        />
-        <span className={styles.velocidadLabel}>min reales</span>
-      </div>
+          <span className={styles.separador}>|</span>
+          <span className={styles.velocidadLabel}>Completar en</span>
+          <input
+            type="number"
+            className={styles.inputDuracion}
+            placeholder="min"
+            min={1}
+            value={duracionMin}
+            onChange={(e) => setDuracionMin(e.target.value)}
+            onBlur={handleDuracionBlur}
+            onKeyDown={(e) => e.key === 'Enter' && handleDuracionBlur()}
+          />
+          <span className={styles.velocidadLabel}>min reales</span>
+        </div>
+      )}
     </div>
   )
 }

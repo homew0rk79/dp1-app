@@ -59,7 +59,15 @@ function useAnimacionTimeline() {
     setTiempoDisplay(0)
     setPlayingAnimacion(false)
     setManifest(data)
-  }, [setManifest, setPlayingAnimacion])
+
+    // En día a día la velocidad queda fija en 60x (1 s real = 1 min simulado).
+    const escenario = useSimulacionStore.getState().escenarioActivo
+    if (escenario === 'DIA_A_DIA') {
+      velocidadRef.current = 60
+      setVelocidadState(60)
+      setVelocidadAnimacion(60)
+    }
+  }, [setManifest, setPlayingAnimacion, setVelocidadAnimacion])
 
   const actualizarManifest = useCallback((data) => {
     useSimulacionStore.getState().updateManifest(data)
