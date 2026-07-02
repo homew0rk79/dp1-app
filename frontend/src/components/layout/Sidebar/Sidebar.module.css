@@ -453,6 +453,63 @@
 
 .simBtnPeligro:hover { background: #fecaca; }
 
+/* ── Upload de envíos (DIA_A_DIA) ──────────────────────────────────────── */
+
+.uploadLabel {
+  display: block;
+  cursor: pointer;
+}
+
+.uploadInputHidden {
+  display: none;
+}
+
+.uploadBtnCargando {
+  opacity: 0.65;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* ── Formulario de registro manual y limpiar ─────────────────────────── */
+
+.formEnvio {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.formEnvioFila {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 0.35rem;
+}
+
+.formEnvioCantidad {
+  width: 100%;
+}
+
+.btnLimpiar {
+  margin-top: 0.5rem;
+  width: 100%;
+  font-size: 0.7rem;
+}
+
+.uploadOk {
+  font-size: 0.7rem;
+  color: #16a34a;
+  font-weight: 500;
+  margin-top: 0.15rem;
+  display: block;
+}
+
+.uploadError {
+  font-size: 0.7rem;
+  color: #dc2626;
+  font-weight: 500;
+  margin-top: 0.15rem;
+  display: block;
+}
+
 .simEnCurso {
   padding: 0.42rem 0.55rem;
   border-radius: var(--radius-sm);

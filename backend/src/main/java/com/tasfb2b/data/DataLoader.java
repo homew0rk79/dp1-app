@@ -387,10 +387,38 @@ public class DataLoader {
      * "_envios_EBCI_.txt" → "EBCI"
      */
     private String extraerCodigoOrigen(String nombreArchivo) {
-        // Patrón: _envios_XXXX_.txt  donde XXXX = 4 letras mayúsculas
+        return extraerCodigoOrigenDeNombre(nombreArchivo);
+    }
+
+    /** Versión pública estática para uso externo (ej. upload endpoint). */
+    public static String extraerCodigoOrigenDeNombre(String nombreArchivo) {
         Pattern p = Pattern.compile("_envios_([A-Z]{4})_\\.txt");
-        Matcher m = p.matcher(nombreArchivo);
+        Matcher m = p.matcher(nombreArchivo != null ? nombreArchivo : "");
         return m.find() ? m.group(1) : null;
+    }
+
+    /**
+     * Parsea un InputStream con el formato de envíos y retorna la lista resultante.
+     * Cada línea: idEnvio-AAAAMMDD-HH-MM-DEST-CANT-idCliente
+     * El origen viene del parámetro (extraído del nombre del archivo).
+     */
+    public static List<Envio> parsearStreamDeEnvios(java.io.InputStream is, String origen) throws IOException {
+        List<Envio> result = new ArrayList<>();
+        try (BufferedReader br = new BufferedReader(
+                new InputStreamReader(is, StandardCharsets.US_ASCII))) {
+            String linea;
+            while ((linea = br.readLine()) != null) {
+                linea = linea.trim();
+                if (linea.isEmpty()) continue;
+                String[] partes = linea.split("-");
+                if (partes.length < 7) continue;
+                try {
+                    result.add(new Envio(partes[0], origen, partes[4],
+                        partes[1], partes[2], partes[3], partes[5], partes[6]));
+                } catch (Exception ignored) {}
+            }
+        }
+        return result;
     }
 
     /**

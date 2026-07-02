@@ -45,6 +45,16 @@ function Sidebar() {
   const rangosSemaforo = useConfiguracionStore((s) => s.rangosSemaforo)
   const [ocupacionRealtime, setOcupacionRealtime] = useState({})
   const [scConsumoReal, setScConsumoReal] = useState(null)
+  const [uploadCargando, setUploadCargando] = useState(false)
+  const [uploadFeedback, setUploadFeedback] = useState(null)
+  const uploadInputRef = useRef(null)
+
+  // DIA_A_DIA: aeropuertos con gmt para hora local + formulario de registro
+  const [aeropuertosInfo, setAeropuertosInfo] = useState([])
+  const [formEnvio, setFormEnvio] = useState({ origen: '', destino: '', cantidad: 1, fechaHora: '' })
+  const [formCargando, setFormCargando] = useState(false)
+  const [formFeedback, setFormFeedback] = useState(null)
+  const [limpiarConfirmar, setLimpiarConfirmar] = useState(false)
 
   const aeropuertoSeleccionado = useSeleccionStore((s) => s.aeropuertoSeleccionado)
   const vueloSeleccionado = useSeleccionStore((s) => s.vueloSeleccionado)
@@ -289,6 +299,16 @@ function Sidebar() {
     resetear()
   }
 
+  useEffect(() => {
+    if (escenarioActivo !== ESCENARIOS.DIA_A_DIA) {
+      setAeropuertosInfo([])
+      return
+    }
+    simulacionService.obtenerAeropuertos()
+      .then((res) => setAeropuertosInfo(res.data ?? []))
+      .catch(() => {})
+  }, [escenarioActivo])
+
   function handleSeleccionEscenario(valor) {
     if (enCurso) return
     resetPlanificador()
@@ -296,6 +316,63 @@ function Sidebar() {
     setColapso(false)
     setEstado('IDLE')
     setEscenario(valor || null)
+    setUploadFeedback(null)
+    setFormFeedback(null)
+    setLimpiarConfirmar(false)
+  }
+
+  async function handleLimpiarEnvios() {
+    if (!limpiarConfirmar) { setLimpiarConfirmar(true); return }
+    setLimpiarConfirmar(false)
+    try {
+      await simulacionService.limpiarEnvios()
+      setFormFeedback({ ok: true, texto: 'Tabla de envíos limpiada.' })
+    } catch {
+      setFormFeedback({ ok: false, texto: 'Error al limpiar la tabla.' })
+    }
+  }
+
+  async function handleRegistrarEnvio(e) {
+    e.preventDefault()
+    if (!formEnvio.origen || !formEnvio.destino || formEnvio.cantidad < 1) return
+    setFormCargando(true)
+    setFormFeedback(null)
+    try {
+      const res = await simulacionService.registrarEnvio({
+        origen: formEnvio.origen,
+        destino: formEnvio.destino,
+        cantidad: Number(formEnvio.cantidad),
+        fechaHora: formEnvio.fechaHora || undefined,
+      })
+      const d = res.data
+      setFormFeedback({ ok: true, texto: `Registrado: ${d.origen}→${d.destino}, ${d.cantidad} maletas` })
+      setFormEnvio((f) => ({ ...f, cantidad: 1 }))
+    } catch (err) {
+      setFormFeedback({ ok: false, texto: err.response?.data?.error ?? 'Error al registrar envío' })
+    } finally {
+      setFormCargando(false)
+    }
+  }
+
+  async function handleUploadEnvios(e) {
+    const archivos = Array.from(e.target.files)
+    if (!archivos.length) return
+    setUploadCargando(true)
+    setUploadFeedback(null)
+    try {
+      const res = await simulacionService.uploadEnvios(archivos)
+      const d = res.data
+      const origenes = archivos
+        .map((f) => { const m = f.name.match(/_envios_([A-Z]{4})_\.txt/); return m ? m[1] : f.name })
+        .join(', ')
+      setUploadFeedback({ ok: true, texto: `${d.importados.toLocaleString()} envíos importados (${origenes})` })
+    } catch (err) {
+      const msg = err.response?.data?.errores?.[0] ?? 'Error al importar el archivo'
+      setUploadFeedback({ ok: false, texto: msg })
+    } finally {
+      setUploadCargando(false)
+      if (uploadInputRef.current) uploadInputRef.current.value = ''
+    }
   }
 
   const cargando = estadoEjecucion === 'CARGANDO'
@@ -403,6 +480,9 @@ function Sidebar() {
                 rangosSemaforo={rangosSemaforo}
                 aeropuertoSeleccionado={aeropuertoSeleccionado}
                 setAeropuertoSeleccionado={setAeropuertoSeleccionado}
+                gmtMap={aeropuertosInfo.length > 0
+                  ? Object.fromEntries(aeropuertosInfo.map((a) => [a.codigo, a.gmt]))
+                  : null}
               />
             )}
 
@@ -451,6 +531,105 @@ function Sidebar() {
                     onChange={(e) => setParametros({ fechaInicio: e.target.value })}
                     disabled={enCurso}
                   />
+                </div>
+              )}
+
+              {/* Carga de envíos (solo DIA_A_DIA) */}
+              {escenarioActivo === ESCENARIOS.DIA_A_DIA && (
+                <div className={styles.simField}>
+                  <label className={styles.simLabel}>Cargar envíos (.txt)</label>
+                  <label className={styles.uploadLabel}>
+                    <input
+                      ref={uploadInputRef}
+                      type="file"
+                      accept=".txt"
+                      multiple
+                      onChange={handleUploadEnvios}
+                      disabled={uploadCargando}
+                      className={styles.uploadInputHidden}
+                    />
+                    <span className={`${styles.simBtnSecundario} ${uploadCargando ? styles.uploadBtnCargando : ''}`}>
+                      {uploadCargando ? 'Importando...' : '+ Seleccionar archivo(s)'}
+                    </span>
+                  </label>
+                  {uploadFeedback && (
+                    <span className={uploadFeedback.ok ? styles.uploadOk : styles.uploadError}>
+                      {uploadFeedback.texto}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Registro manual + limpiar (solo DIA_A_DIA) */}
+              {escenarioActivo === ESCENARIOS.DIA_A_DIA && (
+                <div className={styles.simField}>
+                  <label className={styles.simLabel}>Registrar envío manual</label>
+                  <form onSubmit={handleRegistrarEnvio} className={styles.formEnvio}>
+                    <select
+                      className={styles.simSelect}
+                      value={formEnvio.origen}
+                      onChange={(e) => setFormEnvio((f) => ({ ...f, origen: e.target.value }))}
+                      required
+                      disabled={formCargando}
+                    >
+                      <option value="">Origen</option>
+                      {aeropuertosInfo.map((a) => (
+                        <option key={a.codigo} value={a.codigo}>{a.codigo} — {a.ciudad}</option>
+                      ))}
+                    </select>
+                    <select
+                      className={styles.simSelect}
+                      value={formEnvio.destino}
+                      onChange={(e) => setFormEnvio((f) => ({ ...f, destino: e.target.value }))}
+                      required
+                      disabled={formCargando}
+                    >
+                      <option value="">Destino</option>
+                      {aeropuertosInfo.map((a) => (
+                        <option key={a.codigo} value={a.codigo}>{a.codigo} — {a.ciudad}</option>
+                      ))}
+                    </select>
+                    <div className={styles.formEnvioFila}>
+                      <input
+                        type="number"
+                        className={`${styles.simSelect} ${styles.formEnvioCantidad}`}
+                        placeholder="Cantidad"
+                        min={1}
+                        max={999}
+                        value={formEnvio.cantidad}
+                        onChange={(e) => setFormEnvio((f) => ({ ...f, cantidad: e.target.value }))}
+                        disabled={formCargando}
+                        required
+                      />
+                      <input
+                        type="datetime-local"
+                        className={styles.simSelect}
+                        value={formEnvio.fechaHora}
+                        onChange={(e) => setFormEnvio((f) => ({ ...f, fechaHora: e.target.value }))}
+                        disabled={formCargando}
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      className={styles.simBtnIniciar}
+                      disabled={formCargando || !formEnvio.origen || !formEnvio.destino}
+                    >
+                      {formCargando ? 'Registrando...' : '+ Registrar envío'}
+                    </button>
+                  </form>
+                  {formFeedback && (
+                    <span className={formFeedback.ok ? styles.uploadOk : styles.uploadError}>
+                      {formFeedback.texto}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    className={`${styles.simBtnPeligro} ${styles.btnLimpiar}`}
+                    onClick={handleLimpiarEnvios}
+                    disabled={enCurso}
+                  >
+                    {limpiarConfirmar ? '⚠ Confirmar limpieza' : 'Limpiar tabla de envíos'}
+                  </button>
                 </div>
               )}
 

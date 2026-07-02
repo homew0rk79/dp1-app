@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import { Search, ArrowUp, ArrowDown } from 'lucide-react'
 import Semaforo from '../../../common/Semaforo/Semaforo'
 import { getColorSemaforo, COLORES_SEMAFORO } from '../../../../utils/semaforo'
@@ -12,6 +12,16 @@ import useSeleccionStore from '../../../../store/seleccionStore'
 import styles from './ListaAeropuertosSidebar.module.css'
 
 const CONTINENTES = ['Todos', 'América', 'Europa', 'Asia', 'Oceanía']
+
+function horaLocalActual(gmtOffset) {
+  const ahora = new Date()
+  const utcMs = ahora.getTime() + ahora.getTimezoneOffset() * 60000
+  const local = new Date(utcMs + gmtOffset * 3600000)
+  const hh = local.getHours().toString().padStart(2, '0')
+  const mm = local.getMinutes().toString().padStart(2, '0')
+  const signo = gmtOffset >= 0 ? '+' : ''
+  return `${hh}:${mm} (UTC${signo}${gmtOffset})`
+}
 
 function formatearProxima(fecha) {
   if (!fecha) return '—'
@@ -53,8 +63,17 @@ function ListaAeropuertosSidebar({
   rangosSemaforo,
   aeropuertoSeleccionado,
   setAeropuertoSeleccionado,
+  gmtMap,
 }) {
   const [busqueda, setBusqueda] = useState('')
+  const [horaActual, setHoraActual] = useState(Date.now())
+  const tickRef = useRef(null)
+
+  useEffect(() => {
+    if (!gmtMap) return
+    tickRef.current = setInterval(() => setHoraActual(Date.now()), 30000)
+    return () => clearInterval(tickRef.current)
+  }, [gmtMap])
   const [continente, setContinente] = useState('Todos')
   const [semaforo, setSemaforo] = useState('todos')
   const [ordenCampo, setOrdenCampo] = useState('ocupacion')
@@ -216,6 +235,11 @@ function ListaAeropuertosSidebar({
                   <span className={styles.codigo}>{a.codigo}</span>
                   <span className={styles.nombre}>{a.ciudad}</span>
                   <span className={styles.continente}>{a.continente}</span>
+                  {gmtMap && gmtMap[a.codigo] !== undefined && (
+                    <span className={styles.horaLocal}>
+                      🕐 {horaLocalActual(gmtMap[a.codigo])}
+                    </span>
+                  )}
                   <span className={styles.proximas}>
                     Sal: {formatearProxima(proxSal)} · Lleg: {formatearProxima(proxLleg)}
                   </span>

@@ -17,4 +17,11 @@ export const simulacionService = {
   cancelarVuelo: (payload) => api.post('/replanificacion/vuelo-cancelado', payload),
   obtenerVuelosProximos: (tiempoMin = 0, limite = 20) =>
     api.get('/vuelos/proximos', { params: { tiempoMin, limite } }),
+  uploadEnvios: (archivos) => {
+    const form = new FormData()
+    archivos.forEach((f) => form.append('archivo', f))
+    return api.post('/planificacion/upload-envios', form)
+  },
+  limpiarEnvios: () => api.post('/planificacion/limpiar-envios'),
+  registrarEnvio: (payload) => api.post('/planificacion/registrar-envio', payload),
 }

@@ -1980,4 +1980,108 @@ public class PlanificadorService {
         if (h == 0) return m + " min";
         return m == 0 ? h + " h" : h + " h " + m + " min";
     }
+
+    // =========================================================================
+    // Gestión operacional de envíos (escenario DIA_A_DIA)
+    // =========================================================================
+
+    public void limpiarEnvios() {
+        envioRepository.deleteAll();
+        System.out.println("[PlanificadorService] Tabla de envíos limpiada");
+    }
+
+    public Map<String, Object> registrarEnvio(com.tasfb2b.dto.RegistrarEnvioRequestDTO req) {
+        Map<String, Aeropuerto> aeros = aeropuertosCargados;
+        if (aeros == null || aeros.isEmpty()) {
+            aeros = aeropuertoRepository.findAll().stream()
+                .collect(Collectors.toMap(Aeropuerto::getCodigo, a -> a, (a, b) -> a));
+        }
+
+        String idOriginal = "OP-" + System.currentTimeMillis();
+        Envio envio = new Envio();
+        envio.setIdOriginal(idOriginal);
+        envio.setId(req.getOrigen() + "-" + idOriginal);
+        envio.setOrigen(req.getOrigen());
+        envio.setDestino(req.getDestino());
+        envio.setCantidad(Math.max(1, req.getCantidad()));
+        envio.setIdCliente(req.getIdCliente() != null && !req.getIdCliente().isBlank()
+            ? req.getIdCliente() : "0000000");
+        envio.setEntregado(false);
+
+        LocalDateTime fechaHora;
+        if (req.getFechaHora() != null && !req.getFechaHora().isBlank()) {
+            try {
+                fechaHora = LocalDateTime.parse(req.getFechaHora());
+            } catch (Exception ex) {
+                fechaHora = LocalDateTime.now(java.time.ZoneOffset.UTC);
+            }
+        } else {
+            fechaHora = LocalDateTime.now(java.time.ZoneOffset.UTC);
+        }
+        envio.setFechaHoraRegistro(fechaHora);
+
+        Aeropuerto orig = aeros.get(req.getOrigen());
+        Aeropuerto dest = aeros.get(req.getDestino());
+        if (orig != null && dest != null) {
+            boolean mismoC = orig.getContinente().equals(dest.getContinente());
+            envio.setPlazoMaximoMinutos(mismoC ? 1440 : 2880);
+        }
+
+        Envio guardado = envioRepository.save(envio);
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("id", guardado.getId());
+        resp.put("origen", guardado.getOrigen());
+        resp.put("destino", guardado.getDestino());
+        resp.put("cantidad", guardado.getCantidad());
+        resp.put("fechaHoraRegistro", guardado.getFechaHoraRegistro().toString());
+        resp.put("plazoMaximoMinutos", guardado.getPlazoMaximoMinutos());
+        return resp;
+    }
+
+    // =========================================================================
+    // Importación de envíos desde archivo TXT (escenario DIA_A_DIA)
+    // =========================================================================
+
+    public Map<String, Object> importarEnviosTxt(org.springframework.web.multipart.MultipartFile[] archivos) {
+        Map<String, Aeropuerto> aeros = aeropuertosCargados;
+        if (aeros == null || aeros.isEmpty()) {
+            aeros = aeropuertoRepository.findAll().stream()
+                .collect(Collectors.toMap(Aeropuerto::getCodigo, a -> a, (a, b) -> a));
+        }
+
+        int totalImportados = 0;
+        List<String> errores = new ArrayList<>();
+
+        for (org.springframework.web.multipart.MultipartFile archivo : archivos) {
+            String nombre = archivo.getOriginalFilename() != null ? archivo.getOriginalFilename() : "";
+            String origen = com.tasfb2b.data.DataLoader.extraerCodigoOrigenDeNombre(nombre);
+            if (origen == null) {
+                errores.add((nombre.isEmpty() ? "archivo sin nombre" : nombre)
+                    + ": nombre inválido (formato esperado: _envios_XXXX_.txt)");
+                continue;
+            }
+            try {
+                List<Envio> envios = com.tasfb2b.data.DataLoader.parsearStreamDeEnvios(
+                    archivo.getInputStream(), origen);
+                final Map<String, Aeropuerto> aerosRef = aeros;
+                for (Envio e : envios) {
+                    Aeropuerto orig = aerosRef.get(e.getOrigen());
+                    Aeropuerto dest = aerosRef.get(e.getDestino());
+                    if (orig != null && dest != null) {
+                        boolean mismoC = orig.getContinente().equals(dest.getContinente());
+                        e.setPlazoMaximoMinutos(mismoC ? 1440 : 2880);
+                    }
+                }
+                envioRepository.saveAll(envios);
+                totalImportados += envios.size();
+            } catch (Exception ex) {
+                errores.add(nombre + ": " + ex.getMessage());
+            }
+        }
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("importados", totalImportados);
+        if (!errores.isEmpty()) resp.put("errores", errores);
+        return resp;
+    }
 }
