@@ -52,6 +52,10 @@ function PanelVuelosProximos() {
   async function confirmarCancelacion(vuelo) {
     setCancelando(true)
     setResultado(null)
+    // Pausa breve mientras se replanifica por la cancelación; se reanuda al terminar.
+    const { playingAnimacion, setPlayingAnimacion } = useSimulacionStore.getState()
+    const estabaReproduciendo = playingAnimacion
+    setPlayingAnimacion(false)
     try {
       const res = await simulacionService.cancelarVuelo({
         origen: vuelo.origen,
@@ -74,6 +78,7 @@ function PanelVuelosProximos() {
       })
     } finally {
       setCancelando(false)
+      if (estabaReproduciendo) useSimulacionStore.getState().setPlayingAnimacion(true)
     }
   }
 
