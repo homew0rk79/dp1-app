@@ -31,6 +31,7 @@ function MapaInteractivo() {
   const tiempoSegundos = useSimulacionStore((s) => s.tiempoSegundos)
   const inicioEjecucionReal = useSimulacionStore((s) => s.inicioEjecucionReal)
   const wsVersion = useSimulacionStore((s) => s.wsVersion)
+  const escenarioActivo = useSimulacionStore((s) => s.escenarioActivo)
 
   const aeropuertoSeleccionado = useSeleccionStore((s) => s.aeropuertoSeleccionado)
   const setAeropuertoSeleccionado = useSeleccionStore((s) => s.setAeropuertoSeleccionado)
@@ -162,10 +163,14 @@ function MapaInteractivo() {
     setOcupacionWS(nuevaOcupacion)
   }, [snapshot])
 
-  // Al completar la planificación, cargar el manifest de animación
+  // Al completar la planificación, cargar el manifest de animación.
+  // En día a día el estado se queda en PLANIFICANDO (el scheduler sigue
+  // replanificando), así que la señal de "listo" es porcentaje 100.
   useEffect(() => {
     if (manifest) return undefined
-    if (!completado && progreso?.estado !== 'COMPLETADO') return undefined
+    const diaADiaListo = escenarioActivo === 'DIA_A_DIA' &&
+      progreso?.estado === 'PLANIFICANDO' && progreso?.porcentaje === 100
+    if (!completado && progreso?.estado !== 'COMPLETADO' && !diaADiaListo) return undefined
 
     let cancelado = false
 
@@ -183,6 +188,16 @@ function MapaInteractivo() {
       cancelado = true
     }
   }, [completado, progreso, manifest, cargarManifest])
+
+  // Día a día: cada replanificación (tick de 5 min o cancelación) publica un
+  // snapshot; refrescamos el manifest sin tocar el tiempo ni el play/pause.
+  useEffect(() => {
+    if (!snapshot || escenarioActivo !== 'DIA_A_DIA') return
+    if (!useSimulacionStore.getState().manifest) return
+    simulacionService.obtenerManifestAnimacion()
+      .then((res) => { if (res.data) actualizarManifest(res.data) })
+      .catch(() => {})
+  }, [snapshot, escenarioActivo, actualizarManifest])
 
   // Actualiza la ocupación real cada hora simulada para evitar sobrecarga de requests
   useEffect(() => {

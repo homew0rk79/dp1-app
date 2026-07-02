@@ -60,12 +60,14 @@ function useAnimacionTimeline() {
     setPlayingAnimacion(false)
     setManifest(data)
 
-    // En día a día la velocidad queda fija en 60x (1 s real = 1 min simulado).
+    // En día a día la velocidad queda fija en 60x (1 s real = 1 min simulado)
+    // y la animación arranca sola: es una simulación en tiempo real.
     const escenario = useSimulacionStore.getState().escenarioActivo
     if (escenario === 'DIA_A_DIA') {
       velocidadRef.current = 60
       setVelocidadState(60)
       setVelocidadAnimacion(60)
+      setPlayingAnimacion(true)
     }
   }, [setManifest, setPlayingAnimacion, setVelocidadAnimacion])
 
@@ -82,7 +84,11 @@ function useAnimacionTimeline() {
       setTiempoAnimacion(t)
     }
     if (manifest && t >= manifest.duracionTotalMinutos) {
-      setPlayingAnimacion(false)
+      // En día a día el manifest crece con cada replanificación: no pausar,
+      // el reloj continúa cuando llega el siguiente bloque.
+      if (useSimulacionStore.getState().escenarioActivo !== 'DIA_A_DIA') {
+        setPlayingAnimacion(false)
+      }
     }
   }, [manifest, setPlayingAnimacion, setTiempoAnimacion])
 

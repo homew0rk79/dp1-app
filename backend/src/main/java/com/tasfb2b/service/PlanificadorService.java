@@ -419,7 +419,7 @@ public class PlanificadorService {
      * Tick periódico del escenario día a día: avanza el cursor del bloque,
      * carga envíos nuevos del periodo simulado transcurrido y vuelve a planificar.
      */
-    private void tickDiaADia(Map<String, Aeropuerto> aeropuertos) {
+    private synchronized void tickDiaADia(Map<String, Aeropuerto> aeropuertos) {
         try {
             if (cursorDiaADia == null || solucionActual == null || vuelosCargados == null) return;
 
@@ -1225,8 +1225,14 @@ public class PlanificadorService {
             : simOpt.map(Simulacion::getFechaInicio)
                 .map(PlanificadorService::minutosDesdeInicioSimulacion)
                 .orElse(0);
-        int duracionVentana = simOpt.map(s -> s.getNumDias() > 0 ? calcularHorizonteOperacionalMinutos(s.getNumDias()) : 0)
+        int duracionVentanaBase = simOpt.map(s -> s.getNumDias() > 0 ? calcularHorizonteOperacionalMinutos(s.getNumDias()) : 0)
             .orElse(0);
+        // Día a día: la ventana crece con los bloques ya replanificados por el scheduler.
+        LocalDateTime cursor = cursorDiaADia;
+        int minutosCursor = cursor != null ? Math.max(0, minutosDesdeInicioSimulacion(cursor) - inicioAbs) : 0;
+        int duracionVentana = cursor != null
+            ? Math.max(duracionVentanaBase, minutosCursor + 2880)
+            : duracionVentanaBase;
         int diaInicio = inicioAbs / 1440;
 
         Map<String, Vuelo> vuelos = new HashMap<>();
@@ -1281,7 +1287,10 @@ public class PlanificadorService {
                     diaInicio, duracionVentana)))
             .collect(Collectors.toList());
 
-        return new AnimacionManifestDTO(duracionManifest(maxLlegada, duracionVentana), inicioAbs, ocurrencias, aeropuertos);
+        int duracionTotal = duracionManifest(maxLlegada, duracionVentana);
+        // Día a día: el timeline avanza al ritmo del cursor aunque un bloque no traiga vuelos nuevos.
+        if (cursor != null) duracionTotal = Math.max(duracionTotal, minutosCursor);
+        return new AnimacionManifestDTO(duracionTotal, inicioAbs, ocurrencias, aeropuertos);
     }
 
     public List<Map<String, Object>> getConsumoBloques() {
