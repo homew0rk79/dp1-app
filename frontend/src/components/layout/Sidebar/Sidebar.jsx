@@ -483,6 +483,7 @@ function Sidebar() {
                 gmtMap={aeropuertosInfo.length > 0
                   ? Object.fromEntries(aeropuertosInfo.map((a) => [a.codigo, a.gmt]))
                   : null}
+                ocultarOcupacion={estadoEjecucion === 'PLANIFICANDO'}
               />
             )}
 

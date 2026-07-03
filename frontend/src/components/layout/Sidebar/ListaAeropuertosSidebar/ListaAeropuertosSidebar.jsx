@@ -64,6 +64,7 @@ function ListaAeropuertosSidebar({
   aeropuertoSeleccionado,
   setAeropuertoSeleccionado,
   gmtMap,
+  ocultarOcupacion = false,
 }) {
   const [busqueda, setBusqueda] = useState('')
   const [horaActual, setHoraActual] = useState(Date.now())
@@ -244,10 +245,12 @@ function ListaAeropuertosSidebar({
                     Sal: {formatearProxima(proxSal)} · Lleg: {formatearProxima(proxLleg)}
                   </span>
                 </div>
-                <div className={styles.ocupacion}>
-                  <span style={{ color: hex }}>{pct.toFixed(1)}%</span>
-                  <Semaforo valor={pct} />
-                </div>
+                {!ocultarOcupacion && (
+                  <div className={styles.ocupacion}>
+                    <span style={{ color: hex }}>{pct.toFixed(1)}%</span>
+                    <Semaforo valor={pct} />
+                  </div>
+                )}
               </li>
             )
           })}

@@ -24,6 +24,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -64,6 +65,10 @@ public class PlanificadorService {
     /** Iteraciones reducidas para que el tick periódico quepa en el intervalo. */
     @Value("${tasf.algoritmo.iteraciones.diaadia:50}")
     private int iteracionesDiaADia;
+
+    /** Iteraciones para la planificación INICIAL de DIA_A_DIA (arranque rápido). */
+    @Value("${tasf.algoritmo.iteraciones.diaadia.inicial:50}")
+    private int iteracionesDiaADiaInicial;
 
     /** Cada cuántos minutos reales se replanifica en día a día. */
     @Value("${tasf.diaadia.intervalo-minutos:5}")
@@ -120,6 +125,8 @@ public class PlanificadorService {
     private volatile ScheduledFuture<?> tareaDiaADia = null;
     /** Cursor del último bloque ya procesado por el scheduler. */
     private volatile LocalDateTime cursorDiaADia = null;
+    /** IDs de envíos registrados manualmente via API durante la simulación activa. */
+    private final Set<String> pendingManualEnvioIds = Collections.synchronizedSet(new HashSet<>());
 
     public PlanificadorService(
             WebSocketEventPublisher wsPublisher,
@@ -258,6 +265,7 @@ public class PlanificadorService {
             LocalDate fechaBaseDia = fechaBase.toLocalDate();
             fechaInicioSimulacion = fechaBaseDia;
             fechaHoraInicioSimulacion = fechaBase;
+            pendingManualEnvioIds.clear();
             int dias = resolverDiasEscenario(escenario, numDias);
             simulacion = simulacionRepository.save(new Simulacion(escenario, fechaBaseDia, dias));
             simulacionActualId = simulacion.getId();
@@ -307,21 +315,23 @@ public class PlanificadorService {
 
             // Primer snapshot: solución greedy antes de optimizar
             publicarSnapshot(inicial, aeropuertos, 0);
-            setEstado(Estado.PLANIFICANDO, 40, "Ejecutando Tabu Search (" + iteraciones + " iteraciones)...",
+            boolean esDiaADiaInicial = "DIA_A_DIA".equalsIgnoreCase(escenario);
+            int iters = esDiaADiaInicial ? iteracionesDiaADiaInicial : iteraciones;
+            setEstado(Estado.PLANIFICANDO, 40, "Ejecutando Tabu Search (" + iters + " iteraciones)...",
                 inicial.getCostoTotal());
 
-            TabuSearch ts = new TabuSearch(grafo, iteraciones, tenencia, muestra);
+            TabuSearch ts = new TabuSearch(grafo, iters, tenencia, muestra);
 
             Solucion mejor = ts.ejecutar(inicial, envios, (iter, mejorGlobal) -> {
                 stats.iteracionesEjecutadas = iter;
-                int pct = 40 + (int)(iter * 55.0 / iteraciones);
-                String msg = "Iteración " + iter + "/" + iteraciones
+                int pct = 40 + (int)(iter * 55.0 / iters);
+                String msg = "Iteración " + iter + "/" + iters
                     + " | costo: " + String.format("%,.0f", mejorGlobal.getCostoTotal());
                 setEstado(Estado.PLANIFICANDO, pct, msg, mejorGlobal.getCostoTotal());
                 publicarSnapshot(mejorGlobal, aeropuertos, iter);
             });
 
-            stats.iteracionesEjecutadas = Math.max(stats.iteracionesEjecutadas, iteraciones);
+            stats.iteracionesEjecutadas = Math.max(stats.iteracionesEjecutadas, iters);
             stats.tiempoPlanificacionMs = millisDesde(inicioPlanificacion);
 
             int inicioVentanaAbs = minutosDesdeInicioSimulacion(fechaBase);
@@ -377,8 +387,7 @@ public class PlanificadorService {
 
             // Arrancar el scheduler de replanificación periódica para día a día.
             if (esDiaADia) {
-                cursorDiaADia = fechaBase.plusDays(1);
-                iniciarSchedulerDiaADia(aeropuertos);
+                iniciarSchedulerDiaADia(fechaBase, aeropuertos);
             }
 
         } catch (Exception ex) {
@@ -397,8 +406,9 @@ public class PlanificadorService {
     // =========================================================================
 
     /** Arranca el scheduler que ejecuta tickDiaADia cada {@code intervaloDiaADiaMin} min reales. */
-    private void iniciarSchedulerDiaADia(final Map<String, Aeropuerto> aeropuertos) {
-        detenerSchedulerDiaADia();
+    private void iniciarSchedulerDiaADia(LocalDateTime fechaBase, final Map<String, Aeropuerto> aeropuertos) {
+        detenerSchedulerDiaADia(); // ← resetea cursorDiaADia = null
+        cursorDiaADia = fechaBase.plusDays(1); // ← se asigna DESPUÉS del reset
         schedulerDiaADia = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "scheduler-dia-a-dia");
             t.setDaemon(true);
@@ -429,10 +439,27 @@ public class PlanificadorService {
             int diasBloque = (int) Math.max(1, Math.ceil(minutosBloque / 1440.0));
 
             List<Envio> nuevosEnvios = cargarEnviosDbPorPeriodo(cursorAnterior, diasBloque);
+
+            // Recoger envíos registrados manualmente vía API y aún no planificados.
+            // Se usa un Set en memoria para evitar queries masivas sobre la tabla completa.
+            if (!pendingManualEnvioIds.isEmpty()) {
+                Set<String> enviosEnSolucion = solucionActual.getRutas().stream()
+                    .map(r -> r.getEnvio() != null ? r.getEnvio().getId() : null)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+                Set<String> idsNuevos = nuevosEnvios.stream().map(Envio::getId).collect(Collectors.toSet());
+                List<String> idsPendientes = pendingManualEnvioIds.stream()
+                    .filter(id -> !enviosEnSolucion.contains(id) && !idsNuevos.contains(id))
+                    .collect(Collectors.toList());
+                if (!idsPendientes.isEmpty()) {
+                    envioRepository.findAllById(idsPendientes).forEach(nuevosEnvios::add);
+                }
+            }
+
             if (nuevosEnvios.isEmpty()) {
-                wsPublisher.publicarProgreso(100,
-                    "Día a día: sin envíos nuevos en bloque " + cursorAnterior + " → " + cursorDiaADia,
-                    "PLANIFICANDO", solucionActual.getCostoTotal());
+                System.out.printf("[DIA_A_DIA] tick silencioso: cursor %s → %s (sin envíos nuevos)%n",
+                    cursorAnterior, cursorDiaADia);
+                publicarSnapshot(solucionActual, aeropuertos, 0);
                 return;
             }
 
@@ -2037,6 +2064,7 @@ public class PlanificadorService {
         }
 
         Envio guardado = envioRepository.save(envio);
+        pendingManualEnvioIds.add(guardado.getId());
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("id", guardado.getId());
         resp.put("origen", guardado.getOrigen());
