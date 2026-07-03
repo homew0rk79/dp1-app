@@ -5,6 +5,7 @@ import com.tasfb2b.service.PlanificadorService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
 
@@ -72,6 +73,30 @@ public class PlanificadorController {
     @GetMapping("/consumo-bloques")
     public ResponseEntity<java.util.List<Map<String, Object>>> getConsumoBloques() {
         return ResponseEntity.ok(service.getConsumoBloques());
+    }
+
+    @PostMapping("/upload-envios")
+    public ResponseEntity<Map<String, Object>> uploadEnvios(
+            @RequestParam("archivo") MultipartFile[] archivos) {
+        Map<String, Object> resultado = service.importarEnviosTxt(archivos);
+        return ResponseEntity.ok(resultado);
+    }
+
+    @PostMapping("/limpiar-envios")
+    public ResponseEntity<Map<String, String>> limpiarEnvios() {
+        service.limpiarEnvios();
+        return ResponseEntity.ok(Map.of("mensaje", "Tabla de envíos limpiada"));
+    }
+
+    @PostMapping("/registrar-envio")
+    public ResponseEntity<Map<String, Object>> registrarEnvio(
+            @RequestBody com.tasfb2b.dto.RegistrarEnvioRequestDTO req) {
+        if (req.getOrigen() == null || req.getDestino() == null || req.getCantidad() < 1) {
+            return ResponseEntity.badRequest()
+                .body(Map.of("error", "Campos requeridos: origen, destino, cantidad (≥1)"));
+        }
+        Map<String, Object> resultado = service.registrarEnvio(req);
+        return ResponseEntity.ok(resultado);
     }
 
 }

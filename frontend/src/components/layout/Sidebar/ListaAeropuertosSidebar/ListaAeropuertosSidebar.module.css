@@ -151,6 +151,13 @@
   color: var(--color-text-muted);
 }
 
+.horaLocal {
+  font-size: 0.63rem;
+  color: #0369a1;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
 .proximas {
   font-size: 0.6rem;
   color: #64748b;

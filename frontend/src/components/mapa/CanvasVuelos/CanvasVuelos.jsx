@@ -309,11 +309,13 @@ function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avan
   useEffect(() => {
     if (!manifest) return
 
-    let lastTs = null
+    let lastWallMs = null
 
-    const frame = (ts) => {
-      if (lastTs !== null && playingRef.current) {
-        const dt = Math.min((ts - lastTs) / 1000, 0.1)
+    const frame = () => {
+      const now = Date.now()
+      if (lastWallMs !== null && playingRef.current) {
+        // Date.now() en vez de ts del RAF: captura tiempo real incluso tras tab oculta
+        const dt = (now - lastWallMs) / 1000
         const pasoMin = Math.max(1, Number(avanceTickMin) || 1)
         tiempoContinuoRef.current = Math.max(tiempoContinuoRef.current, tiempoRef.current)
         tiempoContinuoRef.current = Math.min(
@@ -328,7 +330,7 @@ function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avan
       } else {
         tiempoContinuoRef.current = tiempoRef.current
       }
-      lastTs = ts
+      lastWallMs = now
       draw()
       animIdRef.current = requestAnimationFrame(frame)
     }

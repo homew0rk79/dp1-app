@@ -32,6 +32,7 @@ function MapaInteractivo() {
   const inicioEjecucionReal = useSimulacionStore((s) => s.inicioEjecucionReal)
   const wsVersion = useSimulacionStore((s) => s.wsVersion)
   const escenarioActivo = useSimulacionStore((s) => s.escenarioActivo)
+  const estadoEjecucion = useSimulacionStore((s) => s.estadoEjecucion)
 
   const aeropuertoSeleccionado = useSeleccionStore((s) => s.aeropuertoSeleccionado)
   const setAeropuertoSeleccionado = useSeleccionStore((s) => s.setAeropuertoSeleccionado)
@@ -291,7 +292,7 @@ function MapaInteractivo() {
           const estado    = getOcupacion(aeropuerto.codigo)
           const pctOcup   = estado?.ocupacion ?? 0
           const color     = getColorSemaforo(pctOcup, rangosSemaforo)
-          const colorHex  = COLORES_SEMAFORO[color]
+          const colorHex  = (estadoEjecucion === 'PLANIFICANDO' && escenarioActivo !== 'DIA_A_DIA') ? '#94a3b8' : COLORES_SEMAFORO[color]
           const seleccionado = aeropuertoSeleccionado === aeropuerto.codigo
           const visiblePorFiltro = aeropuertoPasaFiltros(aeropuerto, pctOcup)
           if (!visiblePorFiltro && !seleccionado) return null
