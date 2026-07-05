@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import styles from './SimulacionControles.module.css'
 import useSimulacionStore from '../../store/simulacionStore'
-import { formatearFechaHora, sumarMinutos } from '../../utils/tiempos'
+import { formatearFechaHora, formatearDuracion, sumarMinutos } from '../../utils/tiempos'
 import { TA_EJECUCION_ALGORITMO_MIN, FECHA_INICIO_SIMULACION_ALGORITMO } from '../../constants/restricciones'
 
 const PRESETS = [
@@ -39,13 +39,28 @@ function SimulacionControles({
   onVelocidad,
 }) {
   const [duracionMin, setDuracionMin] = useState('')
+  const [horaReal, setHoraReal] = useState(() => new Date())
+  const tiempoSegundos = useSimulacionStore((s) => s.tiempoSegundos)
   const fechaInicioParam = useSimulacionStore((s) => s.parametros.fechaInicio)
   const escenarioActivo = useSimulacionStore((s) => s.escenarioActivo)
   const fechaInicio = manifest?.fechaInicioMinutos > 0
     ? sumarMinutos(FECHA_INICIO_SIMULACION_ALGORITMO, manifest.fechaInicioMinutos)?.toISOString()
     : fechaInicioParam
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setHoraReal(new Date())
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [])
+
   if (!manifest) return null
+
+  const simTotMin = Math.max(0, Math.floor(tiempoDisplay || 0))
+  const simD = Math.floor(simTotMin / 1440)
+  const simH = Math.floor((simTotMin % 1440) / 60)
+  const simM = simTotMin % 60
+  const transcurridoSim = `${simD}d ${String(simH).padStart(2, '0')}h ${String(simM).padStart(2, '0')}m`
 
   /**
    * En "día a día" la velocidad queda fija en 60× (1 s real = 1 min simulado).
@@ -63,6 +78,28 @@ function SimulacionControles({
 
   return (
     <div className={styles.panel}>
+      {/* 4 Tiempos de Simulación / Sistema (#37, #38, #39) */}
+      <div className={styles.gridRelojes}>
+        <div className={styles.relojItem}>
+          <span className={styles.relojLabel}>🕒 Real Actual:</span>
+          <span className={styles.relojValor}>{formatearFechaHora(horaReal)}</span>
+        </div>
+        <div className={styles.relojItem}>
+          <span className={styles.relojLabel}>⏱️ Ejecución Real:</span>
+          <span className={styles.relojValor}>{formatearDuracion(tiempoSegundos || 0)}</span>
+        </div>
+        <div className={styles.relojItem}>
+          <span className={styles.relojLabel}>📅 Momento Simulado:</span>
+          <span className={styles.relojValorResaltado}>
+            {formatTiempo(tiempoDisplay, manifest.duracionTotalMinutos, fechaInicio)}
+          </span>
+        </div>
+        <div className={styles.relojItem}>
+          <span className={styles.relojLabel}>⏳ Transcurrido Sim.:</span>
+          <span className={styles.relojValorResaltado}>{transcurridoSim}</span>
+        </div>
+      </div>
+
       <div className={styles.fila}>
         <button
           className={styles.btnPlay}

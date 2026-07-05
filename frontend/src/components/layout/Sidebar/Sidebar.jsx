@@ -221,6 +221,9 @@ function Sidebar() {
         ? kpisAnimados.vuelosSaturados.toString()
         : completado ? completado.vuelosSaturados.toString() : '—',
       color: (kpisAnimados?.vuelosSaturados ?? completado?.vuelosSaturados ?? 0) > 0 ? 'rojo' : 'default',
+      semaforoValor: semaforosGlobales.flota,
+      rangosSemaforo,
+      subtexto: `Flota: ${semaforosGlobales.flota.toFixed(1)}% ocupada`,
     },
     {
       icono: AlertTriangle,
@@ -229,6 +232,9 @@ function Sidebar() {
         ? kpisAnimados.aeropuertosSaturados.toString()
         : completado ? completado.aeropuertosSaturados.toString() : '—',
       color: (kpisAnimados?.aeropuertosSaturados ?? completado?.aeropuertosSaturados ?? 0) > 0 ? 'rojo' : 'default',
+      semaforoValor: semaforosGlobales.almacenes,
+      rangosSemaforo,
+      subtexto: `Almacenes: ${semaforosGlobales.almacenes.toFixed(1)}% ocupados`,
     },
   ]
 
