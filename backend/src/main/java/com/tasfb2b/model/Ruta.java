@@ -30,7 +30,7 @@ public class Ruta {
 
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "ruta_seq")
-    @SequenceGenerator(name = "ruta_seq", sequenceName = "ruta_id_seq", allocationSize = 1)
+    @SequenceGenerator(name = "ruta_seq", sequenceName = "ruta_id_seq", allocationSize = 50)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
