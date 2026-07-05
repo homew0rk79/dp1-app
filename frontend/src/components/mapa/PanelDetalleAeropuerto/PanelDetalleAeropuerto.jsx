@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { PlaneLanding, PlaneTakeoff, XCircle } from 'lucide-react'
 import { TIEMPO_SIMULADO_REFERENCIA } from '../../../constants/tiempoSimulado'
 import useSimulacionStore from '../../../store/simulacionStore'
@@ -41,22 +41,85 @@ function ListaEnvios({ items, tipo }) {
 }
 
 function PanelDetalleAeropuerto({ codigo, onCancelVuelo }) {
-
+  const [tab, setTab] = useState('vuelos')
   const manifest = useSimulacionStore((s) => s.manifest)
   const tiempoAnimacion = useSimulacionStore((s) => s.tiempoAnimacion)
   const fechaInicio = useSimulacionStore((s) => s.parametros.fechaInicio)
 
   let vuelosReales = []
-  if (manifest) {
+  let llegadasPlanificadas = []
+  let salidasPlanificadas = []
+
+  if (manifest && manifest.ocurrencias) {
     vuelosReales = manifest.ocurrencias
       .filter((o) => o.origen === codigo && o.salidaAbs >= tiempoAnimacion)
       .sort((a, b) => a.salidaAbs - b.salidaAbs)
       .slice(0, 5)
+
+    llegadasPlanificadas = manifest.ocurrencias
+      .filter((o) => o.destino === codigo && o.llegadaAbs >= tiempoAnimacion)
+      .sort((a, b) => a.llegadaAbs - b.llegadaAbs)
+      .slice(0, 10)
+      .map((o, idx) => {
+        const fechaLl = sumarMinutos(fechaInicio, o.llegadaAbs)
+        return {
+          id: `ENV-IN-${o.vuelo || o.codigoVuelo || 'V'}-${idx + 1}`,
+          maletas: o.maletas || 0,
+          producto: `Carga proyectada (${o.maletas || 0} pz / cap ${o.capacidadMax || 0})`,
+          origen: o.origen,
+          destino: o.destino,
+          vuelo: o.vuelo || o.codigoVuelo || `UT-${o.origen}-${o.destino}`,
+          horaLlegadaFmt: fechaLl ? formatearFechaHora(fechaLl).slice(0, 16) : '—',
+        }
+      })
+
+    salidasPlanificadas = manifest.ocurrencias
+      .filter((o) => o.origen === codigo && o.salidaAbs >= tiempoAnimacion)
+      .sort((a, b) => a.salidaAbs - b.salidaAbs)
+      .slice(0, 10)
+      .map((o, idx) => {
+        const fechaSa = sumarMinutos(fechaInicio, o.salidaAbs)
+        return {
+          id: `ENV-OUT-${o.vuelo || o.codigoVuelo || 'V'}-${idx + 1}`,
+          maletas: o.maletas || 0,
+          producto: `Despacho proyectado (${o.maletas || 0} pz / cap ${o.capacidadMax || 0})`,
+          origen: o.origen,
+          destino: o.destino,
+          vuelo: o.vuelo || o.codigoVuelo || `UT-${o.origen}-${o.destino}`,
+          horaSalidaFmt: fechaSa ? formatearFechaHora(fechaSa).slice(0, 16) : '—',
+        }
+      })
   }
+
+  if (!manifest) return null
 
   return (
     <div className={styles.panel}>
-      {manifest && (
+      <div className={styles.tabsWrap}>
+        <button
+          type="button"
+          className={`${styles.tabBtn} ${tab === 'vuelos' ? styles.tabBtnActivo : ''}`}
+          onClick={() => setTab('vuelos')}
+        >
+          ✈️ Próximos ({vuelosReales.length})
+        </button>
+        <button
+          type="button"
+          className={`${styles.tabBtn} ${tab === 'llegadas' ? styles.tabBtnActivo : ''}`}
+          onClick={() => setTab('llegadas')}
+        >
+          📥 Llegadas ({llegadasPlanificadas.length})
+        </button>
+        <button
+          type="button"
+          className={`${styles.tabBtn} ${tab === 'salidas' ? styles.tabBtnActivo : ''}`}
+          onClick={() => setTab('salidas')}
+        >
+          📤 Salidas ({salidasPlanificadas.length})
+        </button>
+      </div>
+
+      {tab === 'vuelos' && (
         <section className={styles.seccion}>
           <h5 className={styles.seccionTitulo} style={{ color: '#ef4444' }}>
             <PlaneTakeoff size={13} />
@@ -94,6 +157,25 @@ function PanelDetalleAeropuerto({ codigo, onCancelVuelo }) {
         </section>
       )}
 
+      {tab === 'llegadas' && (
+        <section className={styles.seccion}>
+          <h5 className={styles.seccionTitulo} style={{ color: '#2563eb' }}>
+            <PlaneLanding size={13} />
+            Llegadas Planificadas (#79, #80)
+          </h5>
+          <ListaEnvios items={llegadasPlanificadas} tipo="llegada" />
+        </section>
+      )}
+
+      {tab === 'salidas' && (
+        <section className={styles.seccion}>
+          <h5 className={styles.seccionTitulo} style={{ color: '#059669' }}>
+            <PlaneTakeoff size={13} />
+            Salidas Programadas (#81, #82)
+          </h5>
+          <ListaEnvios items={salidasPlanificadas} tipo="salida" />
+        </section>
+      )}
     </div>
   )
 }

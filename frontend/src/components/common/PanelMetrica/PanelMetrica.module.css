@@ -45,3 +45,49 @@
 .verde .iconoWrapper { background: var(--color-verde-bg); color: #15803d; }
 .ambar .iconoWrapper { background: var(--color-ambar-bg); color: #b45309; }
 .rojo  .iconoWrapper { background: var(--color-rojo-bg);  color: #b91c1c; }
+
+.topRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.semaforoWrap {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 0.12rem 0.45rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.pctBadge {
+  font-size: 0.74rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.subtexto {
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+  margin-top: 0.15rem;
+  font-weight: 500;
+}
+
+.barraBg {
+  width: 100%;
+  height: 5px;
+  background: var(--color-border);
+  border-radius: 3px;
+  margin-top: 0.35rem;
+  overflow: hidden;
+}
+
+.barraFill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease, background-color 0.3s ease;
+}
