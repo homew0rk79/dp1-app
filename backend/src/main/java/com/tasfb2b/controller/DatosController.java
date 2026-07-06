@@ -1,7 +1,10 @@
 package com.tasfb2b.controller;
 
 import com.tasfb2b.dto.AeropuertoDTO;
+import com.tasfb2b.dto.EnvioEnVueloDTO;
 import com.tasfb2b.dto.MaletaEnAeropuertoDTO;
+import com.tasfb2b.dto.MonitorEnviosDTO;
+import com.tasfb2b.dto.PlanificadosAeropuertoDTO;
 import com.tasfb2b.dto.VueloDTO;
 import com.tasfb2b.dto.VueloProximoDTO;
 import com.tasfb2b.service.PlanificadorService;
@@ -79,5 +82,47 @@ public class DatosController {
             @RequestParam(defaultValue = "0") int tiempoMin,
             @RequestParam(defaultValue = "20") int limite) {
         return ResponseEntity.ok(service.getVuelosProximos(tiempoMin, limite));
+    }
+
+    /**
+     * Envíos asignados a una instancia concreta de vuelo (UT).
+     * Usado por el drill-down del panel de unidades de transporte.
+     *
+     * @param origen            aeropuerto de origen del vuelo
+     * @param destino           aeropuerto de destino del vuelo
+     * @param horaSalidaMinutos hora de salida en minutos desde medianoche
+     * @param dia               día simulado (0-indexado)
+     */
+    @GetMapping("/vuelos/envios")
+    public ResponseEntity<List<EnvioEnVueloDTO>> getEnviosDeVuelo(
+            @RequestParam String origen,
+            @RequestParam String destino,
+            @RequestParam int horaSalidaMinutos,
+            @RequestParam(defaultValue = "0") int dia) {
+        return ResponseEntity.ok(service.getEnviosDeVuelo(origen, destino, horaSalidaMinutos, dia));
+    }
+
+    /**
+     * Información planificada de envíos que entran y salen de un almacén.
+     * Usado por el drill-down del panel de aeropuertos.
+     */
+    @GetMapping("/aeropuertos/{codigo}/planificados")
+    public ResponseEntity<PlanificadosAeropuertoDTO> getPlanificadosAeropuerto(
+            @PathVariable String codigo,
+            @RequestParam(defaultValue = "0") int tiempoMin,
+            @RequestParam(defaultValue = "30") int limite) {
+        return ResponseEntity.ok(service.getPlanificadosAeropuerto(codigo, tiempoMin, limite));
+    }
+
+    /**
+     * Monitor de envíos: planificados por salir, en vuelo y entregados
+     * en las últimas {@code ventanaHoras} horas simuladas.
+     */
+    @GetMapping("/envios/monitor")
+    public ResponseEntity<MonitorEnviosDTO> getMonitorEnvios(
+            @RequestParam(defaultValue = "0") int tiempoMin,
+            @RequestParam(defaultValue = "4") int ventanaHoras,
+            @RequestParam(defaultValue = "50") int limite) {
+        return ResponseEntity.ok(service.getMonitorEnvios(tiempoMin, ventanaHoras, limite));
     }
 }

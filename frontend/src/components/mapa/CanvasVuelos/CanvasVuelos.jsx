@@ -226,8 +226,8 @@ function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avan
 
     const T    = tiempoRef.current
     const zoom = map.current.getZoom()
-    // Ícono escala con zoom: pequeño en vista mundial, mayor al acercar
-    const iconSize = Math.max(3.5, Math.min(9, (zoom - 1) * 0.9))
+    // Ícono escala con zoom: visible desde la vista mundial, mayor al acercar
+    const iconSize = Math.max(7, Math.min(15, (zoom - 1) * 2.2))
 
     const newHits = []
     const hayFiltroUT = Boolean(

@@ -166,3 +166,73 @@
   color: var(--color-text-muted);
   font-style: italic;
 }
+
+/* ── Drill-down de envíos por UT ─────────────────────────────────────── */
+
+.btnExpandir {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0 0.25rem 0 0;
+  color: var(--color-text-muted);
+  vertical-align: middle;
+  display: inline-flex;
+  align-items: center;
+}
+
+.btnExpandir:hover {
+  color: var(--color-primary, #2563eb);
+}
+
+.filaDetalle td {
+  background: #f8fafc;
+  padding: 0.4rem 0.6rem !important;
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+}
+
+.detalleEstado {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.detalleEnvios {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.detalleTitulo {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.detalleLista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.detalleItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.72rem;
+  padding: 0.15rem 0.3rem;
+  background: white;
+  border-radius: 3px;
+  border-left: 2px solid #2563eb;
+}
+
+.detalleCantidad {
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--color-text);
+}

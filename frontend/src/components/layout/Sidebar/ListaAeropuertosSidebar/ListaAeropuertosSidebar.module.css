@@ -109,8 +109,7 @@
 
 .item {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  flex-direction: column;
   padding: 0.42rem 0.5rem;
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -171,4 +170,77 @@
   flex-shrink: 0;
   font-size: 0.78rem;
   font-weight: 600;
+}
+
+/* ── Drill-down de envíos/planificados por almacén ───────────────────── */
+
+.filaPrincipal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  width: 100%;
+}
+
+.accionesItem {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.btnEnvios {
+  background: transparent;
+  border: 1px solid var(--color-border, #d0d4dc);
+  border-radius: 4px;
+  padding: 0.15rem 0.3rem;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  display: inline-flex;
+  align-items: center;
+  transition: all 0.15s;
+}
+
+.btnEnvios:hover {
+  color: var(--color-primary, #2563eb);
+  border-color: var(--color-primary, #2563eb);
+}
+
+.btnEnviosActivo {
+  background: var(--color-primary, #2563eb);
+  color: white !important;
+  border-color: var(--color-primary, #2563eb);
+}
+
+.detalleAlmacen {
+  margin-top: 0.4rem;
+  padding-top: 0.4rem;
+  border-top: 1px dashed var(--color-border, #e5e7eb);
+  cursor: default;
+}
+
+.tabsDetalle {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 0.4rem;
+}
+
+.tabDetalle {
+  font-size: 0.68rem;
+  padding: 0.18rem 0.45rem;
+  background: transparent;
+  border: 1px solid var(--color-border, #d0d4dc);
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.tabDetalle:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.tabDetalleActivo {
+  background: var(--color-text);
+  color: white;
+  border-color: var(--color-text);
 }

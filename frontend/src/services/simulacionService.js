@@ -17,6 +17,12 @@ export const simulacionService = {
   cancelarVuelo: (payload) => api.post('/replanificacion/vuelo-cancelado', payload),
   obtenerVuelosProximos: (tiempoMin = 0, limite = 20) =>
     api.get('/vuelos/proximos', { params: { tiempoMin, limite } }),
+  obtenerEnviosDeVuelo: (origen, destino, horaSalidaMinutos, dia = 0) =>
+    api.get('/vuelos/envios', { params: { origen, destino, horaSalidaMinutos, dia } }),
+  obtenerPlanificadosAeropuerto: (codigo, tiempoMin = 0, limite = 30) =>
+    api.get(`/aeropuertos/${codigo}/planificados`, { params: { tiempoMin, limite } }),
+  obtenerMonitorEnvios: (tiempoMin = 0, ventanaHoras = 4, limite = 50) =>
+    api.get('/envios/monitor', { params: { tiempoMin, ventanaHoras, limite } }),
   uploadEnvios: (archivos) => {
     const form = new FormData()
     archivos.forEach((f) => form.append('archivo', f))

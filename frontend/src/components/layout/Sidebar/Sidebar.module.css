@@ -31,6 +31,8 @@
 
 .collapsed {
   width: 48px;
+  /* Debe pisar el min-width base (340px); si no, la franja blanca persiste */
+  min-width: 48px;
 }
 
 /* Toggle button */
