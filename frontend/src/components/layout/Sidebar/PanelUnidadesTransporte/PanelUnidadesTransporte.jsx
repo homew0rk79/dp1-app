@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
-import { ArrowUp, ArrowDown, Search } from 'lucide-react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
+import { ArrowUp, ArrowDown, Search, ChevronRight, ChevronDown } from 'lucide-react'
 import Semaforo from '../../../common/Semaforo/Semaforo'
 import { getColorSemaforo, COLORES_SEMAFORO } from '../../../../utils/semaforo'
+import { matchPatronCampos } from '../../../../utils/filtros'
 import useConfiguracionStore from '../../../../store/configuracionStore'
 import useSeleccionStore from '../../../../store/seleccionStore'
+import { simulacionService } from '../../../../services/simulacionService'
 import { VUELOS_MOCK } from '../../../../mocks/vuelos'
 import { FECHA_INICIO_SIMULACION_ALGORITMO } from '../../../../constants/restricciones'
 import styles from './PanelUnidadesTransporte.module.css'
@@ -46,6 +48,10 @@ function ocurrenciasAUt(ocurrencias, tiempoAnimacion) {
       ocupacion: o.capacidadMax > 0 ? Math.round((o.maletas / o.capacidadMax) * 1000) / 10 : 0,
       maletas: o.maletas,
       capacidadMax: o.capacidadMax,
+      // Datos para el drill-down de envíos (endpoint /vuelos/envios)
+      salidaAbs: o.salidaAbs,
+      dia: Math.floor(o.salidaAbs / 1440),
+      horaSalidaMinutos: o.salidaAbs % 1440,
     }))
 }
 
@@ -107,6 +113,32 @@ function PanelUnidadesTransporte({ ocurrencias, tiempoAnimacion }) {
   const [filtroSemaforo, setFiltroSemaforo] = useState('todos')
   const [sortConfig, setSortConfig] = useState({ key: 'horaSalida', direction: 'asc' })
 
+  // Drill-down: key de la UT expandida y cache de envíos por key
+  const [utExpandida, setUtExpandida] = useState(null)
+  const [enviosPorUt, setEnviosPorUt] = useState({})
+
+  async function toggleEnvios(ut, e) {
+    e.stopPropagation()
+    if (utExpandida === ut.key) {
+      setUtExpandida(null)
+      return
+    }
+    setUtExpandida(ut.key)
+    if (enviosPorUt[ut.key]) return // ya cacheado
+    if (ut.horaSalidaMinutos == null) {
+      setEnviosPorUt((prev) => ({ ...prev, [ut.key]: { error: 'Sin datos de simulación' } }))
+      return
+    }
+    setEnviosPorUt((prev) => ({ ...prev, [ut.key]: { cargando: true } }))
+    try {
+      const res = await simulacionService.obtenerEnviosDeVuelo(
+        ut.origen, ut.destino, ut.horaSalidaMinutos, ut.dia)
+      setEnviosPorUt((prev) => ({ ...prev, [ut.key]: { envios: res.data || [] } }))
+    } catch {
+      setEnviosPorUt((prev) => ({ ...prev, [ut.key]: { error: 'No se pudieron obtener los envíos' } }))
+    }
+  }
+
   const listaBase = useMemo(() => {
     const desdeSim = ocurrenciasAUt(ocurrencias, tiempoAnimacion)
     if (desdeSim && desdeSim.length > 0) return desdeSim
@@ -114,13 +146,12 @@ function PanelUnidadesTransporte({ ocurrencias, tiempoAnimacion }) {
   }, [ocurrencias, tiempoAnimacion])
 
   const listaVisible = useMemo(() => {
-    const q = filtroDestino.trim().toLowerCase()
+    const q = filtroDestino.trim()
     let lista = listaBase
     if (q) {
+      // Coincide contra código, tramo "AAAA-BBBB", origen o destino; admite comodín *
       lista = lista.filter((ut) =>
-        ut.destino.toLowerCase().includes(q) ||
-        ut.origen.toLowerCase().includes(q) ||
-        ut.codigo.toLowerCase().includes(q),
+        matchPatronCampos(q, ut.codigo, `${ut.origen}-${ut.destino}`, ut.origen, ut.destino),
       )
     }
     if (filtroSemaforo !== 'todos') {
@@ -159,7 +190,7 @@ function PanelUnidadesTransporte({ ocurrencias, tiempoAnimacion }) {
         <input
           type="text"
           className={styles.filtroInput}
-          placeholder="Filtrar por destino"
+          placeholder="Código, tramo, origen o destino (admite *)"
           value={filtroDestino}
           onChange={(e) => setFiltroDestino(e.target.value)}
         />
@@ -202,24 +233,73 @@ function PanelUnidadesTransporte({ ocurrencias, tiempoAnimacion }) {
                 const color = getColorSemaforo(ut.ocupacion, rangosSemaforo)
                 const hex = COLORES_SEMAFORO[color]
                 const seleccionado = vueloSeleccionado === ut.key
+                const expandida = utExpandida === ut.key
+                const detalle = enviosPorUt[ut.key]
                 return (
-                  <tr
-                    key={ut.key}
-                    className={seleccionado ? styles.filaSeleccionada : ''}
-                    onClick={() => setVueloSeleccionado(seleccionado ? null : ut.key)}
-                  >
-                    <td className={styles.mono}>{ut.codigo}</td>
-                    <td className={styles.mono}>{ut.origen}</td>
-                    <td className={styles.mono}>{ut.destino}</td>
-                    <td>{formatearHora(ut.horaSalida)}</td>
-                    <td>{formatearHora(ut.horaLlegada)}</td>
-                    <td className={styles.celdaOcupacion}>
-                      <span className={styles.ocupacion} style={{ color: hex }}>
-                        {ut.ocupacion.toFixed(1)}%
-                      </span>
-                      <Semaforo valor={ut.ocupacion} />
-                    </td>
-                  </tr>
+                  <Fragment key={ut.key}>
+                    <tr
+                      className={seleccionado ? styles.filaSeleccionada : ''}
+                      onClick={() => setVueloSeleccionado(seleccionado ? null : ut.key)}
+                    >
+                      <td className={styles.mono}>
+                        <button
+                          type="button"
+                          className={styles.btnExpandir}
+                          onClick={(e) => toggleEnvios(ut, e)}
+                          title="Ver envíos que traslada"
+                        >
+                          {expandida ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                        </button>
+                        {ut.codigo}
+                      </td>
+                      <td className={styles.mono}>{ut.origen}</td>
+                      <td className={styles.mono}>{ut.destino}</td>
+                      <td>{formatearHora(ut.horaSalida)}</td>
+                      <td>{formatearHora(ut.horaLlegada)}</td>
+                      <td className={styles.celdaOcupacion}>
+                        <span className={styles.ocupacion} style={{ color: hex }}>
+                          {ut.ocupacion.toFixed(1)}%
+                        </span>
+                        <Semaforo valor={ut.ocupacion} />
+                      </td>
+                    </tr>
+                    {expandida && (
+                      <tr className={styles.filaDetalle}>
+                        <td colSpan={COLUMNAS.length}>
+                          {detalle?.cargando && (
+                            <span className={styles.detalleEstado}>Cargando envíos…</span>
+                          )}
+                          {detalle?.error && (
+                            <span className={styles.detalleEstado}>{detalle.error}</span>
+                          )}
+                          {detalle?.envios && detalle.envios.length === 0 && (
+                            <span className={styles.detalleEstado}>Sin envíos asignados a este vuelo</span>
+                          )}
+                          {detalle?.envios && detalle.envios.length > 0 && (
+                            <div className={styles.detalleEnvios}>
+                              <div className={styles.detalleTitulo}>
+                                {detalle.envios.length} envío(s) ·{' '}
+                                {detalle.envios.reduce((s, x) => s + x.cantidad, 0)} maleta(s)
+                              </div>
+                              <ul className={styles.detalleLista}>
+                                {detalle.envios.map((env) => (
+                                  <li key={env.envioId} className={styles.detalleItem}>
+                                    <span className={styles.mono}>{env.envioId}</span>
+                                    <span>
+                                      {env.ciudadOrigen} → {env.ciudadDestino}
+                                    </span>
+                                    <span className={styles.detalleCantidad}>
+                                      {env.cantidad} mlt
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 )
               })
             )}

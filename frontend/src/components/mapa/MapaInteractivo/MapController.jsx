@@ -12,6 +12,25 @@ function MapController({ aeropuertos }) {
   const overlayCtx = useOverlayRuta()
   const overlay = overlayStore ?? overlayCtx?.overlay
 
+  // Recalcular el tamaño del mapa cuando su contenedor cambia (p. ej. al
+  // colapsar/expandir el sidebar). Sin esto Leaflet deja tiles sin renderizar.
+  useEffect(() => {
+    const contenedor = map.getContainer()?.parentElement
+    if (!contenedor || typeof ResizeObserver === 'undefined') return
+
+    let timer = null
+    const observer = new ResizeObserver(() => {
+      // Debounce ligeramente mayor que la transición de 0.22s del sidebar
+      clearTimeout(timer)
+      timer = setTimeout(() => map.invalidateSize(), 260)
+    })
+    observer.observe(contenedor)
+    return () => {
+      clearTimeout(timer)
+      observer.disconnect()
+    }
+  }, [map])
+
   useEffect(() => {
     if (!aeropuertoSeleccionado) return
     const aero = aeropuertos.find((a) => a.codigo === aeropuertoSeleccionado)

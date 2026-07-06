@@ -1608,6 +1608,175 @@ public class PlanificadorService {
         return tiempoActual;
     }
 
+    // =========================================================================
+    // Consultas del panel: envíos por vuelo, planificados por almacén, monitor
+    // =========================================================================
+
+    /** Tramo de una ruta con sus tiempos absolutos ya resueltos. */
+    private static final class TramoProgramado {
+        final Vuelo vuelo;
+        final int salidaAbs;
+        final int llegadaAbs;
+        TramoProgramado(Vuelo vuelo, int salidaAbs, int llegadaAbs) {
+            this.vuelo = vuelo;
+            this.salidaAbs = salidaAbs;
+            this.llegadaAbs = llegadaAbs;
+        }
+    }
+
+    /**
+     * Resuelve los tiempos absolutos de cada tramo de la ruta con el mismo
+     * criterio del algoritmo ({@code proximaSalidaAbsoluta} con margen de 30 min).
+     */
+    private static List<TramoProgramado> calcularTramosProgramados(Ruta ruta) {
+        if (ruta.isSinSolucion() || ruta.getVuelos().isEmpty()) return Collections.emptyList();
+        List<TramoProgramado> tramos = new ArrayList<>(ruta.getVuelos().size());
+        int tiempoActual = ruta.getEnvio().getMinutosRegistro();
+        for (Vuelo v : ruta.getVuelos()) {
+            int salidaAbs = GrafoVuelos.proximaSalidaAbsoluta(tiempoActual, v.getSalidaMinutos(), 30);
+            int llegadaAbs = salidaAbs + v.getDuracionMinutos();
+            tramos.add(new TramoProgramado(v, salidaAbs, llegadaAbs));
+            tiempoActual = llegadaAbs;
+        }
+        return tramos;
+    }
+
+    /**
+     * Envíos asignados a una instancia concreta de vuelo (UT).
+     * La instancia se identifica por origen, destino, hora de salida del día
+     * (minutos desde medianoche) y día simulado.
+     */
+    public List<EnvioEnVueloDTO> getEnviosDeVuelo(String origen, String destino,
+                                                   int horaSalidaMinutos, int dia) {
+        if (solucionActual == null) return Collections.emptyList();
+
+        List<EnvioEnVueloDTO> resultado = new ArrayList<>();
+        for (Ruta ruta : solucionActual.getRutas()) {
+            for (TramoProgramado t : calcularTramosProgramados(ruta)) {
+                if (!t.vuelo.getOrigen().equals(origen)) continue;
+                if (!t.vuelo.getDestino().equals(destino)) continue;
+                if (t.vuelo.getSalidaMinutos() != horaSalidaMinutos) continue;
+                if (t.salidaAbs / 1440 != dia) continue;
+
+                Envio e = ruta.getEnvio();
+                resultado.add(new EnvioEnVueloDTO(
+                        e.getId(), e.getOrigen(), e.getDestino(),
+                        getCiudad(e.getOrigen()), getCiudad(e.getDestino()),
+                        e.getCantidad()));
+                break; // un envío usa la instancia una sola vez
+            }
+        }
+        resultado.sort(Comparator.comparing(EnvioEnVueloDTO::getEnvioId));
+        return resultado;
+    }
+
+    /**
+     * Información planificada de envíos que entran y salen de un almacén,
+     * a partir de {@code tiempoMin}, ordenada por hora.
+     */
+    public PlanificadosAeropuertoDTO getPlanificadosAeropuerto(String codigo, int tiempoMin, int limite) {
+        if (solucionActual == null || codigo == null) {
+            return new PlanificadosAeropuertoDTO(Collections.emptyList(), Collections.emptyList(), 0, 0);
+        }
+
+        List<PlanificadosAeropuertoDTO.ItemPlanificado> entrantes = new ArrayList<>();
+        List<PlanificadosAeropuertoDTO.ItemPlanificado> salientes = new ArrayList<>();
+
+        for (Ruta ruta : solucionActual.getRutas()) {
+            Envio e = ruta.getEnvio();
+            for (TramoProgramado t : calcularTramosProgramados(ruta)) {
+                String etiquetaVuelo = t.vuelo.getOrigen() + "→" + t.vuelo.getDestino()
+                        + " " + formatearMinutos(t.vuelo.getSalidaMinutos());
+                if (t.vuelo.getDestino().equals(codigo) && t.llegadaAbs >= tiempoMin) {
+                    entrantes.add(new PlanificadosAeropuertoDTO.ItemPlanificado(
+                            e.getId(), etiquetaVuelo, t.llegadaAbs, e.getCantidad(), e.getDestino()));
+                }
+                if (t.vuelo.getOrigen().equals(codigo) && t.salidaAbs >= tiempoMin) {
+                    salientes.add(new PlanificadosAeropuertoDTO.ItemPlanificado(
+                            e.getId(), etiquetaVuelo, t.salidaAbs, e.getCantidad(), e.getDestino()));
+                }
+            }
+        }
+
+        entrantes.sort(Comparator.comparingInt(PlanificadosAeropuertoDTO.ItemPlanificado::getHoraAbs));
+        salientes.sort(Comparator.comparingInt(PlanificadosAeropuertoDTO.ItemPlanificado::getHoraAbs));
+
+        int totalIn  = entrantes.stream().mapToInt(PlanificadosAeropuertoDTO.ItemPlanificado::getCantidad).sum();
+        int totalOut = salientes.stream().mapToInt(PlanificadosAeropuertoDTO.ItemPlanificado::getCantidad).sum();
+
+        if (entrantes.size() > limite) entrantes = entrantes.subList(0, limite);
+        if (salientes.size() > limite) salientes = salientes.subList(0, limite);
+
+        return new PlanificadosAeropuertoDTO(entrantes, salientes, totalIn, totalOut);
+    }
+
+    /**
+     * Monitor de envíos: planificados por salir, en vuelo en este instante,
+     * y entregados dentro de las últimas {@code ventanaHoras} horas simuladas.
+     */
+    public MonitorEnviosDTO getMonitorEnvios(int tiempoMin, int ventanaHoras, int limite) {
+        if (solucionActual == null) {
+            return new MonitorEnviosDTO(Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+        }
+
+        int ventanaMin = Math.max(1, ventanaHoras) * 60;
+        List<MonitorEnviosDTO.ItemEnvio> planificados = new ArrayList<>();
+        List<MonitorEnviosDTO.ItemEnvio> enVuelo = new ArrayList<>();
+        List<MonitorEnviosDTO.ItemEnvio> entregados = new ArrayList<>();
+
+        for (Ruta ruta : solucionActual.getRutas()) {
+            List<TramoProgramado> tramos = calcularTramosProgramados(ruta);
+            if (tramos.isEmpty()) continue;
+            Envio e = ruta.getEnvio();
+
+            TramoProgramado primero = tramos.get(0);
+            TramoProgramado ultimo  = tramos.get(tramos.size() - 1);
+
+            if (primero.salidaAbs > tiempoMin) {
+                // Aún no sale de su origen
+                planificados.add(new MonitorEnviosDTO.ItemEnvio(
+                        e.getId(), e.getOrigen(), e.getDestino(),
+                        etiquetaVuelo(primero), primero.salidaAbs, e.getCantidad()));
+                continue;
+            }
+
+            if (ultimo.llegadaAbs <= tiempoMin) {
+                // Ya entregado: solo dentro de la ventana
+                if (tiempoMin - ultimo.llegadaAbs <= ventanaMin) {
+                    entregados.add(new MonitorEnviosDTO.ItemEnvio(
+                            e.getId(), e.getOrigen(), e.getDestino(),
+                            etiquetaVuelo(ultimo), ultimo.llegadaAbs, e.getCantidad()));
+                }
+                continue;
+            }
+
+            // En tránsito: buscar el tramo volando en este instante
+            for (TramoProgramado t : tramos) {
+                if (t.salidaAbs <= tiempoMin && tiempoMin <= t.llegadaAbs) {
+                    enVuelo.add(new MonitorEnviosDTO.ItemEnvio(
+                            e.getId(), e.getOrigen(), e.getDestino(),
+                            etiquetaVuelo(t), t.salidaAbs, e.getCantidad()));
+                    break;
+                }
+            }
+        }
+
+        planificados.sort(Comparator.comparingInt(MonitorEnviosDTO.ItemEnvio::getHoraAbs));
+        enVuelo.sort(Comparator.comparingInt(MonitorEnviosDTO.ItemEnvio::getHoraAbs));
+        entregados.sort(Comparator.comparingInt(MonitorEnviosDTO.ItemEnvio::getHoraAbs).reversed());
+
+        if (planificados.size() > limite) planificados = planificados.subList(0, limite);
+        if (enVuelo.size() > limite)      enVuelo      = enVuelo.subList(0, limite);
+        if (entregados.size() > limite)   entregados   = entregados.subList(0, limite);
+
+        return new MonitorEnviosDTO(planificados, enVuelo, entregados);
+    }
+
+    private String etiquetaVuelo(TramoProgramado t) {
+        return t.vuelo.getOrigen() + "→" + t.vuelo.getDestino()
+                + " " + formatearMinutos(t.vuelo.getSalidaMinutos());
+    }
+
     private static class OcurrenciaAcumulada {
         final String origen;
         final String destino;

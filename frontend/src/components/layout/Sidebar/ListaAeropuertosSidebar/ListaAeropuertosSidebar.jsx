@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
-import { Search, ArrowUp, ArrowDown } from 'lucide-react'
+import { Search, ArrowUp, ArrowDown, Package } from 'lucide-react'
 import Semaforo from '../../../common/Semaforo/Semaforo'
 import { getColorSemaforo, COLORES_SEMAFORO } from '../../../../utils/semaforo'
+import { matchPatronCampos } from '../../../../utils/filtros'
 import { AEROPUERTOS_MOCK } from '../../../../mocks/aeropuertos'
 import {
   proximaSalidaAeropuerto,
@@ -9,7 +10,16 @@ import {
 } from '../../../../utils/planificacionAeropuerto'
 import { TIEMPO_SIMULADO_REFERENCIA } from '../../../../constants/tiempoSimulado'
 import useSeleccionStore from '../../../../store/seleccionStore'
+import useSimulacionStore from '../../../../store/simulacionStore'
+import DetalleMaletasAeropuerto from '../../../mapa/DetalleMaletasAeropuerto/DetalleMaletasAeropuerto'
+import PlanificadosAeropuerto from './PlanificadosAeropuerto'
 import styles from './ListaAeropuertosSidebar.module.css'
+
+const TABS_DETALLE = [
+  { id: 'almacen', label: 'En almacén' },
+  { id: 'entrantes', label: 'Por llegar' },
+  { id: 'salientes', label: 'Por salir' },
+]
 
 const CONTINENTES = ['Todos', 'América', 'Europa', 'Asia', 'Oceanía']
 
@@ -81,6 +91,17 @@ function ListaAeropuertosSidebar({
   const [ordenDir, setOrdenDir] = useState('desc')
   const setFiltroAlmacenes = useSeleccionStore((s) => s.setFiltroAlmacenes)
 
+  // Drill-down: aeropuerto expandido y pestaña activa (almacén / por llegar / por salir)
+  const [aeropuertoExpandido, setAeropuertoExpandido] = useState(null)
+  const [tabDetalle, setTabDetalle] = useState('almacen')
+  const tiempoAnimacion = useSimulacionStore((s) => s.tiempoAnimacion)
+
+  function toggleDetalle(codigo, e) {
+    e.stopPropagation()
+    setAeropuertoExpandido((prev) => (prev === codigo ? null : codigo))
+    setTabDetalle('almacen')
+  }
+
   const aeropuertosBase = useMemo(() => {
     if (aeropuertosWS.length > 0) {
       return aeropuertosWS.map((a) => ({
@@ -99,9 +120,10 @@ function ListaAeropuertosSidebar({
   }, [aeropuertosWS, getOcupacionPct])
 
   const aeropuertosFiltrados = useMemo(() => {
-    const q = busqueda.trim().toLowerCase()
+    const q = busqueda.trim()
     let lista = aeropuertosBase.filter((a) => {
-      if (q && !a.codigo.toLowerCase().includes(q) && !a.ciudad.toLowerCase().includes(q)) {
+      // Coincide contra código o ciudad; admite comodín * (p. ej. "SK*")
+      if (q && !matchPatronCampos(q, a.codigo, a.ciudad)) {
         return false
       }
       if (continente !== 'Todos' && a.continente !== continente) return false
@@ -226,29 +248,79 @@ function ListaAeropuertosSidebar({
             const proxSal = proximaSalidaAeropuerto(a.codigo, ref)
             const proxLleg = proximaLlegadaAeropuerto(a.codigo, ref)
 
+            const expandido = aeropuertoExpandido === a.codigo
             return (
               <li
                 key={a.codigo}
                 className={`${styles.item} ${selected ? styles.itemSeleccionado : ''}`}
                 onClick={() => setAeropuertoSeleccionado(selected ? null : a.codigo)}
               >
-                <div className={styles.info}>
-                  <span className={styles.codigo}>{a.codigo}</span>
-                  <span className={styles.nombre}>{a.ciudad}</span>
-                  <span className={styles.continente}>{a.continente}</span>
-                  {gmtMap && gmtMap[a.codigo] !== undefined && (
-                    <span className={styles.horaLocal}>
-                      🕐 {horaLocalActual(gmtMap[a.codigo])}
+                <div className={styles.filaPrincipal}>
+                  <div className={styles.info}>
+                    <span className={styles.codigo}>{a.codigo}</span>
+                    <span className={styles.nombre}>{a.ciudad}</span>
+                    <span className={styles.continente}>{a.continente}</span>
+                    {gmtMap && gmtMap[a.codigo] !== undefined && (
+                      <span className={styles.horaLocal}>
+                        🕐 {horaLocalActual(gmtMap[a.codigo])}
+                      </span>
+                    )}
+                    <span className={styles.proximas}>
+                      Sal: {formatearProxima(proxSal)} · Lleg: {formatearProxima(proxLleg)}
                     </span>
-                  )}
-                  <span className={styles.proximas}>
-                    Sal: {formatearProxima(proxSal)} · Lleg: {formatearProxima(proxLleg)}
-                  </span>
+                  </div>
+                  <div className={styles.accionesItem}>
+                    {!ocultarOcupacion && (
+                      <div className={styles.ocupacion}>
+                        <span style={{ color: hex }}>{pct.toFixed(1)}%</span>
+                        <Semaforo valor={pct} />
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      className={`${styles.btnEnvios} ${expandido ? styles.btnEnviosActivo : ''}`}
+                      onClick={(e) => toggleDetalle(a.codigo, e)}
+                      title="Ver envíos y planificados del almacén"
+                    >
+                      <Package size={12} />
+                    </button>
+                  </div>
                 </div>
-                {!ocultarOcupacion && (
-                  <div className={styles.ocupacion}>
-                    <span style={{ color: hex }}>{pct.toFixed(1)}%</span>
-                    <Semaforo valor={pct} />
+
+                {expandido && (
+                  <div className={styles.detalleAlmacen} onClick={(e) => e.stopPropagation()}>
+                    <div className={styles.tabsDetalle}>
+                      {TABS_DETALLE.map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          className={`${styles.tabDetalle} ${tabDetalle === t.id ? styles.tabDetalleActivo : ''}`}
+                          onClick={() => setTabDetalle(t.id)}
+                        >
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                    {tabDetalle === 'almacen' && (
+                      <DetalleMaletasAeropuerto
+                        codigo={a.codigo}
+                        tiempoMin={Math.floor(tiempoAnimacion)}
+                      />
+                    )}
+                    {tabDetalle === 'entrantes' && (
+                      <PlanificadosAeropuerto
+                        codigo={a.codigo}
+                        tiempoMin={Math.floor(tiempoAnimacion)}
+                        modo="entrantes"
+                      />
+                    )}
+                    {tabDetalle === 'salientes' && (
+                      <PlanificadosAeropuerto
+                        codigo={a.codigo}
+                        tiempoMin={Math.floor(tiempoAnimacion)}
+                        modo="salientes"
+                      />
+                    )}
                   </div>
                 )}
               </li>

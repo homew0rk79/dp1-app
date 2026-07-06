@@ -1,0 +1,73 @@
+.contenedor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.estado {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+  padding: 0.3rem 0;
+}
+
+.resumen {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.lista::-webkit-scrollbar       { width: 5px; }
+.lista::-webkit-scrollbar-thumb { background: #c0c4cc; border-radius: 999px; }
+
+.item {
+  background: rgba(0, 0, 0, 0.02);
+  border-left: 2px solid #2563eb;
+  border-radius: 3px;
+  padding: 0.25rem 0.4rem;
+}
+
+.fila,
+.filaSec {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.envioId {
+  font-family: ui-monospace, monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.cantidad {
+  font-size: 0.68rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.vuelo {
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+  font-family: ui-monospace, monospace;
+}
+
+.hora {
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
