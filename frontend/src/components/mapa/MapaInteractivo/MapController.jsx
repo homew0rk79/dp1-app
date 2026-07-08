@@ -4,7 +4,7 @@ import useSeleccionStore from '../../../store/seleccionStore'
 import CapaOverlayRuta from '../CapaOverlayRuta/CapaOverlayRuta'
 import { useOverlayRuta } from '../../../context/OverlayRutaContext'
 
-function MapController({ aeropuertos }) {
+function MapController({ aeropuertos, mostrarTramos = true }) {
   const map = useMap()
   const aeropuertoSeleccionado = useSeleccionStore((s) => s.aeropuertoSeleccionado)
   const vueloSeleccionado = useSeleccionStore((s) => s.vueloSeleccionado)
@@ -55,7 +55,7 @@ function MapController({ aeropuertos }) {
     }
   }, [vueloSeleccionado, aeropuertos, map])
 
-  if (!overlay?.escalas?.length) return null
+  if (!mostrarTramos || !overlay?.escalas?.length) return null
 
   return (
     <CapaOverlayRuta

@@ -10,4 +10,7 @@ public interface RutaRepository extends JpaRepository<Ruta, Long> {
     List<Ruta> findBySimulacionId(Long simulacionId);
     List<Ruta> findTop300BySimulacionIdOrderByCumplimientoDesc(Long simulacionId);
     Optional<Ruta> findBySimulacionIdAndEnvioId(Long simulacionId, String envioId);
+    List<Ruta> findByEnvioIdOrderByIdDesc(String envioId);
+    List<Ruta> findByIdEnvioOriginalOrderByIdDesc(String idEnvioOriginal);
+    List<Ruta> findTop20ByEnvioIsNotNullOrderByIdDesc();
 }

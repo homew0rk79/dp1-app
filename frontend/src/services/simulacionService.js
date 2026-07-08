@@ -30,4 +30,22 @@ export const simulacionService = {
   },
   limpiarEnvios: () => api.post('/planificacion/limpiar-envios'),
   registrarEnvio: (payload) => api.post('/planificacion/registrar-envio', payload),
+  listarAlmacenesMantenimiento: () => api.get('/mantenimiento-mapa/almacenes'),
+  crearAlmacenMantenimiento: (payload) => api.post('/mantenimiento-mapa/almacenes', payload),
+  actualizarAlmacenMantenimiento: (id, payload) => api.put(`/mantenimiento-mapa/almacenes/${id}`, payload),
+  listarUTMantenimiento: () => api.get('/mantenimiento-mapa/ut'),
+  crearUTMantenimiento: (payload) => api.post('/mantenimiento-mapa/ut', payload),
+  actualizarUTMantenimiento: (id, payload) => api.put(`/mantenimiento-mapa/ut/${id}`, payload),
+  actualizarCapacidadUTMantenimiento: (id, payload) => api.patch(`/mantenimiento-mapa/ut/${id}/capacidad`, payload),
+  listarTramosMantenimiento: () => api.get('/mantenimiento-mapa/tramos'),
+  crearTramoMantenimiento: (payload) => api.post('/mantenimiento-mapa/tramos', payload),
+  actualizarTramoMantenimiento: (id, payload) => api.put(`/mantenimiento-mapa/tramos/${id}`, payload),
+  actualizarHorariosTramoMantenimiento: (id, payload) => api.patch(`/mantenimiento-mapa/tramos/${id}/horarios`, payload),
+  obtenerConfiguracionMapa: () => api.get('/mantenimiento-mapa/configuracion'),
+  guardarConfiguracionMapa: (payload) => api.put('/mantenimiento-mapa/configuracion', payload),
+  obtenerRutaMaleta: (origen, idEnvio, numeroMaleta) =>
+    api.get(`/envios/${encodeURIComponent(origen)}/${encodeURIComponent(idEnvio)}/maletas/${encodeURIComponent(numeroMaleta)}/ruta`),
+  obtenerRutaEnvio: (origen, idEnvio) =>
+    api.get(`/envios/${encodeURIComponent(origen)}/${encodeURIComponent(idEnvio)}/ruta`),
+  obtenerIdsPruebaRutas: () => api.get('/rutas-busqueda/ids-prueba'),
 }

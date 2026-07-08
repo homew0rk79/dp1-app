@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import { CircleMarker, MapContainer, TileLayer, Marker, Popup, Polyline, Tooltip, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 
 import LeyendaMapa from '../LeyendaMapa/LeyendaMapa'
@@ -8,16 +8,19 @@ import CanvasVuelos from '../CanvasVuelos/CanvasVuelos'
 import DetalleMaletasAeropuerto from '../DetalleMaletasAeropuerto/DetalleMaletasAeropuerto'
 import PanelDetalleAeropuerto from '../PanelDetalleAeropuerto/PanelDetalleAeropuerto'
 import MapController from './MapController'
+import PanelConfiguracionMapa from './PanelConfiguracionMapa'
+import PanelBusquedaRuta from './PanelBusquedaRuta'
 import SimulacionControles from '../../SimulacionControles/SimulacionControles'
 import { getColorSemaforo, COLORES_SEMAFORO } from '../../../utils/semaforo'
 import { formatearCapacidad } from '../../../utils/formatters'
-import { formatearDuracion, formatearFechaHora, sumarMinutos } from '../../../utils/tiempos'
+import { formatearFechaHora, sumarMinutos } from '../../../utils/tiempos'
 import useConfiguracionStore from '../../../store/configuracionStore'
 import usePlanificadorStore from '../../../store/planificadorStore'
 import useSimulacionStore from '../../../store/simulacionStore'
 import useSeleccionStore from '../../../store/seleccionStore'
 import useAnimacionTimeline from '../../../hooks/useAnimacionTimeline'
 import { simulacionService } from '../../../services/simulacionService'
+import { AEROPUERTOS_POR_CODIGO } from '../../../mocks/aeropuertos'
 import {
   FECHA_INICIO_SIMULACION_ALGORITMO,
   TA_EJECUCION_ALGORITMO_MIN,
@@ -25,11 +28,208 @@ import {
 } from '../../../constants/restricciones'
 import styles from './MapaInteractivo.module.css'
 
+const AEROPUERTOS_EXTRA_POR_CODIGO = {
+  OPKC: {
+    codigo: 'OPKC',
+    nombre: 'Karachi',
+    ciudad: 'Karachi',
+    pais: 'Pakistan',
+    continente: 'Asia',
+    lat: 24.9,
+    lng: 67.15,
+    capacidadMax: 410,
+  },
+  UBBB: {
+    codigo: 'UBBB',
+    nombre: 'Baku',
+    ciudad: 'Baku',
+    pais: 'Azerbaiyan',
+    continente: 'Asia',
+    lat: 40.4672,
+    lng: 50.0467,
+    capacidadMax: 400,
+  },
+}
+
+const STORAGE_CONFIG_MAPA = 'tasf.configuracionMapa'
+const STORAGE_ALMACENES = 'tasf.almacenesMapa'
+const STORAGE_UT = 'tasf.unidadesTransporteMapa'
+const STORAGE_TRAMOS = 'tasf.tramosMapa'
+
+const CONFIG_MAPA_DEFAULT = {
+  mostrarAlmacenes: true,
+  mostrarUT: true,
+  mostrarTramos: true,
+  zoomInicial: 2,
+  centroLat: 20,
+  centroLng: 15,
+  colorTramos: '#2563eb',
+  colorAlmacenes: '#22c55e',
+}
+
+function colorValido(valor, fallback) {
+  return /^#[0-9a-fA-F]{6}$/.test(String(valor || '')) ? valor : fallback
+}
+
+function normalizarConfigMapa(config = {}) {
+  return {
+    ...CONFIG_MAPA_DEFAULT,
+    ...config,
+    zoomInicial: Number.isFinite(Number(config.zoomInicial)) ? Number(config.zoomInicial) : CONFIG_MAPA_DEFAULT.zoomInicial,
+    centroLat: Number.isFinite(Number(config.centroLat)) ? Number(config.centroLat) : CONFIG_MAPA_DEFAULT.centroLat,
+    centroLng: Number.isFinite(Number(config.centroLng)) ? Number(config.centroLng) : CONFIG_MAPA_DEFAULT.centroLng,
+    colorTramos: colorValido(config.colorTramos, CONFIG_MAPA_DEFAULT.colorTramos),
+    colorAlmacenes: colorValido(config.colorAlmacenes, CONFIG_MAPA_DEFAULT.colorAlmacenes),
+  }
+}
+
+function normalizarCodigo(valor) {
+  return String(valor || '').trim().toUpperCase()
+}
+
+function leerStorage(clave, fallback) {
+  try {
+    const raw = window.localStorage.getItem(clave)
+    return raw ? JSON.parse(raw) : fallback
+  } catch {
+    return fallback
+  }
+}
+
+function guardarStorage(clave, valor) {
+  try {
+    window.localStorage.setItem(clave, JSON.stringify(valor))
+  } catch {
+    // El mantenimiento continua en memoria si localStorage no esta disponible.
+  }
+}
+
+function ConfiguracionVistaMapa({ config }) {
+  const map = useMap()
+
+  useEffect(() => {
+    const lat = Number(config.centroLat)
+    const lng = Number(config.centroLng)
+    const zoom = Number(config.zoomInicial)
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(zoom)) return
+    map.setView([lat, lng], zoom)
+  }, [config.centroLat, config.centroLng, config.zoomInicial, map])
+
+  return null
+}
+
+function coordsTramo(tramo) {
+  const origen = tramo?.aeropuertoOrigen
+  const destino = tramo?.aeropuertoDestino
+  if (!origen || !destino) return null
+  const latOrigen = Number(origen.lat)
+  const lngOrigen = Number(origen.lng)
+  const latDestino = Number(destino.lat)
+  const lngDestino = Number(destino.lng)
+  if (![latOrigen, lngOrigen, latDestino, lngDestino].every(Number.isFinite)) return null
+  return [[latOrigen, lngOrigen], [latDestino, lngDestino]]
+}
+
+function coordsRuta(ruta) {
+  return (ruta?.tramos || [])
+    .map(coordsTramo)
+    .filter(Boolean)
+}
+
+function RutaBuscadaVistaMapa({ busqueda }) {
+  const map = useMap()
+
+  useEffect(() => {
+    if (!busqueda) return
+    const coords = [
+      ...coordsRuta(busqueda.rutaActual).flat(),
+      ...coordsRuta(busqueda.rutaAnterior).flat(),
+    ]
+    if (coords.length < 2) return
+    map.fitBounds(coords, { padding: [64, 64], maxZoom: 6 })
+  }, [map, busqueda])
+
+  if (!busqueda) return null
+
+  const capas = [
+    {
+      clave: 'actual',
+      ruta: busqueda.rutaActual,
+      etiqueta: 'Ruta actual',
+      color: '#f97316',
+      dashArray: null,
+      weight: 5,
+      opacity: 0.96,
+    },
+    {
+      clave: 'anterior',
+      ruta: busqueda.rutaAnterior,
+      etiqueta: 'Ruta anterior',
+      color: '#7c3aed',
+      dashArray: '9 7',
+      weight: 4,
+      opacity: 0.78,
+    },
+  ]
+
+  return (
+    <>
+      {capas.flatMap((capa) => (
+        coordsRuta(capa.ruta).map((coords, index) => (
+          <Polyline
+            key={`ruta-buscada-${capa.clave}-${capa.ruta?.idRuta}-${index}`}
+            positions={coords}
+            pathOptions={{
+              color: capa.color,
+              weight: capa.weight,
+              opacity: capa.opacity,
+              dashArray: capa.dashArray,
+              lineCap: 'round',
+              lineJoin: 'round',
+            }}
+          >
+            <Popup>
+              <strong>{capa.etiqueta}</strong><br />
+              {capa.ruta?.tramos?.[index]?.origen} - {capa.ruta?.tramos?.[index]?.destino}<br />
+              {capa.ruta?.tramos?.[index]?.salida} - {capa.ruta?.tramos?.[index]?.llegada}
+            </Popup>
+          </Polyline>
+        ))
+      ))}
+
+      {(busqueda.rutaActual?.aeropuertos || []).map((aero) => {
+        const lat = Number(aero.lat)
+        const lng = Number(aero.lng)
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+        return (
+          <CircleMarker
+            key={`ruta-buscada-aero-${aero.codigo}`}
+            center={[lat, lng]}
+            radius={7}
+            pathOptions={{
+              color: '#ffffff',
+              weight: 2,
+              fillColor: '#f97316',
+              fillOpacity: 0.95,
+            }}
+          >
+            <Tooltip direction="top" offset={[0, -6]} opacity={0.95}>
+              <strong>{aero.codigo}</strong> - {aero.ciudad || aero.nombre}
+            </Tooltip>
+          </CircleMarker>
+        )
+      })}
+    </>
+  )
+}
+
+function endpointMantenimientoNoDisponible(err) {
+  return err?.response?.status === 404 || err?.response?.status === 405
+}
+
 function MapaInteractivo() {
   const rangosSemaforo = useConfiguracionStore((s) => s.rangosSemaforo)
   const fechaInicio = useSimulacionStore((s) => s.parametros.fechaInicio)
-  const tiempoSegundos = useSimulacionStore((s) => s.tiempoSegundos)
-  const inicioEjecucionReal = useSimulacionStore((s) => s.inicioEjecucionReal)
   const wsVersion = useSimulacionStore((s) => s.wsVersion)
   const escenarioActivo = useSimulacionStore((s) => s.escenarioActivo)
   const estadoEjecucion = useSimulacionStore((s) => s.estadoEjecucion)
@@ -39,8 +239,15 @@ function MapaInteractivo() {
   const filtrosMapa = useSeleccionStore((s) => s.filtrosMapa)
 
   const [aeropuertos, setAeropuertos] = useState([])
-  const [ahoraReal, setAhoraReal] = useState(() => new Date())
-  const [consumoBloques, setConsumoBloques] = useState([])
+  const [panelConfigAbierto, setPanelConfigAbierto] = useState(false)
+  const [panelRutaAbierto, setPanelRutaAbierto] = useState(false)
+  const [rutaBuscada, setRutaBuscada] = useState(null)
+  const [rutaBuscadaError, setRutaBuscadaError] = useState('')
+  const [rutaBuscadaCargando, setRutaBuscadaCargando] = useState(false)
+  const [idsPruebaRutas, setIdsPruebaRutas] = useState({ origenes: [], ejemplos: [], idsEnvio: [], idsMaleta: [], mensaje: '' })
+  const [configMapa, setConfigMapa] = useState(() => normalizarConfigMapa(leerStorage(STORAGE_CONFIG_MAPA, CONFIG_MAPA_DEFAULT)))
+  const [unidadesTransporte, setUnidadesTransporte] = useState(() => leerStorage(STORAGE_UT, []))
+  const [tramosMantenimiento, setTramosMantenimiento] = useState(() => leerStorage(STORAGE_TRAMOS, []))
   // Ocupación durante el algoritmo (snapshot WS), usada antes de tener manifest
   const [ocupacionWS, setOcupacionWS] = useState({})
   // Ocupación real al minuto exacto de la animación (actualizada c/hora simulada)
@@ -118,36 +325,53 @@ function MapaInteractivo() {
   }
 
   const hayDatosSimulacion = Boolean(manifest || snapshot || completado)
-  const fechaSimulada = manifest?.fechaInicioMinutos > 0
-    ? sumarMinutos(FECHA_INICIO_SIMULACION_ALGORITMO, manifest.fechaInicioMinutos + tiempoDisplay)
-    : sumarMinutos(fechaInicio, tiempoDisplay)
-  const segundosReales = inicioEjecucionReal
-    ? Math.max(0, Math.floor((ahoraReal.getTime() - inicioEjecucionReal) / 1000))
-    : tiempoSegundos
-
-  // Cargar aeropuertos base al montar
+  // Cargar datos de mantenimiento al montar. Backend es la fuente principal;
+  // localStorage queda como respaldo si el backend no esta disponible.
   useEffect(() => {
-    simulacionService.obtenerAeropuertos()
-      .then(res => setAeropuertos(res.data))
+    simulacionService.obtenerConfiguracionMapa()
+      .then(res => setConfigMapa(normalizarConfigMapa(res.data ?? {})))
+      .catch(() => setConfigMapa(normalizarConfigMapa(leerStorage(STORAGE_CONFIG_MAPA, CONFIG_MAPA_DEFAULT))))
+
+    simulacionService.listarAlmacenesMantenimiento()
+      .then(res => {
+        setAeropuertos(res.data ?? [])
+      })
       .catch((err) => {
         console.error('No se pudieron cargar aeropuertos:', err)
+        setAeropuertos(leerStorage(STORAGE_ALMACENES, []))
+      })
+
+    simulacionService.listarUTMantenimiento()
+      .then(res => setUnidadesTransporte(res.data ?? []))
+      .catch(() => setUnidadesTransporte(leerStorage(STORAGE_UT, [])))
+
+    simulacionService.listarTramosMantenimiento()
+      .then(res => setTramosMantenimiento(res.data ?? []))
+      .catch(() => setTramosMantenimiento(leerStorage(STORAGE_TRAMOS, [])))
+
+    simulacionService.obtenerIdsPruebaRutas()
+      .then(res => setIdsPruebaRutas(res.data ?? { origenes: [], ejemplos: [], idsEnvio: [], idsMaleta: [], mensaje: '' }))
+      .catch((err) => {
+        console.warn('[rutas-id] No se pudieron cargar IDs reales de prueba:', err)
+        setIdsPruebaRutas({ origenes: [], ejemplos: [], idsEnvio: [], idsMaleta: [], mensaje: 'No se pudieron cargar IDs reales de prueba.' })
       })
   }, [])
 
   useEffect(() => {
-    const id = setInterval(() => setAhoraReal(new Date()), 1000)
-    return () => clearInterval(id)
-  }, [])
+    guardarStorage(STORAGE_CONFIG_MAPA, configMapa)
+  }, [configMapa])
 
   useEffect(() => {
-    if (!manifest && !completado) {
-      setConsumoBloques([])
-      return
-    }
-    simulacionService.obtenerConsumoBloques()
-      .then(res => setConsumoBloques(res.data ?? []))
-      .catch(() => setConsumoBloques([]))
-  }, [manifest, completado])
+    if (aeropuertos.length > 0) guardarStorage(STORAGE_ALMACENES, aeropuertos)
+  }, [aeropuertos])
+
+  useEffect(() => {
+    guardarStorage(STORAGE_UT, unidadesTransporte)
+  }, [unidadesTransporte])
+
+  useEffect(() => {
+    guardarStorage(STORAGE_TRAMOS, tramosMantenimiento)
+  }, [tramosMantenimiento])
 
   // Ocupación en tiempo real durante la ejecución del algoritmo
   useEffect(() => {
@@ -252,16 +476,152 @@ function MapaInteractivo() {
     return !q || aeropuerto.codigo.toLowerCase().includes(q) || aeropuerto.ciudad.toLowerCase().includes(q)
   }
 
-  const maxConsumo = consumoBloques.reduce((max, item) => Math.max(max, item.maletas || 0), 0)
-  const bloquesVisibles = consumoBloques.slice(0, 24)
-  const scConsumoReal = bloquesVisibles[0]?.saltoMin ?? null
+  const aeropuertosPorCodigo = {
+    ...AEROPUERTOS_POR_CODIGO,
+    ...AEROPUERTOS_EXTRA_POR_CODIGO,
+    ...Object.fromEntries(
+      aeropuertos
+        .filter((a) => a?.codigo && Number.isFinite(Number(a.lat)) && Number.isFinite(Number(a.lng)))
+        .map((a) => [normalizarCodigo(a.codigo), { ...a, lat: Number(a.lat), lng: Number(a.lng) }]),
+    ),
+  }
+  const tramosRenderizados = tramosMantenimiento.map((tramo, index) => {
+    const origen = normalizarCodigo(tramo.origen)
+    const destino = normalizarCodigo(tramo.destino)
+    const origenAero = aeropuertosPorCodigo[origen]
+    const destinoAero = aeropuertosPorCodigo[destino]
+    const coordsOrigen = origenAero ? [origenAero.lat, origenAero.lng] : null
+    const coordsDestino = destinoAero ? [destinoAero.lat, destinoAero.lng] : null
+
+    console.log('Renderizando tramo:')
+    console.log(`ID: ${tramo.id ?? tramo.utAsignada ?? index}`)
+    console.log(`${origen} -> ${destino}`)
+    if (coordsOrigen) console.log(`Origen: [${coordsOrigen[0]}, ${coordsOrigen[1]}]`)
+    else console.warn(`No se encontró aeropuerto ${origen}`)
+    if (coordsDestino) console.log(`Destino: [${coordsDestino[0]}, ${coordsDestino[1]}]`)
+    else console.warn(`No se encontró aeropuerto ${destino}`)
+
+    return {
+      ...tramo,
+      renderKey: tramo.id ?? `${origen}-${destino}-${index}`,
+      origen,
+      destino,
+      origenAero,
+      destinoAero,
+      coordsOrigen,
+      coordsDestino,
+      dibujable: Boolean(coordsOrigen && coordsDestino),
+    }
+  })
+  const tramosVisibles = tramosRenderizados.filter((tramo) => tramo.dibujable)
+
+  console.log('Cantidad de tramos en la lista:', tramosMantenimiento.length)
+  console.log('Cantidad de líneas dibujadas:', configMapa.mostrarTramos ? tramosVisibles.length : 0)
+
+  async function guardarConfigMapa(siguiente) {
+    try {
+      const res = await simulacionService.guardarConfiguracionMapa(siguiente)
+      setConfigMapa(normalizarConfigMapa(res.data ?? siguiente))
+    } catch (err) {
+      console.error('No se pudo guardar configuracion del mapa:', err)
+      guardarStorage(STORAGE_CONFIG_MAPA, siguiente)
+    }
+  }
+
+  async function guardarAlmacen(almacen) {
+    if (!almacen.id) throw new Error('Solo se permite editar almacenes existentes.')
+    const res = await simulacionService.actualizarAlmacenMantenimiento(almacen.id, almacen)
+    const guardado = res.data
+    setAeropuertos((actuales) => {
+      return actuales.map((a) => a.id === guardado.id ? guardado : a)
+    })
+  }
+
+  async function guardarUnidad(unidad) {
+    if (!unidad.id) throw new Error('Solo se permite editar UT existentes.')
+    let res
+    try {
+      res = await simulacionService.actualizarCapacidadUTMantenimiento(unidad.id, {
+        capacidadMax: unidad.capacidadMax,
+      })
+    } catch (err) {
+      if (!endpointMantenimientoNoDisponible(err)) throw err
+      res = await simulacionService.actualizarUTMantenimiento(unidad.id, unidad)
+    }
+    const guardado = res.data
+    setUnidadesTransporte((actuales) => {
+      return actuales.map((ut) => ut.id === guardado.id ? guardado : ut)
+    })
+  }
+
+  async function guardarTramo(tramo) {
+    if (!tramo.id) throw new Error('Solo se permite editar tramos existentes.')
+    const res = await simulacionService.actualizarHorariosTramoMantenimiento(tramo.id, {
+      horaSalida: tramo.horaSalida,
+      horaLlegada: tramo.horaLlegada,
+    })
+    const guardado = res.data
+    setTramosMantenimiento((actuales) => {
+      return actuales.map((t) => t.id === guardado.id ? guardado : t)
+    })
+  }
+
+  function mensajeBusquedaRuta(err, fallback) {
+    const data = err?.response?.data
+    if (typeof data === 'string' && data.trim()) return data
+    if (data?.error) return data.error
+    return fallback
+  }
+
+  async function buscarRutaMaleta({ origen, idEnvio, numeroMaleta }) {
+    setRutaBuscadaCargando(true)
+    setRutaBuscadaError('')
+    const endpoint = `/api/envios/${encodeURIComponent(origen)}/${encodeURIComponent(idEnvio)}/maletas/${encodeURIComponent(numeroMaleta)}/ruta`
+    console.log('[rutas-id] ID ingresado:', { origen, idEnvio, numeroMaleta })
+    console.log('[rutas-id] endpoint llamado:', endpoint)
+    try {
+      const res = await simulacionService.obtenerRutaMaleta(origen, idEnvio, numeroMaleta)
+      console.log('[rutas-id] respuesta backend:', res.data)
+      setRutaBuscada(res.data)
+    } catch (err) {
+      console.log('[rutas-id] respuesta backend:', err?.response?.data ?? err)
+      setRutaBuscada(null)
+      setRutaBuscadaError(mensajeBusquedaRuta(err, 'No se encontró una maleta con ese ID.'))
+    } finally {
+      setRutaBuscadaCargando(false)
+    }
+  }
+
+  async function buscarRutaEnvio({ origen, idEnvio }) {
+    setRutaBuscadaCargando(true)
+    setRutaBuscadaError('')
+    const endpoint = `/api/envios/${encodeURIComponent(origen)}/${encodeURIComponent(idEnvio)}/ruta`
+    console.log('[rutas-id] ID ingresado:', { origen, idEnvio })
+    console.log('[rutas-id] endpoint llamado:', endpoint)
+    try {
+      const res = await simulacionService.obtenerRutaEnvio(origen, idEnvio)
+      console.log('[rutas-id] respuesta backend:', res.data)
+      setRutaBuscada(res.data)
+    } catch (err) {
+      console.log('[rutas-id] respuesta backend:', err?.response?.data ?? err)
+      setRutaBuscada(null)
+      setRutaBuscadaError(mensajeBusquedaRuta(err, 'No se encontró un envío con ese ID.'))
+    } finally {
+      setRutaBuscadaCargando(false)
+    }
+  }
+
+  function limpiarRutaBuscada() {
+    setRutaBuscada(null)
+    setRutaBuscadaError('')
+  }
 
   return (
     <div className={styles.contenedor}>
       <MapContainer
-        center={[20, 15]}
-        zoom={2}
-        minZoom={2}
+        center={[configMapa.centroLat, configMapa.centroLng]}
+        zoom={configMapa.zoomInicial}
+        minZoom={0}
         className={styles.mapa}
         zoomControl
       >
@@ -271,10 +631,36 @@ function MapaInteractivo() {
         />
 
         {/* Controlador de mapa: reacciona a selección externa (flyTo) */}
-        <MapController aeropuertos={aeropuertos} />
+        <MapController aeropuertos={aeropuertos} mostrarTramos={configMapa.mostrarTramos} />
+        <ConfiguracionVistaMapa config={configMapa} />
+        <RutaBuscadaVistaMapa busqueda={rutaBuscada} />
+
+        {configMapa.mostrarTramos && tramosVisibles.map((tramo) => (
+          <Polyline
+            key={tramo.renderKey}
+            positions={[
+              tramo.coordsOrigen,
+              tramo.coordsDestino,
+            ]}
+            pathOptions={{
+              color: configMapa.colorTramos,
+              weight: 3.5,
+              opacity: 0.95,
+              dashArray: '8 7',
+              lineCap: 'round',
+              lineJoin: 'round',
+            }}
+          >
+            <Popup>
+              <strong>{tramo.utAsignada}</strong><br />
+              {tramo.origen} - {tramo.destino}<br />
+              {tramo.estado}
+            </Popup>
+          </Polyline>
+        ))}
 
         {/* Animación canvas — solo activo cuando hay manifest */}
-        {manifest && (
+        {manifest && configMapa.mostrarUT && (
           <CanvasVuelos
             manifest={manifest}
             tiempoRef={tiempoRef}
@@ -288,14 +674,14 @@ function MapaInteractivo() {
         )}
 
         {/* Aeropuertos: se muestran cuando existe ejecucion, snapshot o manifest */}
-        {hayDatosSimulacion && aeropuertos.map((aeropuerto) => {
+        {configMapa.mostrarAlmacenes && aeropuertos.map((aeropuerto) => {
           const estado    = getOcupacion(aeropuerto.codigo)
           const pctOcup   = estado?.ocupacion ?? 0
           const color     = getColorSemaforo(pctOcup, rangosSemaforo)
-          const colorHex  = (estadoEjecucion === 'PLANIFICANDO' && escenarioActivo !== 'DIA_A_DIA') ? '#94a3b8' : COLORES_SEMAFORO[color]
+          const colorHex  = (estadoEjecucion === 'PLANIFICANDO' && escenarioActivo !== 'DIA_A_DIA') ? '#94a3b8' : (configMapa.colorAlmacenes || COLORES_SEMAFORO[color])
           const seleccionado = aeropuertoSeleccionado === aeropuerto.codigo
           const visiblePorFiltro = aeropuertoPasaFiltros(aeropuerto, pctOcup)
-          if (!visiblePorFiltro && !seleccionado) return null
+          if (hayDatosSimulacion && !visiblePorFiltro && !seleccionado) return null
 
           const icon = L.divIcon({
             className: styles.aeropuertoMarker,
@@ -385,47 +771,53 @@ function MapaInteractivo() {
         )}
       </MapContainer>
 
+      <button
+        type="button"
+        className={styles.btnConfiguracion}
+        onClick={() => setPanelConfigAbierto(true)}
+      >
+        Configuración
+      </button>
+
+      <button
+        type="button"
+        className={styles.btnBuscarRuta}
+        onClick={() => setPanelRutaAbierto(true)}
+      >
+        Rutas por ID
+      </button>
+
+      <PanelConfiguracionMapa
+        abierto={panelConfigAbierto}
+        onCerrar={() => setPanelConfigAbierto(false)}
+        configMapa={configMapa}
+        onConfigMapaChange={setConfigMapa}
+        onGuardarConfigMapa={guardarConfigMapa}
+        almacenes={aeropuertos}
+        onGuardarAlmacen={guardarAlmacen}
+        unidades={unidadesTransporte}
+        onGuardarUnidad={guardarUnidad}
+        tramos={tramosMantenimiento}
+        onGuardarTramo={guardarTramo}
+        velocidad={velocidad}
+        onVelocidad={setVelocidad}
+        styles={styles}
+      />
+
+      <PanelBusquedaRuta
+        abierto={panelRutaAbierto}
+        onCerrar={() => setPanelRutaAbierto(false)}
+        onBuscarMaleta={buscarRutaMaleta}
+        onBuscarEnvio={buscarRutaEnvio}
+        onLimpiar={limpiarRutaBuscada}
+        resultado={rutaBuscada}
+        cargando={rutaBuscadaCargando}
+        error={rutaBuscadaError}
+        idsPrueba={idsPruebaRutas}
+        styles={styles}
+      />
+
       {hayDatosSimulacion && <LeyendaMapa />}
-
-      {hayDatosSimulacion && (
-        <div className={styles.panelTiempos}>
-          <div>
-            <span>Fecha-hora simulada</span>
-            <strong>{formatearFechaHora(fechaSimulada)}</strong>
-          </div>
-          <div>
-            <span>Fecha-hora real</span>
-            <strong>{formatearFechaHora(ahoraReal)}</strong>
-          </div>
-          <div>
-            <span>Transcurrido simulado</span>
-            <strong>{formatearDuracion(tiempoDisplay * 60)}</strong>
-          </div>
-          <div>
-            <span>Transcurrido real</span>
-            <strong>{formatearDuracion(segundosReales)}</strong>
-          </div>
-        </div>
-      )}
-
-      {(manifest || completado) && bloquesVisibles.length > 0 && (
-        <div className={styles.panelConsumo}>
-          <div className={styles.consumoHeader}>
-            <span>Consumo por bloques</span>
-            <strong>{scConsumoReal ? `Sc=${scConsumoReal} min` : 'Sc --'}</strong>
-          </div>
-          <div className={styles.consumoBarras}>
-            {bloquesVisibles.map((item) => (
-              <span
-                key={item.bloque}
-                className={styles.consumoBarra}
-                title={`Bloque ${item.bloque}: ${item.maletas} maletas`}
-                style={{ height: `${Math.max(8, ((item.maletas || 0) / (maxConsumo || 1)) * 52)}px` }}
-              />
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Botón ir al colapso */}
       {colapso && manifest && colapso.minutosColapso > 0 && (
