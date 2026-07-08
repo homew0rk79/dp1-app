@@ -15,6 +15,7 @@ public class Aeropuerto {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id; 
     private String codigo;      // Código ICAO: "SKBO", "EHAM", etc.
+    private String nombre;
     private String ciudad;
     private String pais;
     private String continente;  // "AMERICA", "EUROPA", "ASIA"
@@ -29,6 +30,7 @@ public class Aeropuerto {
     public Aeropuerto(String codigo, String ciudad, String pais, int gmt, int capacidadMax,
                       String continente, double lat, double lng) {
         this.codigo = codigo;
+        this.nombre = ciudad;
         this.ciudad = ciudad;
         this.pais = pais;
         this.gmt = gmt;
@@ -55,6 +57,8 @@ public class Aeropuerto {
     }
 
     public String getCodigo()       { return codigo; }
+    public String getNombre()       { return nombre != null && !nombre.isBlank() ? nombre : ciudad; }
+    public void setNombre(String v) { this.nombre = v; }
     public String getCiudad()       { return ciudad; }
     public String getPais()         { return pais; }
     public String getContinente()   { return continente; }

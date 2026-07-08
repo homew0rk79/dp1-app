@@ -10,7 +10,6 @@ import {
   RotateCcw,
   ChevronLeft,
   ChevronRight,
-  Gauge,
 } from 'lucide-react'
 
 import PanelMetrica from '../../common/PanelMetrica/PanelMetrica'
@@ -29,7 +28,6 @@ import {
   FECHA_INICIO_DATOS,
   FECHA_FIN_DATOS,
   FECHA_INICIO_SIMULACION_ALGORITMO,
-  TA_EJECUCION_ALGORITMO_MIN,
   SA_SALTO_ALGORITMO_MIN,
 } from '../../../constants/restricciones'
 import { formatearDuracion } from '../../../utils/tiempos'
@@ -45,7 +43,6 @@ function Sidebar() {
   const ultimaHoraRef  = useRef(-1)
   const rangosSemaforo = useConfiguracionStore((s) => s.rangosSemaforo)
   const [ocupacionRealtime, setOcupacionRealtime] = useState({})
-  const [scConsumoReal, setScConsumoReal] = useState(null)
   const [uploadCargando, setUploadCargando] = useState(false)
   const [uploadFeedback, setUploadFeedback] = useState(null)
   const uploadInputRef = useRef(null)
@@ -127,16 +124,6 @@ function Sidebar() {
       .then(res => setOcupacionRealtime(res.data ?? {}))
       .catch(() => {})
   }, [tiempoAnimacion, manifest, offsetMinutos])
-
-  useEffect(() => {
-    if (!manifest && !completado) {
-      setScConsumoReal(null)
-      return
-    }
-    simulacionService.obtenerConsumoBloques()
-      .then(res => setScConsumoReal(res.data?.[0]?.saltoMin ?? null))
-      .catch(() => setScConsumoReal(null))
-  }, [manifest, completado])
 
   // Aeropuertos en tiempo real (desde snapshot WS) o lista vacía
   const aeropuertosWS = snapshot?.aeropuertos ?? []
@@ -702,18 +689,6 @@ function Sidebar() {
                     <RotateCcw size={13} /> Nueva simulación
                   </button>
                 )}
-              </div>
-
-              <div className={styles.parametrosAlgoritmo}>
-                <div className={styles.paramHeader}>
-                  <Gauge size={13} />
-                  <span>Tiempos del algoritmo</span>
-                </div>
-                <div className={styles.paramGrid}>
-                  <span>Ta: avance por tick</span><strong>{TA_EJECUCION_ALGORITMO_MIN} min</strong>
-                  <span>Sa: salto algoritmo</span><strong>{SA_SALTO_ALGORITMO_MIN} min</strong>
-                  <span>Sc: bloque consumo</span><strong>{scConsumoReal ? `${scConsumoReal} min` : '--'}</strong>
-                </div>
               </div>
 
               {simulacionEnCurso && (
