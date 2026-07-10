@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowUp, ArrowDown, Search, ChevronRight, ChevronDown } from 'lucide-react'
 import Semaforo from '../../../common/Semaforo/Semaforo'
 import { getColorSemaforo, COLORES_SEMAFORO } from '../../../../utils/semaforo'
@@ -117,6 +117,15 @@ function PanelUnidadesTransporte({ ocurrencias, tiempoAnimacion }) {
   const [utExpandida, setUtExpandida] = useState(null)
   const [enviosPorUt, setEnviosPorUt] = useState({})
 
+  // Vinculación mapa→panel: al seleccionar una UT (p. ej. click en el avión
+  // del canvas) desplazar la tabla hasta su fila.
+  const tablaRef = useRef(null)
+  useEffect(() => {
+    if (!vueloSeleccionado || !tablaRef.current) return
+    const fila = tablaRef.current.querySelector(`[data-key="${vueloSeleccionado}"]`)
+    if (fila) fila.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [vueloSeleccionado])
+
   async function toggleEnvios(ut, e) {
     e.stopPropagation()
     if (utExpandida === ut.key) {
@@ -154,8 +163,12 @@ function PanelUnidadesTransporte({ ocurrencias, tiempoAnimacion }) {
         matchPatronCampos(q, ut.codigo, `${ut.origen}-${ut.destino}`, ut.origen, ut.destino),
       )
     }
-    if (filtroSemaforo !== 'todos') {
-      lista = lista.filter((ut) => getColorSemaforo(ut.ocupacion, rangosSemaforo) === filtroSemaforo)
+    // Semáforo con categoría "vacío" (0 maletas): los colores excluyen los vacíos
+    if (filtroSemaforo === 'vacio') {
+      lista = lista.filter((ut) => ut.maletas === 0)
+    } else if (filtroSemaforo !== 'todos') {
+      lista = lista.filter((ut) =>
+        ut.maletas > 0 && getColorSemaforo(ut.ocupacion, rangosSemaforo) === filtroSemaforo)
     }
     return [...lista].sort((a, b) =>
       compararFilas(a, b, sortConfig.key, sortConfig.direction),
@@ -204,9 +217,10 @@ function PanelUnidadesTransporte({ ocurrencias, tiempoAnimacion }) {
         <option value="verde">Verde</option>
         <option value="ambar">Ambar</option>
         <option value="rojo">Rojo</option>
+        <option value="vacio">Vacío (0 maletas)</option>
       </select>
 
-      <div className={styles.tablaWrap}>
+      <div className={styles.tablaWrap} ref={tablaRef}>
         <table className={styles.tabla}>
           <thead>
             <tr>
@@ -238,6 +252,7 @@ function PanelUnidadesTransporte({ ocurrencias, tiempoAnimacion }) {
                 return (
                   <Fragment key={ut.key}>
                     <tr
+                      data-key={ut.key}
                       className={seleccionado ? styles.filaSeleccionada : ''}
                       onClick={() => setVueloSeleccionado(seleccionado ? null : ut.key)}
                     >
