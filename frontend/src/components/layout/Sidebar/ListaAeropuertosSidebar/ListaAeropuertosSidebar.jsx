@@ -96,6 +96,15 @@ function ListaAeropuertosSidebar({
   const [tabDetalle, setTabDetalle] = useState('almacen')
   const tiempoAnimacion = useSimulacionStore((s) => s.tiempoAnimacion)
 
+  // Vinculación mapa→panel: al seleccionar un aeropuerto (p. ej. click en el
+  // marker del mapa) desplazar la lista hasta su item.
+  const listaRef = useRef(null)
+  useEffect(() => {
+    if (!aeropuertoSeleccionado || !listaRef.current) return
+    const item = listaRef.current.querySelector(`[data-codigo="${aeropuertoSeleccionado}"]`)
+    if (item) item.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [aeropuertoSeleccionado])
+
   function toggleDetalle(codigo, e) {
     e.stopPropagation()
     setAeropuertoExpandido((prev) => (prev === codigo ? null : codigo))
@@ -127,7 +136,13 @@ function ListaAeropuertosSidebar({
         return false
       }
       if (continente !== 'Todos' && a.continente !== continente) return false
-      if (semaforo !== 'todos' && getColorSemaforo(a.porcentajeOcupacion, rangosSemaforo) !== semaforo) return false
+      // Semáforo con categoría "vacío" (0%): los colores excluyen los vacíos
+      if (semaforo === 'vacio') {
+        if (a.porcentajeOcupacion > 0) return false
+      } else if (semaforo !== 'todos') {
+        if (a.porcentajeOcupacion === 0) return false
+        if (getColorSemaforo(a.porcentajeOcupacion, rangosSemaforo) !== semaforo) return false
+      }
       return true
     })
 
@@ -205,6 +220,7 @@ function ListaAeropuertosSidebar({
           <option value="verde">Verde</option>
           <option value="ambar">Ambar</option>
           <option value="rojo">Rojo</option>
+          <option value="vacio">Vacío (0%)</option>
         </select>
       </div>
 
@@ -239,7 +255,7 @@ function ListaAeropuertosSidebar({
       {aeropuertosFiltrados.length === 0 ? (
         <p className={styles.vacio}>Sin aeropuertos que coincidan</p>
       ) : (
-        <ul className={styles.lista}>
+        <ul className={styles.lista} ref={listaRef}>
           {aeropuertosFiltrados.map((a) => {
             const pct = a.porcentajeOcupacion
             const color = getColorSemaforo(pct, rangosSemaforo)
@@ -252,6 +268,7 @@ function ListaAeropuertosSidebar({
             return (
               <li
                 key={a.codigo}
+                data-codigo={a.codigo}
                 className={`${styles.item} ${selected ? styles.itemSeleccionado : ''}`}
                 onClick={() => setAeropuertoSeleccionado(selected ? null : a.codigo)}
               >
