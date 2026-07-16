@@ -167,6 +167,15 @@ public class PlanificadorService {
         return new EstadoDTO(estado.get().name(), progreso, mensajeEstado, escenarioActual);
     }
 
+    public Optional<Ruta> getRutaEnMemoriaPorEnvioId(String envioId) {
+        if (solucionActual == null || envioId == null || envioId.isBlank()) return Optional.empty();
+        return solucionActual.getRutas().stream()
+            .filter(r -> !r.isSinSolucion())
+            .filter(r -> r.getEnvio() != null && envioId.equals(r.getEnvio().getId()))
+            .filter(r -> r.getVuelos() != null && !r.getVuelos().isEmpty())
+            .findFirst();
+    }
+
     public MetricasDTO getMetricas() {
         if (solucionActual == null) {
             return getUltimaSimulacion()

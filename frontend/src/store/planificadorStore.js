@@ -10,6 +10,8 @@ const usePlanificadorStore = create((set) => ({
 
   // Alertas temporales de cancelación/replanificación (#57/#58)
   alertasCancelacion: [],
+  // Vuelos cancelados permanentes para visualización en mapa
+  vuelosCancelados: [],
 
   setConectado: (conectado) => set({ conectado }),
   setProgreso: (progreso) => set({ progreso }),
@@ -36,6 +38,11 @@ const usePlanificadorStore = create((set) => ({
       alertasCancelacion: s.alertasCancelacion.filter((a) => a.id !== id),
     })),
 
+  addVueloCancelado: (vuelo) =>
+    set((s) => ({
+      vuelosCancelados: [...s.vuelosCancelados, vuelo],
+    })),
+
   resetPlanificador: () =>
     set({
       progreso: null,
@@ -44,6 +51,7 @@ const usePlanificadorStore = create((set) => ({
       colapso: null,
       error: null,
       alertasCancelacion: [],
+      vuelosCancelados: [],
     }),
 }))
 

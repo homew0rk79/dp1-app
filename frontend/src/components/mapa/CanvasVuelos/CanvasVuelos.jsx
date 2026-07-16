@@ -54,7 +54,7 @@ function drawAirplaneIcon(ctx, size, fillColor) {
   ctx.stroke()
 }
 
-function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avanceTickMin = 1, onCancelVuelo, filtrosUT }) {
+function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avanceTickMin = 1, onCancelVuelo, filtrosUT, vuelosCancelados = [] }) {
   const map          = useRef(null)
   const mapInstance  = useMap()
   const canvasRef    = useRef(null)
@@ -227,7 +227,7 @@ function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avan
     const T    = tiempoRef.current
     const zoom = map.current.getZoom()
     // Ícono escala con zoom: visible desde la vista mundial, mayor al acercar
-    const iconSize = Math.max(7, Math.min(15, (zoom - 1) * 2.2))
+    const iconSize = Math.max(11, Math.min(24, (zoom - 1) * 3.5))
 
     const newHits = []
     const hayFiltroUT = Boolean(
@@ -262,17 +262,18 @@ function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avan
       const alpha     = 0.35 + fillRatio * 0.45
       const seleccionado = vueloSeleccionado === vueloKey
 
+      // Colores siguiendo semáforo: verde → ambar → rojo (igual que aeropuertos)
       const color =
         seleccionado ? 'rgba(14,165,233,0.95)'
-        : fillRatio > 0.9 ? `rgba(220,38,38,${alpha})`
-        : fillRatio > 0.7 ? `rgba(234,179,8,${alpha})`
-        : `rgba(37,99,235,${alpha})`
+        : fillRatio > 0.9 ? `rgba(244,67,54,${alpha})`
+        : fillRatio > 0.7 ? `rgba(255,152,0,${alpha})`
+        : `rgba(76,175,80,${alpha})`
 
       const dotColor =
         seleccionado ? 'rgba(14,165,233,1)'
-        : fillRatio > 0.9 ? 'rgba(220,38,38,0.95)'
-        : fillRatio > 0.7 ? 'rgba(234,179,8,0.95)'
-        : 'rgba(37,99,235,0.95)'
+        : fillRatio > 0.9 ? '#f44336'
+        : fillRatio > 0.7 ? '#ff9800'
+        : '#4caf50'
 
       // Arco Bézier
       ctx.beginPath()
@@ -303,7 +304,34 @@ function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avan
     }
 
     hitAreasRef.current = newHits
-  }, [manifest, tiempoRef, filtrosUT, vueloSeleccionado])
+
+    // Vuelos cancelados: arco rojo grueso durante su ventana de tiempo original
+    for (const c of vuelosCancelados) {
+      if (c.salidaAbs > T || T > c.llegadaAbs) continue
+      const a = aerosRef.current[c.origen]
+      const b = aerosRef.current[c.destino]
+      if (!a || !b) continue
+
+      const p1 = map.current.latLngToContainerPoint([a.lat, a.lng])
+      const p2 = map.current.latLngToContainerPoint([b.lat, b.lng])
+      const dx = p2.x - p1.x, dy = p2.y - p1.y
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      if (dist < 3) continue
+
+      const nx = -dy / dist, ny = dx / dist
+      const cpX = (p1.x + p2.x) / 2 + nx * dist * 0.28
+      const cpY = (p1.y + p2.y) / 2 + ny * dist * 0.28
+
+      ctx.beginPath()
+      ctx.moveTo(p1.x, p1.y)
+      ctx.quadraticCurveTo(cpX, cpY, p2.x, p2.y)
+      ctx.strokeStyle = 'rgba(220,38,38,0.9)'
+      ctx.lineWidth = 3
+      ctx.setLineDash([10, 5])
+      ctx.stroke()
+      ctx.setLineDash([])
+    }
+  }, [manifest, tiempoRef, filtrosUT, vueloSeleccionado, vuelosCancelados])
 
   // RAF loop — avanza T y dibuja cada frame
   useEffect(() => {

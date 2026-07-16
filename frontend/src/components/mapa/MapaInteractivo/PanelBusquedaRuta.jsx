@@ -4,12 +4,28 @@ function formatearEstado(estado) {
   return String(estado || '-').replace(/_/g, ' ').toUpperCase()
 }
 
+function estadoEfectivo(tramo, tiempoActualAbs) {
+  if (tiempoActualAbs == null || tramo.salidaAbs == null) return tramo.estado
+  if (tramo.salidaAbs > tiempoActualAbs) return 'planificado'
+  if (tramo.llegadaAbs != null && tramo.llegadaAbs > tiempoActualAbs) return 'en_transito'
+  return 'entregado'
+}
+
+function estadoRutaEfectivo(ruta, tiempoActualAbs) {
+  if (!ruta?.tramos?.length || tiempoActualAbs == null) return ruta?.estado
+  const primerSalida = ruta.tramos[0]?.salidaAbs
+  const ultimaLlegada = ruta.tramos[ruta.tramos.length - 1]?.llegadaAbs
+  if (primerSalida != null && primerSalida > tiempoActualAbs) return 'planificado'
+  if (ultimaLlegada != null && ultimaLlegada <= tiempoActualAbs) return 'entregado'
+  return 'en_transito'
+}
+
 function obtenerNumeroMaleta(idMaleta) {
   const partes = String(idMaleta || '').split('-')
   return partes.length > 0 ? partes[partes.length - 1] : '-'
 }
 
-function TramosRuta({ titulo, ruta, mensajeVacio, styles, etiquetaMaletas = 'Maletas' }) {
+function TramosRuta({ titulo, ruta, mensajeVacio, styles, etiquetaMaletas = 'Maletas', tiempoActualAbs }) {
   if (!ruta) return <p className={styles.rutaMensajeVacio}>{mensajeVacio}</p>
 
   return (
@@ -20,7 +36,7 @@ function TramosRuta({ titulo, ruta, mensajeVacio, styles, etiquetaMaletas = 'Mal
       </div>
       <div className={styles.rutaResumenGrid}>
         <span>Estado</span>
-        <strong>{formatearEstado(ruta.estado)}</strong>
+        <strong>{formatearEstado(estadoRutaEfectivo(ruta, tiempoActualAbs))}</strong>
         <span>Escalas</span>
         <strong>{Math.max(0, (ruta.escalas?.length || 0) - 2)}</strong>
         <span>{etiquetaMaletas}</span>
@@ -45,8 +61,8 @@ function TramosRuta({ titulo, ruta, mensajeVacio, styles, etiquetaMaletas = 'Mal
             <span>{tramo.origen} - {tramo.destino}</span>
             <span>{tramo.salida || '-'}</span>
             <span>{tramo.llegada || '-'}</span>
-            <span className={styles.rutaEstadoBadge} title={formatearEstado(tramo.estado)}>
-              {formatearEstado(tramo.estado)}
+            <span className={styles.rutaEstadoBadge} title={formatearEstado(estadoEfectivo(tramo, tiempoActualAbs))}>
+              {formatearEstado(estadoEfectivo(tramo, tiempoActualAbs))}
             </span>
           </div>
         ))}
@@ -112,6 +128,7 @@ function PanelBusquedaRuta({
   cargando,
   error,
   idsPrueba,
+  tiempoActualAbs,
   styles,
 }) {
   const [tipoBusqueda, setTipoBusqueda] = useState('envio')
@@ -307,6 +324,7 @@ function PanelBusquedaRuta({
               mensajeVacio="El envío existe, pero aún no tiene ruta registrada."
               styles={styles}
               etiquetaMaletas={esMaletaResultado ? 'Total de maletas del envío' : 'Maletas'}
+              tiempoActualAbs={tiempoActualAbs}
             />
             <TramosRuta
               titulo="Ruta anterior"
@@ -314,6 +332,7 @@ function PanelBusquedaRuta({
               mensajeVacio={mensajeAnterior}
               styles={styles}
               etiquetaMaletas={esMaletaResultado ? 'Total de maletas del envío' : 'Maletas'}
+              tiempoActualAbs={tiempoActualAbs}
             />
           </section>
         )}

@@ -95,6 +95,9 @@ function ListaAeropuertosSidebar({
   const [aeropuertoExpandido, setAeropuertoExpandido] = useState(null)
   const [tabDetalle, setTabDetalle] = useState('almacen')
   const tiempoAnimacion = useSimulacionStore((s) => s.tiempoAnimacion)
+  const manifest        = useSimulacionStore((s) => s.manifest)
+  const offsetMinutos   = manifest?.fechaInicioMinutos > 0 ? manifest.fechaInicioMinutos : 0
+  const tiempoAbs       = Math.floor(tiempoAnimacion) + offsetMinutos
 
   // Vinculación mapa→panel: al seleccionar un aeropuerto (p. ej. click en el
   // marker del mapa) desplazar la lista hasta su item.
@@ -321,20 +324,20 @@ function ListaAeropuertosSidebar({
                     {tabDetalle === 'almacen' && (
                       <DetalleMaletasAeropuerto
                         codigo={a.codigo}
-                        tiempoMin={Math.floor(tiempoAnimacion)}
+                        tiempoMin={tiempoAbs}
                       />
                     )}
                     {tabDetalle === 'entrantes' && (
                       <PlanificadosAeropuerto
                         codigo={a.codigo}
-                        tiempoMin={Math.floor(tiempoAnimacion)}
+                        tiempoMin={tiempoAbs}
                         modo="entrantes"
                       />
                     )}
                     {tabDetalle === 'salientes' && (
                       <PlanificadosAeropuerto
                         codigo={a.codigo}
-                        tiempoMin={Math.floor(tiempoAnimacion)}
+                        tiempoMin={tiempoAbs}
                         modo="salientes"
                       />
                     )}

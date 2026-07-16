@@ -3,6 +3,7 @@ import { PackageCheck, PlaneTakeoff, Clock3, ChevronDown, ChevronRight } from 'l
 
 import { simulacionService } from '../../../../services/simulacionService'
 import useSimulacionStore from '../../../../store/simulacionStore'
+import useSeleccionStore from '../../../../store/seleccionStore'
 import styles from './PanelMonitorEnvios.module.css'
 
 const REFRESH_MS = 10000
@@ -16,7 +17,7 @@ function formatearMinutosAbs(min) {
   return `D${dia} ${hh}:${mm}`
 }
 
-function SeccionEnvios({ id, titulo, icono: Icono, items, abierta, onToggle, etiquetaHora }) {
+function SeccionEnvios({ id, titulo, icono: Icono, items, abierta, onToggle, etiquetaHora, onItemClick, seleccionadoId }) {
   const totalMaletas = items.reduce((s, x) => s + x.cantidad, 0)
   return (
     <section className={styles.seccion}>
@@ -34,21 +35,30 @@ function SeccionEnvios({ id, titulo, icono: Icono, items, abierta, onToggle, eti
           <p className={styles.vacio}>Sin envíos en esta categoría</p>
         ) : (
           <ul className={styles.lista}>
-            {items.map((it, i) => (
-              <li key={`${it.envioId}-${i}`} className={styles.item}>
-                <div className={styles.fila}>
-                  <span className={styles.envioId}>{it.envioId}</span>
-                  <span className={styles.cantidad}>{it.cantidad} mlt</span>
-                </div>
-                <div className={styles.filaSec}>
-                  <span>{it.origen} → {it.destino}</span>
-                  <span className={styles.hora}>
-                    {etiquetaHora} {formatearMinutosAbs(it.horaAbs)}
-                  </span>
-                </div>
-                <div className={styles.vuelo}>UT: {it.vuelo}</div>
-              </li>
-            ))}
+            {items.map((it, i) => {
+              const clave = `${it.envioId}-${i}`
+              const seleccionado = seleccionadoId === clave
+              return (
+                <li
+                  key={clave}
+                  className={`${styles.item} ${seleccionado ? styles.itemSeleccionado : ''}`}
+                  onClick={() => onItemClick?.(it, clave)}
+                  style={{ cursor: onItemClick ? 'pointer' : undefined }}
+                >
+                  <div className={styles.fila}>
+                    <span className={styles.envioId}>{it.envioId}</span>
+                    <span className={styles.cantidad}>{it.cantidad} mlt</span>
+                  </div>
+                  <div className={styles.filaSec}>
+                    <span>{it.origen} → {it.destino}</span>
+                    <span className={styles.hora}>
+                      {etiquetaHora} {formatearMinutosAbs(it.horaAbs)}
+                    </span>
+                  </div>
+                  <div className={styles.vuelo}>UT: {it.vuelo}</div>
+                </li>
+              )
+            })}
           </ul>
         )
       )}
@@ -59,26 +69,34 @@ function SeccionEnvios({ id, titulo, icono: Icono, items, abierta, onToggle, eti
 /**
  * Monitor de envíos del panel del visualizador: planificados por salir,
  * en vuelo en el instante actual, y entregados en las últimas 4 horas simuladas.
+ * Al hacer clic en un envío "en vuelo" se resalta el avión correspondiente en el mapa.
+ * Al hacer clic en un envío planificado/entregado se selecciona el aeropuerto origen.
  */
 function PanelMonitorEnvios() {
   const tiempoAnimacion = useSimulacionStore((s) => s.tiempoAnimacion)
   const manifest = useSimulacionStore((s) => s.manifest)
 
+  const setVueloSeleccionado = useSeleccionStore((s) => s.setVueloSeleccionado)
+  const setAeropuertoSeleccionado = useSeleccionStore((s) => s.setAeropuertoSeleccionado)
+
   const [datos, setDatos] = useState(null)
   const [error, setError] = useState(null)
   const [abiertas, setAbiertas] = useState({ planificados: true, enVuelo: true, entregados: false })
+  const [seleccionadoId, setSeleccionadoId] = useState(null)
+
+  const offsetMinutos = manifest?.fechaInicioMinutos > 0 ? manifest.fechaInicioMinutos : 0
 
   const cargar = useCallback(async () => {
     if (!manifest) return
     try {
       const res = await simulacionService.obtenerMonitorEnvios(
-        Math.max(0, Math.floor(tiempoAnimacion)), VENTANA_HORAS)
+        Math.max(0, Math.floor(tiempoAnimacion) + offsetMinutos), VENTANA_HORAS)
       setDatos(res.data)
       setError(null)
     } catch {
       setError('No se pudo obtener el monitor de envíos')
     }
-  }, [manifest, tiempoAnimacion])
+  }, [manifest, tiempoAnimacion, offsetMinutos])
 
   useEffect(() => {
     if (!manifest) return
@@ -89,6 +107,49 @@ function PanelMonitorEnvios() {
 
   function toggle(id) {
     setAbiertas((prev) => ({ ...prev, [id]: !prev[id] }))
+  }
+
+  function handleClickEnVuelo(it, clave) {
+    if (seleccionadoId === clave) {
+      setSeleccionadoId(null)
+      setVueloSeleccionado(null)
+      return
+    }
+    setSeleccionadoId(clave)
+    // Buscar la ocurrencia activa que coincide con origen→destino
+    const occ = (manifest?.ocurrencias || []).find(o =>
+      o.origen === it.origen &&
+      o.destino === it.destino &&
+      o.salidaAbs <= tiempoAnimacion &&
+      tiempoAnimacion <= o.llegadaAbs
+    )
+    if (occ) {
+      // Resalta el avión en el canvas (setVueloSeleccionado borra aeropuertoSeleccionado — no llamar ambos)
+      setVueloSeleccionado(`${occ.origen}-${occ.destino}-${occ.salidaAbs}`)
+    } else {
+      // Sin vuelo activo en canvas, al menos marca el aeropuerto origen
+      setAeropuertoSeleccionado(it.origen)
+    }
+  }
+
+  function handleClickPlanificado(it, clave) {
+    if (seleccionadoId === clave) {
+      setSeleccionadoId(null)
+      setAeropuertoSeleccionado(null)
+      return
+    }
+    setSeleccionadoId(clave)
+    setAeropuertoSeleccionado(it.origen)
+  }
+
+  function handleClickEntregado(it, clave) {
+    if (seleccionadoId === clave) {
+      setSeleccionadoId(null)
+      setAeropuertoSeleccionado(null)
+      return
+    }
+    setSeleccionadoId(clave)
+    setAeropuertoSeleccionado(it.destino)
   }
 
   if (!manifest) {
@@ -107,6 +168,8 @@ function PanelMonitorEnvios() {
         abierta={abiertas.planificados}
         onToggle={toggle}
         etiquetaHora="Sale"
+        onItemClick={handleClickPlanificado}
+        seleccionadoId={seleccionadoId}
       />
       <SeccionEnvios
         id="enVuelo"
@@ -116,6 +179,8 @@ function PanelMonitorEnvios() {
         abierta={abiertas.enVuelo}
         onToggle={toggle}
         etiquetaHora="Salió"
+        onItemClick={handleClickEnVuelo}
+        seleccionadoId={seleccionadoId}
       />
       <SeccionEnvios
         id="entregados"
@@ -125,6 +190,8 @@ function PanelMonitorEnvios() {
         abierta={abiertas.entregados}
         onToggle={toggle}
         etiquetaHora="Llegó"
+        onItemClick={handleClickEntregado}
+        seleccionadoId={seleccionadoId}
       />
     </div>
   )

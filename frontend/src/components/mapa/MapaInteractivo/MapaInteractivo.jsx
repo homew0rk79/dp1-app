@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import L from 'leaflet'
 import { CircleMarker, MapContainer, TileLayer, Marker, Popup, Polyline, Tooltip, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -63,7 +63,7 @@ const CONFIG_MAPA_DEFAULT = {
   zoomInicial: 2,
   centroLat: 20,
   centroLng: 15,
-  colorTramos: '#2563eb',
+  colorTramos: '#f97316',
   colorAlmacenes: '#22c55e',
 }
 
@@ -227,6 +227,21 @@ function endpointMantenimientoNoDisponible(err) {
   return err?.response?.status === 404 || err?.response?.status === 405
 }
 
+const TRAMOS_PATH_OPTIONS_BASE = { weight: 3.5, opacity: 0.95, dashArray: '8 7', lineCap: 'round', lineJoin: 'round' }
+
+const TramosLayer = memo(function TramosLayer({ tramosVisibles, colorTramos }) {
+  const pathOptions = useMemo(() => ({ ...TRAMOS_PATH_OPTIONS_BASE, color: colorTramos }), [colorTramos])
+  return tramosVisibles.map((tramo) => (
+    <Polyline key={tramo.renderKey} positions={[tramo.coordsOrigen, tramo.coordsDestino]} pathOptions={pathOptions}>
+      <Popup>
+        <strong>{tramo.utAsignada}</strong><br />
+        {tramo.origen} - {tramo.destino}<br />
+        {tramo.estado}
+      </Popup>
+    </Polyline>
+  ))
+})
+
 function MapaInteractivo() {
   const rangosSemaforo = useConfiguracionStore((s) => s.rangosSemaforo)
   const fechaInicio = useSimulacionStore((s) => s.parametros.fechaInicio)
@@ -261,6 +276,8 @@ function MapaInteractivo() {
   const progreso = usePlanificadorStore((s) => s.progreso)
   const alertasCancelacion = usePlanificadorStore((s) => s.alertasCancelacion)
   const removeAlertaCancelacion = usePlanificadorStore((s) => s.removeAlertaCancelacion)
+  const vuelosCancelados = usePlanificadorStore((s) => s.vuelosCancelados)
+  const addVueloCancelado = usePlanificadorStore((s) => s.addVueloCancelado)
 
   // Ref para no registrar el mismo timer dos veces (#58)
   const alertaTimersRef = useRef({})
@@ -312,6 +329,12 @@ function MapaInteractivo() {
         origen: vuelo.origen,
         destino: vuelo.destino,
         horaSalidaMinutos: vuelo.horaSalidaMinutos,
+      })
+      addVueloCancelado({
+        origen: vuelo.origen,
+        destino: vuelo.destino,
+        salidaAbs: vuelo.salidaAbs,
+        llegadaAbs: vuelo.llegadaAbs,
       })
       const res = await simulacionService.obtenerManifestAnimacion()
       if (res.data) {
@@ -476,7 +499,7 @@ function MapaInteractivo() {
     return !q || aeropuerto.codigo.toLowerCase().includes(q) || aeropuerto.ciudad.toLowerCase().includes(q)
   }
 
-  const aeropuertosPorCodigo = {
+  const aeropuertosPorCodigo = useMemo(() => ({
     ...AEROPUERTOS_POR_CODIGO,
     ...AEROPUERTOS_EXTRA_POR_CODIGO,
     ...Object.fromEntries(
@@ -484,39 +507,26 @@ function MapaInteractivo() {
         .filter((a) => a?.codigo && Number.isFinite(Number(a.lat)) && Number.isFinite(Number(a.lng)))
         .map((a) => [normalizarCodigo(a.codigo), { ...a, lat: Number(a.lat), lng: Number(a.lng) }]),
     ),
-  }
-  const tramosRenderizados = tramosMantenimiento.map((tramo, index) => {
-    const origen = normalizarCodigo(tramo.origen)
-    const destino = normalizarCodigo(tramo.destino)
-    const origenAero = aeropuertosPorCodigo[origen]
-    const destinoAero = aeropuertosPorCodigo[destino]
-    const coordsOrigen = origenAero ? [origenAero.lat, origenAero.lng] : null
-    const coordsDestino = destinoAero ? [destinoAero.lat, destinoAero.lng] : null
+  }), [aeropuertos])
 
-    console.log('Renderizando tramo:')
-    console.log(`ID: ${tramo.id ?? tramo.utAsignada ?? index}`)
-    console.log(`${origen} -> ${destino}`)
-    if (coordsOrigen) console.log(`Origen: [${coordsOrigen[0]}, ${coordsOrigen[1]}]`)
-    else console.warn(`No se encontró aeropuerto ${origen}`)
-    if (coordsDestino) console.log(`Destino: [${coordsDestino[0]}, ${coordsDestino[1]}]`)
-    else console.warn(`No se encontró aeropuerto ${destino}`)
-
-    return {
-      ...tramo,
-      renderKey: tramo.id ?? `${origen}-${destino}-${index}`,
-      origen,
-      destino,
-      origenAero,
-      destinoAero,
-      coordsOrigen,
-      coordsDestino,
-      dibujable: Boolean(coordsOrigen && coordsDestino),
-    }
-  })
-  const tramosVisibles = tramosRenderizados.filter((tramo) => tramo.dibujable)
-
-  console.log('Cantidad de tramos en la lista:', tramosMantenimiento.length)
-  console.log('Cantidad de líneas dibujadas:', configMapa.mostrarTramos ? tramosVisibles.length : 0)
+  const tramosVisibles = useMemo(() =>
+    tramosMantenimiento
+      .map((tramo, index) => {
+        const origen = normalizarCodigo(tramo.origen)
+        const destino = normalizarCodigo(tramo.destino)
+        const origenAero = aeropuertosPorCodigo[origen]
+        const destinoAero = aeropuertosPorCodigo[destino]
+        const coordsOrigen = origenAero ? [origenAero.lat, origenAero.lng] : null
+        const coordsDestino = destinoAero ? [destinoAero.lat, destinoAero.lng] : null
+        return {
+          ...tramo,
+          renderKey: tramo.id ?? `${origen}-${destino}-${index}`,
+          origen, destino, origenAero, destinoAero, coordsOrigen, coordsDestino,
+          dibujable: Boolean(coordsOrigen && coordsDestino),
+        }
+      })
+      .filter((t) => t.dibujable)
+  , [tramosMantenimiento, aeropuertosPorCodigo])
 
   async function guardarConfigMapa(siguiente) {
     try {
@@ -556,7 +566,10 @@ function MapaInteractivo() {
 
   async function guardarTramo(tramo) {
     if (!tramo.id) throw new Error('Solo se permite editar tramos existentes.')
-    const res = await simulacionService.actualizarHorariosTramoMantenimiento(tramo.id, {
+    const res = await simulacionService.actualizarTramoMantenimiento(tramo.id, {
+      utAsignada: tramo.utAsignada,
+      origen: (tramo.origen || '').trim().toUpperCase(),
+      destino: (tramo.destino || '').trim().toUpperCase(),
       horaSalida: tramo.horaSalida,
       horaLlegada: tramo.horaLlegada,
     })
@@ -635,29 +648,9 @@ function MapaInteractivo() {
         <ConfiguracionVistaMapa config={configMapa} />
         <RutaBuscadaVistaMapa busqueda={rutaBuscada} />
 
-        {configMapa.mostrarTramos && tramosVisibles.map((tramo) => (
-          <Polyline
-            key={tramo.renderKey}
-            positions={[
-              tramo.coordsOrigen,
-              tramo.coordsDestino,
-            ]}
-            pathOptions={{
-              color: configMapa.colorTramos,
-              weight: 3.5,
-              opacity: 0.95,
-              dashArray: '8 7',
-              lineCap: 'round',
-              lineJoin: 'round',
-            }}
-          >
-            <Popup>
-              <strong>{tramo.utAsignada}</strong><br />
-              {tramo.origen} - {tramo.destino}<br />
-              {tramo.estado}
-            </Popup>
-          </Polyline>
-        ))}
+        {configMapa.mostrarTramos && (
+          <TramosLayer tramosVisibles={tramosVisibles} colorTramos={configMapa.colorTramos} />
+        )}
 
         {/* Animación canvas — solo activo cuando hay manifest */}
         {manifest && configMapa.mostrarUT && (
@@ -670,6 +663,7 @@ function MapaInteractivo() {
             avanceTickMin={TA_EJECUCION_ALGORITMO_MIN}
             onCancelVuelo={handleCancelVuelo}
             filtrosUT={filtrosMapa?.ut}
+            vuelosCancelados={vuelosCancelados}
           />
         )}
 
@@ -678,7 +672,7 @@ function MapaInteractivo() {
           const estado    = getOcupacion(aeropuerto.codigo)
           const pctOcup   = estado?.ocupacion ?? 0
           const color     = getColorSemaforo(pctOcup, rangosSemaforo)
-          const colorHex  = (estadoEjecucion === 'PLANIFICANDO' && escenarioActivo !== 'DIA_A_DIA') ? '#94a3b8' : (configMapa.colorAlmacenes || COLORES_SEMAFORO[color])
+          const colorHex  = (estadoEjecucion === 'PLANIFICANDO' && escenarioActivo !== 'DIA_A_DIA') ? '#94a3b8' : (color === 'verde' ? (configMapa.colorAlmacenes || COLORES_SEMAFORO.verde) : COLORES_SEMAFORO[color])
           const seleccionado = aeropuertoSeleccionado === aeropuerto.codigo
           const visiblePorFiltro = aeropuertoPasaFiltros(aeropuerto, pctOcup)
           if (hayDatosSimulacion && !visiblePorFiltro && !seleccionado) return null
@@ -686,13 +680,14 @@ function MapaInteractivo() {
           const icon = L.divIcon({
             className: styles.aeropuertoMarker,
             html: `
-              <span class="${styles.aeropuertoIcono}" style="--airport-color:${colorHex};">
+              <span class="${styles.aeropuertoIcono}${seleccionado ? ' ' + styles.aeropuertoIconoSeleccionado : ''}" style="--airport-color:${colorHex};">
+                ${seleccionado ? `<span class="${styles.aeropuertoPulse}"></span>` : ''}
                 <span class="${styles.aeropuertoPista}"></span>
                 <span class="${styles.aeropuertoAvion}">&#9992;</span>
               </span>
             `,
-            iconSize: seleccionado ? [32, 32] : [28, 28],
-            iconAnchor: seleccionado ? [16, 16] : [14, 14],
+            iconSize: seleccionado ? [36, 36] : [28, 28],
+            iconAnchor: seleccionado ? [18, 18] : [14, 14],
           })
 
           return (
@@ -814,6 +809,7 @@ function MapaInteractivo() {
         cargando={rutaBuscadaCargando}
         error={rutaBuscadaError}
         idsPrueba={idsPruebaRutas}
+        tiempoActualAbs={Math.floor(tiempoDisplay) + offsetMinutos}
         styles={styles}
       />
 
