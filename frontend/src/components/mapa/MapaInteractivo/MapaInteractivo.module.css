@@ -951,3 +951,24 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Aeropuerto seleccionado — highlight y pulso */
+.aeropuertoIconoSeleccionado {
+  border-width: 2.5px;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.45), 0 2px 12px rgba(15, 23, 42, 0.5);
+}
+
+@keyframes aeropuertoPulse {
+  0%   { transform: scale(1);   opacity: 0.75; }
+  70%  { transform: scale(2.6); opacity: 0;    }
+  100% { transform: scale(2.6); opacity: 0;    }
+}
+
+.aeropuertoPulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--airport-color);
+  animation: aeropuertoPulse 1.6s ease-out infinite;
+  pointer-events: none;
+}

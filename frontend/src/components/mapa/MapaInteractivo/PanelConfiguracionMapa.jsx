@@ -254,8 +254,20 @@ function PanelConfiguracionMapa({
 
   function guardarTramo(e) {
     e.preventDefault()
-    const salida = new Date(form.horaSalida)
-    const llegada = new Date(form.horaLlegada)
+    const origen = (form.origen || '').trim().toUpperCase()
+    const destino = (form.destino || '').trim().toUpperCase()
+    if (!origen) {
+      setErrores({ modal: 'El código ICAO de origen es obligatorio.' })
+      return
+    }
+    if (!destino) {
+      setErrores({ modal: 'El código ICAO de destino es obligatorio.' })
+      return
+    }
+    if (origen === destino) {
+      setErrores({ modal: 'Origen y destino no pueden ser iguales.' })
+      return
+    }
     if (!form.horaSalida) {
       setErrores({ modal: 'La hora de salida es obligatoria.' })
       return
@@ -264,13 +276,13 @@ function PanelConfiguracionMapa({
       setErrores({ modal: 'La hora de llegada es obligatoria.' })
       return
     }
-    if (llegada <= salida) {
+    if (new Date(form.horaLlegada) <= new Date(form.horaSalida)) {
       setErrores({ modal: 'La llegada debe ser posterior a la salida.' })
       return
     }
     setErrores({})
     setConfirmacion({
-      mensaje: 'Modificar la hora de salida o llegada puede afectar la simulación. ¿Deseas continuar?',
+      mensaje: 'Modificar el origen, destino u horarios puede afectar la simulación. ¿Deseas continuar?',
       accion: ejecutarGuardarTramo,
     })
   }
@@ -302,10 +314,10 @@ function PanelConfiguracionMapa({
     try {
       await onGuardarTramo({
         ...form,
-        horaSalida: form.horaSalida,
-        horaLlegada: form.horaLlegada,
+        origen: (form.origen || '').trim().toUpperCase(),
+        destino: (form.destino || '').trim().toUpperCase(),
       })
-      cerrarFormularioConExito('Horarios del tramo guardados correctamente.')
+      cerrarFormularioConExito('Tramo guardado correctamente.')
     } catch (err) {
       setConfirmacion(null)
       setErrores({ modal: mensajeError(err, 'No se pudo guardar el tramo.') })
@@ -594,8 +606,26 @@ function CamposTramo({ form, setForm, styles }) {
   return (
     <div className={styles.formGrid}>
       <CampoBloqueado label="UT asignada" value={form.utAsignada} styles={styles} />
-      <CampoBloqueado label="Origen" value={form.origen} styles={styles} />
-      <CampoBloqueado label="Destino" value={form.destino} styles={styles} />
+      <label>
+        Origen (ICAO)
+        <input
+          type="text"
+          maxLength={4}
+          value={form.origen}
+          placeholder="ej: SKBO"
+          onChange={(e) => setForm({ ...form, origen: e.target.value.toUpperCase() })}
+        />
+      </label>
+      <label>
+        Destino (ICAO)
+        <input
+          type="text"
+          maxLength={4}
+          value={form.destino}
+          placeholder="ej: EHAM"
+          onChange={(e) => setForm({ ...form, destino: e.target.value.toUpperCase() })}
+        />
+      </label>
       <label>
         Salida
         <input type="datetime-local" value={form.horaSalida} onChange={(e) => setForm({ ...form, horaSalida: e.target.value })} />

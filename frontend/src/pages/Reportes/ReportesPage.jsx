@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Download, TrendingUp, Plane, Cpu, Activity } from 'lucide-react'
 import { ESCENARIOS, ETIQUETAS_ESCENARIO } from '../../constants/escenarios'
 import ReporteDesempeno from './ReporteDesempeno'
@@ -49,7 +50,9 @@ function KpiCard({ titulo, valor, sub, icono: Icono, variante = '' }) {
 }
 
 function ReportesPage() {
-  const [escenario, setEscenario] = useState(ESCENARIOS.DIA_A_DIA)
+  const location = useLocation()
+  const escenarioInicial = location.state?.escenario ?? ESCENARIOS.DIA_A_DIA
+  const [escenario, setEscenario] = useState(escenarioInicial)
   const [tabActiva, setTabActiva] = useState('desempeno')
   const [resumenReal, setResumenReal] = useState(null)
 

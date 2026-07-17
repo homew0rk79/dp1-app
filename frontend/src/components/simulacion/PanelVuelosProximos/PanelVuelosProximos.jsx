@@ -3,6 +3,7 @@ import { PlaneTakeoff, X, AlertTriangle } from 'lucide-react'
 
 import { simulacionService } from '../../../services/simulacionService'
 import useSimulacionStore from '../../../store/simulacionStore'
+import usePlanificadorStore from '../../../store/planificadorStore'
 import styles from './PanelVuelosProximos.module.css'
 
 const REFRESH_MS = 5000
@@ -14,8 +15,9 @@ const REFRESH_MS = 5000
  * durante el escenario día a día.
  */
 function PanelVuelosProximos() {
-  const tiempoAnimacion = useSimulacionStore((s) => s.tiempoAnimacion)
-  const manifest        = useSimulacionStore((s) => s.manifest)
+  const tiempoAnimacion   = useSimulacionStore((s) => s.tiempoAnimacion)
+  const manifest          = useSimulacionStore((s) => s.manifest)
+  const addVueloCancelado = usePlanificadorStore((s) => s.addVueloCancelado)
 
   const [vuelos, setVuelos]               = useState([])
   const [cargando, setCargando]           = useState(false)
@@ -68,6 +70,23 @@ function PanelVuelosProximos() {
         mensaje: res.data?.mensaje
           || `Replanificado: ${res.data?.reasignados ?? 0} envío(s)`,
       })
+      // Registrar el vuelo cancelado para visualización (arco rojo en mapa)
+      const occ = (manifest?.ocurrencias || [])
+        .filter(o =>
+          o.origen === vuelo.origen &&
+          o.destino === vuelo.destino &&
+          (o.salidaAbs % 1440) === vuelo.horaSalidaMin &&
+          o.salidaAbs >= tiempoAnimacion
+        )
+        .sort((a, b) => a.salidaAbs - b.salidaAbs)[0]
+      if (occ) {
+        addVueloCancelado({
+          origen: occ.origen,
+          destino: occ.destino,
+          salidaAbs: occ.salidaAbs,
+          llegadaAbs: occ.llegadaAbs,
+        })
+      }
       setConfirmando(null)
       // Refresca la lista tras la replanificación
       cargarVuelos()

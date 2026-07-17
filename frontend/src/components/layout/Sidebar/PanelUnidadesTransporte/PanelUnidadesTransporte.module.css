@@ -15,6 +15,8 @@
 
 .filtroWrap {
   position: relative;
+  display: flex;
+  align-items: stretch;
 }
 
 .filtroIcon {
@@ -27,7 +29,8 @@
 }
 
 .filtroInput {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   box-sizing: border-box;
   padding: 0.42rem 0.55rem 0.42rem 1.75rem;
   border: 1px solid var(--color-border);
@@ -40,6 +43,30 @@
 
 .filtroInput:focus {
   border-color: var(--color-accent);
+}
+
+.filtroInputConBtn {
+  border-right: none;
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+}
+
+.btnBuscar {
+  flex-shrink: 0;
+  padding: 0 0.55rem;
+  height: 100%;
+  border: 1px solid var(--color-accent, #2563eb);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--color-accent, #2563eb);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s;
+}
+
+.btnBuscar:hover {
+  background: #1d4ed8;
 }
 
 .filtroInput::placeholder {
@@ -235,4 +262,98 @@
   font-weight: 700;
   white-space: nowrap;
   color: var(--color-text);
+}
+
+/* ── Barra de filtro activo ─────────────────────────────────────────────── */
+
+.filtroActivoWrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.25rem 0.5rem;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: var(--radius-sm);
+  font-size: 0.72rem;
+  color: #1e40af;
+}
+
+.filtroActivoLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filtroActivoLimpiar {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #1e40af;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0;
+}
+
+.filtroActivoLimpiar:hover {
+  color: #ef4444;
+}
+
+/* ── Toggle modo solo activos / todos ───────────────────────────────────── */
+
+.toggleModo {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.toggleBtn {
+  flex: 1;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.toggleBtn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+}
+
+.toggleActivo {
+  background: var(--color-accent, #2563eb);
+  border-color: var(--color-accent, #2563eb);
+  color: #fff;
+}
+
+.toggleActivo:hover {
+  background: var(--color-accent, #2563eb);
+  color: #fff;
+}
+
+/* ── Badges de estado en modo "Todos" ──────────────────────────────────── */
+
+.badgeFuturo,
+.badgePasado {
+  display: inline-block;
+  margin-left: 0.3rem;
+  font-size: 0.62rem;
+  vertical-align: middle;
+  opacity: 0.65;
+}
+
+.badgeFuturo {
+  color: #2563eb;
+}
+
+.badgePasado {
+  color: #16a34a;
 }

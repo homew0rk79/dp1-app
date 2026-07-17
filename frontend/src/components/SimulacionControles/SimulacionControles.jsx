@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import styles from './SimulacionControles.module.css'
 import useSimulacionStore from '../../store/simulacionStore'
 import { formatearFechaHora, formatearDuracion, sumarMinutos } from '../../utils/tiempos'
@@ -40,32 +40,49 @@ function SimulacionControles({
 }) {
   const [duracionMin, setDuracionMin] = useState('')
   const [horaReal, setHoraReal] = useState(() => new Date())
-  const tiempoSegundos = useSimulacionStore((s) => s.tiempoSegundos)
+  const [minimizado, setMinimizado] = useState(false)
+  // Tiempo suave: actualiza cada segundo real sin depender del tick del RAF
+  const [tiempoSuave, setTiempoSuave] = useState(() => tiempoDisplay)
+  const velocidadRef = useRef(velocidad)
+  const playingRef = useRef(playing)
+
+  const inicioEjecucionReal = useSimulacionStore((s) => s.inicioEjecucionReal)
   const fechaInicioParam = useSimulacionStore((s) => s.parametros.fechaInicio)
   const escenarioActivo = useSimulacionStore((s) => s.escenarioActivo)
   const fechaInicio = manifest?.fechaInicioMinutos > 0
     ? sumarMinutos(FECHA_INICIO_SIMULACION_ALGORITMO, manifest.fechaInicioMinutos)?.toISOString()
     : fechaInicioParam
 
+  useEffect(() => { velocidadRef.current = velocidad }, [velocidad])
+  useEffect(() => { playingRef.current = playing }, [playing])
+
+  // Sincronizar tiempoSuave con tiempoDisplay (seek o tick del RAF)
+  useEffect(() => { setTiempoSuave(tiempoDisplay) }, [tiempoDisplay])
+
+  // Timer único: actualiza horaReal + avanza tiempoSuave cada segundo real
   useEffect(() => {
     const interval = setInterval(() => {
       setHoraReal(new Date())
+      if (playingRef.current) {
+        setTiempoSuave((prev) =>
+          Math.min(prev + velocidadRef.current, manifest?.duracionTotalMinutos ?? Infinity)
+        )
+      }
     }, 1000)
     return () => clearInterval(interval)
-  }, [])
+  }, [manifest])
 
   if (!manifest) return null
 
-  const simTotMin = Math.max(0, Math.floor(tiempoDisplay || 0))
-  const simD = Math.floor(simTotMin / 1440)
-  const simH = Math.floor((simTotMin % 1440) / 60)
-  const simM = simTotMin % 60
-  const transcurridoSim = `${simD}d ${String(simH).padStart(2, '0')}h ${String(simM).padStart(2, '0')}m`
+  // Tiempo transcurrido simulado con resolución de segundos
+  const suaveMin = Math.max(0, tiempoSuave)
+  const simTotSec = Math.floor(suaveMin * 60)
+  const simD = Math.floor(simTotSec / 86400)
+  const simH = Math.floor((simTotSec % 86400) / 3600)
+  const simM = Math.floor((simTotSec % 3600) / 60)
+  const simS = simTotSec % 60
+  const transcurridoSim = `${simD}d ${String(simH).padStart(2, '0')}h ${String(simM).padStart(2, '0')}m ${String(simS).padStart(2, '0')}s`
 
-  /**
-   * En "día a día" la velocidad queda fija en 60× (1 s real = 1 min simulado).
-   * Se oculta el selector de presets y el input "completar en X min reales".
-   */
   const velocidadFija = escenarioActivo === 'DIA_A_DIA'
 
   function handleDuracionBlur() {
@@ -76,8 +93,38 @@ function SimulacionControles({
     }
   }
 
+  if (minimizado) {
+    return (
+      <div className={`${styles.panel} ${styles.panelMinimizado}`}>
+        <span className={styles.tiempo}>
+          {formatTiempo(tiempoDisplay, manifest.duracionTotalMinutos, fechaInicio)}
+        </span>
+        <button
+          type="button"
+          className={styles.btnMinimizar}
+          onClick={() => setMinimizado(false)}
+          aria-label="Expandir panel de simulación"
+          title="Expandir"
+        >
+          ▲
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className={styles.panel}>
+      {/* Botón minimizar */}
+      <button
+        type="button"
+        className={styles.btnMinimizar}
+        onClick={() => setMinimizado(true)}
+        aria-label="Minimizar panel de simulación"
+        title="Minimizar"
+      >
+        ▼
+      </button>
+
       {/* 4 Tiempos de Simulación / Sistema (#37, #38, #39) */}
       <div className={styles.gridRelojes}>
         <div className={styles.relojItem}>
@@ -85,8 +132,12 @@ function SimulacionControles({
           <span className={styles.relojValor}>{formatearFechaHora(horaReal)}</span>
         </div>
         <div className={styles.relojItem}>
-          <span className={styles.relojLabel}>⏱️ Ejecución Real:</span>
-          <span className={styles.relojValor}>{formatearDuracion(tiempoSegundos || 0)}</span>
+          <span className={styles.relojLabel}>⏱️ Desde inicio:</span>
+          <span className={styles.relojValor}>
+            {inicioEjecucionReal
+              ? formatearDuracion(Math.max(0, Math.floor((horaReal.getTime() - inicioEjecucionReal) / 1000)))
+              : '—'}
+          </span>
         </div>
         <div className={styles.relojItem}>
           <span className={styles.relojLabel}>📅 Momento Simulado:</span>

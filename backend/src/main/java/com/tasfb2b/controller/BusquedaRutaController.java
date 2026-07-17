@@ -10,6 +10,7 @@ import com.tasfb2b.repository.EnvioRepository;
 import com.tasfb2b.repository.RutaRepository;
 import com.tasfb2b.repository.SimulacionRepository;
 import com.tasfb2b.repository.TramoRutaRepository;
+import com.tasfb2b.service.PlanificadorService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -35,17 +36,20 @@ public class BusquedaRutaController {
     private final TramoRutaRepository tramoRutaRepository;
     private final AeropuertoRepository aeropuertoRepository;
     private final EnvioRepository envioRepository;
+    private final PlanificadorService planificadorService;
 
     public BusquedaRutaController(
             SimulacionRepository simulacionRepository,
             RutaRepository rutaRepository,
             TramoRutaRepository tramoRutaRepository,
             AeropuertoRepository aeropuertoRepository,
-            EnvioRepository envioRepository) {
+            EnvioRepository envioRepository,
+            PlanificadorService planificadorService) {
         this.rutaRepository = rutaRepository;
         this.tramoRutaRepository = tramoRutaRepository;
         this.aeropuertoRepository = aeropuertoRepository;
         this.envioRepository = envioRepository;
+        this.planificadorService = planificadorService;
     }
 
     @GetMapping("/envios/{origen}/{idEnvio}/ruta")
@@ -126,6 +130,10 @@ public class BusquedaRutaController {
 
     private Optional<Ruta> buscarRutaActualPorIdGlobal(String idGlobal) {
         if (idGlobal == null || idGlobal.isBlank()) return Optional.empty();
+        // Primero buscar en solución activa en memoria (simulación corriendo)
+        Optional<Ruta> enMemoria = planificadorService.getRutaEnMemoriaPorEnvioId(idGlobal);
+        if (enMemoria.isPresent()) return enMemoria;
+        // Fallback: buscar en base de datos (simulación completada o persistida)
         List<Ruta> rutas = rutaRepository.findByEnvioIdOrderByIdDesc(idGlobal).stream()
             .filter(this::esRutaConsultable)
             .toList();
@@ -187,7 +195,66 @@ public class BusquedaRutaController {
         return !tramoRutaRepository.findByRutaIdOrderByOrdenAsc(ruta.getId()).isEmpty();
     }
 
+    private RutaBusquedaDTO.RutaMapaDTO toRutaMapaDesdeVuelos(Ruta ruta) {
+        Map<String, RutaBusquedaDTO.AeropuertoRutaDTO> aeropuertos = new LinkedHashMap<>();
+        List<RutaBusquedaDTO.TramoMapaDTO> tramosDto = new ArrayList<>();
+        List<String> escalas = new ArrayList<>();
+
+        String origenRuta = valor(ruta.getOrigen());
+        if (!origenRuta.equals("-")) {
+            escalas.add(origenRuta);
+            aeropuertoDto(origenRuta).ifPresent(a -> aeropuertos.put(a.getCodigo(), a));
+        }
+
+        int tiempoActual = ruta.getEnvio().getMinutosRegistro();
+        int orden = 0;
+        for (Vuelo vuelo : ruta.getVuelos()) {
+            int salidaAbs = proximaSalidaAbs(tiempoActual, vuelo.getSalidaMinutos(), 30);
+            int llegadaAbs = salidaAbs + vuelo.getDuracionMinutos();
+            tiempoActual = llegadaAbs;
+
+            RutaBusquedaDTO.AeropuertoRutaDTO aeroOrigen  = aeropuertoDto(vuelo.getOrigen()).orElse(null);
+            RutaBusquedaDTO.AeropuertoRutaDTO aeroDestino = aeropuertoDto(vuelo.getDestino()).orElse(null);
+            if (aeroOrigen  != null) aeropuertos.put(aeroOrigen.getCodigo(),  aeroOrigen);
+            if (aeroDestino != null) aeropuertos.put(aeroDestino.getCodigo(), aeroDestino);
+            if (vuelo.getDestino() != null && !vuelo.getDestino().isBlank()) escalas.add(vuelo.getDestino());
+
+            tramosDto.add(new RutaBusquedaDTO.TramoMapaDTO(
+                null, orden++,
+                valor(vuelo.getOrigen()), valor(vuelo.getDestino()),
+                aeroOrigen, aeroDestino,
+                formatearAbs(salidaAbs), formatearAbs(llegadaAbs),
+                salidaAbs, llegadaAbs,
+                "en_transito"
+            ));
+        }
+
+        if (escalas.size() == 1 && ruta.getDestino() != null && !ruta.getDestino().isBlank()) {
+            escalas.add(ruta.getDestino());
+            aeropuertoDto(ruta.getDestino()).ifPresent(a -> aeropuertos.put(a.getCodigo(), a));
+        }
+
+        return new RutaBusquedaDTO.RutaMapaDTO(
+            ruta.getId(),
+            valor(ruta.getOrigen()), valor(ruta.getDestino()),
+            valor(ruta.getEstado()), valor(ruta.getCumplimiento()),
+            ruta.getCantidad() != null ? ruta.getCantidad() : 0,
+            escalas, new ArrayList<>(aeropuertos.values()), tramosDto
+        );
+    }
+
+    private static int proximaSalidaAbs(int tiempoActual, int salidaEnDia, int margen) {
+        int dia = tiempoActual / 1440;
+        int minDentroDelDia = tiempoActual % 1440;
+        if (minDentroDelDia + margen <= salidaEnDia) return dia * 1440 + salidaEnDia;
+        return (dia + 1) * 1440 + salidaEnDia;
+    }
+
     private RutaBusquedaDTO.RutaMapaDTO toRutaMapa(Ruta ruta) {
+        // Rutas en memoria (simulación activa) tienen vuelos @Transient poblados
+        if (ruta.getVuelos() != null && !ruta.getVuelos().isEmpty()) {
+            return toRutaMapaDesdeVuelos(ruta);
+        }
         List<TramoRuta> tramos = tramoRutaRepository.findByRutaIdOrderByOrdenAsc(ruta.getId());
         Map<String, RutaBusquedaDTO.AeropuertoRutaDTO> aeropuertos = new LinkedHashMap<>();
         List<RutaBusquedaDTO.TramoMapaDTO> tramosDto = new ArrayList<>();
