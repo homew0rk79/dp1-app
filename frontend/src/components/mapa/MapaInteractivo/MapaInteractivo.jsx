@@ -663,6 +663,7 @@ function MapaInteractivo() {
             avanceTickMin={TA_EJECUCION_ALGORITMO_MIN}
             onCancelVuelo={handleCancelVuelo}
             filtrosUT={filtrosMapa?.ut}
+            filtrosAlmacenes={filtrosMapa?.almacenes}
             vuelosCancelados={vuelosCancelados}
           />
         )}

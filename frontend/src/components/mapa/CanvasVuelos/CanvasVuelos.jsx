@@ -54,7 +54,7 @@ function drawAirplaneIcon(ctx, size, fillColor) {
   ctx.stroke()
 }
 
-function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avanceTickMin = 1, onCancelVuelo, filtrosUT, vuelosCancelados = [] }) {
+function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avanceTickMin = 1, onCancelVuelo, filtrosUT, filtrosAlmacenes, vuelosCancelados = [] }) {
   const map          = useRef(null)
   const mapInstance  = useMap()
   const canvasRef    = useRef(null)
@@ -235,11 +235,21 @@ function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avan
     )
     const utVisibles = hayFiltroUT ? new Set(filtrosUT?.visibles ?? []) : null
 
+    const hayFiltroAlmacen = Boolean(
+      filtrosAlmacenes && (
+        filtrosAlmacenes.texto?.trim() ||
+        filtrosAlmacenes.continente !== 'Todos' ||
+        (filtrosAlmacenes.semaforo && filtrosAlmacenes.semaforo !== 'todos')
+      )
+    )
+    const aerosVisibles = hayFiltroAlmacen ? new Set(filtrosAlmacenes?.visibles ?? []) : null
+
     for (const o of manifest.ocurrencias) {
       if (o.salidaAbs > T || T > o.llegadaAbs) continue  // vuelo no activo o ya llegó (#56)
 
       const vueloKey = `${o.origen}-${o.destino}-${o.salidaAbs}`
       if (utVisibles && !utVisibles.has(vueloKey)) continue
+      if (aerosVisibles && !aerosVisibles.has(o.origen) && !aerosVisibles.has(o.destino)) continue
 
       const a = aerosRef.current[o.origen]
       const b = aerosRef.current[o.destino]
@@ -331,7 +341,7 @@ function CanvasVuelos({ manifest, tiempoRef, velocidadRef, playing, onTick, avan
       ctx.stroke()
       ctx.setLineDash([])
     }
-  }, [manifest, tiempoRef, filtrosUT, vueloSeleccionado, vuelosCancelados])
+  }, [manifest, tiempoRef, filtrosUT, filtrosAlmacenes, vueloSeleccionado, vuelosCancelados])
 
   // RAF loop — avanza T y dibuja cada frame
   useEffect(() => {

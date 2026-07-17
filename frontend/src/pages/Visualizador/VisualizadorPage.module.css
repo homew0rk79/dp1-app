@@ -43,3 +43,136 @@
   overflow: hidden;
   position: relative;
 }
+
+/* ── Modal reporte final ────────────────────────────────────────────────── */
+
+.modalBackdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.modal {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 8px 40px rgba(15, 23, 42, 0.22);
+  width: 100%;
+  max-width: 520px;
+  overflow: hidden;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem 1.3rem 0.8rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.modalTitulo {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.modalSubtitulo {
+  font-size: 0.78rem;
+  color: #64748b;
+  margin: 0.15rem 0 0;
+}
+
+.modalCerrar {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #94a3b8;
+  padding: 0.1rem;
+  line-height: 1;
+  font-size: 1.1rem;
+}
+
+.modalCerrar:hover {
+  color: #ef4444;
+}
+
+.modalBody {
+  padding: 1rem 1.3rem 1.3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.7rem;
+}
+
+.kpiCard {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0.75rem 0.9rem;
+}
+
+.kpiLabel {
+  font-size: 0.7rem;
+  color: #64748b;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.kpiValor {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.2;
+  margin-top: 0.2rem;
+}
+
+.kpiSub {
+  font-size: 0.68rem;
+  color: #94a3b8;
+  margin-top: 0.1rem;
+}
+
+.kpiVerde { border-color: #bbf7d0; background: #f0fdf4; }
+.kpiVerde .kpiValor { color: #16a34a; }
+.kpiRojo  { border-color: #fecaca; background: #fef2f2; }
+.kpiRojo  .kpiValor { color: #dc2626; }
+
+.modalCargando {
+  text-align: center;
+  padding: 1.5rem;
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 1.3rem 1.1rem;
+}
+
+.btnCerrar {
+  padding: 0.5rem 1.2rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnCerrar:hover {
+  background: #e2e8f0;
+}

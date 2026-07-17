@@ -5,6 +5,7 @@ import { getColorSemaforo, COLORES_SEMAFORO } from '../../../../utils/semaforo'
 import { matchPatronCampos } from '../../../../utils/filtros'
 import useConfiguracionStore from '../../../../store/configuracionStore'
 import useSeleccionStore from '../../../../store/seleccionStore'
+import useSimulacionStore from '../../../../store/simulacionStore'
 import { simulacionService } from '../../../../services/simulacionService'
 import { VUELOS_MOCK } from '../../../../mocks/vuelos'
 import { FECHA_INICIO_SIMULACION_ALGORITMO } from '../../../../constants/restricciones'
@@ -19,9 +20,9 @@ const COLUMNAS = [
   { key: 'ocupacion', label: 'Ocupación (%)' },
 ]
 
-function minutosAbsAFecha(min) {
+function minutosAbsAFecha(min, offsetMin = 0) {
   const base = new Date(`${FECHA_INICIO_SIMULACION_ALGORITMO}:00Z`)
-  return new Date(base.getTime() + min * 60000)
+  return new Date(base.getTime() + (min + offsetMin) * 60000)
 }
 
 function formatearHora(fecha) {
@@ -34,25 +35,36 @@ function formatearHora(fecha) {
   return `${dd}/${mo} ${hh}:${mm}`
 }
 
-function ocurrenciasAUt(ocurrencias, tiempoAnimacion) {
+function mapearOcurrencia(o, tiempoAnimacion, offsetMin = 0) {
+  const activo = o.salidaAbs <= tiempoAnimacion && tiempoAnimacion <= o.llegadaAbs
+  const pasado = o.llegadaAbs < tiempoAnimacion
+  return {
+    key: `${o.origen}-${o.destino}-${o.salidaAbs}`,
+    codigo: o.vuelo ?? o.codigoVuelo ?? `${o.origen}-${o.destino}`,
+    origen: o.origen,
+    destino: o.destino,
+    horaSalida: minutosAbsAFecha(o.salidaAbs, offsetMin),
+    horaLlegada: minutosAbsAFecha(o.llegadaAbs, offsetMin),
+    ocupacion: o.capacidadMax > 0 ? Math.round((o.maletas / o.capacidadMax) * 1000) / 10 : 0,
+    maletas: o.maletas,
+    capacidadMax: o.capacidadMax,
+    salidaAbs: o.salidaAbs,
+    dia: Math.floor(o.salidaAbs / 1440),
+    horaSalidaMinutos: o.salidaAbs % 1440,
+    estado: activo ? 'activo' : pasado ? 'pasado' : 'futuro',
+  }
+}
+
+function ocurrenciasAUt(ocurrencias, tiempoAnimacion, offsetMin = 0) {
   if (!ocurrencias) return null
   return ocurrencias
     .filter((o) => o.salidaAbs <= tiempoAnimacion && tiempoAnimacion <= o.llegadaAbs)
-    .map((o) => ({
-      key: `${o.origen}-${o.destino}-${o.salidaAbs}`,
-      codigo: o.vuelo ?? o.codigoVuelo ?? `${o.origen}-${o.destino}`,
-      origen: o.origen,
-      destino: o.destino,
-      horaSalida: minutosAbsAFecha(o.salidaAbs),
-      horaLlegada: minutosAbsAFecha(o.llegadaAbs),
-      ocupacion: o.capacidadMax > 0 ? Math.round((o.maletas / o.capacidadMax) * 1000) / 10 : 0,
-      maletas: o.maletas,
-      capacidadMax: o.capacidadMax,
-      // Datos para el drill-down de envíos (endpoint /vuelos/envios)
-      salidaAbs: o.salidaAbs,
-      dia: Math.floor(o.salidaAbs / 1440),
-      horaSalidaMinutos: o.salidaAbs % 1440,
-    }))
+    .map((o) => mapearOcurrencia(o, tiempoAnimacion, offsetMin))
+}
+
+function todasOcurrenciasAUt(ocurrencias, tiempoAnimacion, offsetMin = 0) {
+  if (!ocurrencias) return null
+  return ocurrencias.map((o) => mapearOcurrencia(o, tiempoAnimacion, offsetMin))
 }
 
 function mocksAUt() {
@@ -108,10 +120,27 @@ function PanelUnidadesTransporte({ ocurrencias, tiempoAnimacion }) {
   const vueloSeleccionado = useSeleccionStore((s) => s.vueloSeleccionado)
   const setVueloSeleccionado = useSeleccionStore((s) => s.setVueloSeleccionado)
   const setFiltroUT = useSeleccionStore((s) => s.setFiltroUT)
+  const manifest = useSimulacionStore((s) => s.manifest)
 
   const [filtroDestino, setFiltroDestino] = useState('')
   const [filtroSemaforo, setFiltroSemaforo] = useState('todos')
   const [sortConfig, setSortConfig] = useState({ key: 'horaSalida', direction: 'asc' })
+  const [filtroMapaActivo, setFiltroMapaActivo] = useState(false)
+  const listaVisibleRef = useRef([])
+
+  function aplicarFiltroMapa() {
+    setFiltroUT({
+      texto: filtroDestino,
+      semaforo: filtroSemaforo,
+      visibles: listaVisibleRef.current.map((ut) => ut.key),
+    })
+    setFiltroMapaActivo(!!filtroDestino.trim() || filtroSemaforo !== 'todos')
+  }
+
+  function limpiarFiltroMapa() {
+    setFiltroUT({ texto: '', semaforo: 'todos', visibles: [] })
+    setFiltroMapaActivo(false)
+  }
 
   // Drill-down: key de la UT expandida y cache de envíos por key
   const [utExpandida, setUtExpandida] = useState(null)
@@ -148,17 +177,21 @@ function PanelUnidadesTransporte({ ocurrencias, tiempoAnimacion }) {
     }
   }
 
+  const offsetMin = manifest?.fechaInicioMinutos ?? 0
+
   const listaBase = useMemo(() => {
-    const desdeSim = ocurrenciasAUt(ocurrencias, tiempoAnimacion)
+    if (manifest?.ocurrencias) {
+      return todasOcurrenciasAUt(manifest.ocurrencias, tiempoAnimacion, offsetMin)
+    }
+    const desdeSim = ocurrenciasAUt(ocurrencias, tiempoAnimacion, offsetMin)
     if (desdeSim && desdeSim.length > 0) return desdeSim
     return mocksAUt()
-  }, [ocurrencias, tiempoAnimacion])
+  }, [ocurrencias, tiempoAnimacion, manifest, offsetMin])
 
   const listaVisible = useMemo(() => {
     const q = filtroDestino.trim()
     let lista = listaBase
     if (q) {
-      // Coincide contra código, tramo "AAAA-BBBB", origen o destino; admite comodín *
       lista = lista.filter((ut) =>
         matchPatronCampos(q, ut.codigo, `${ut.origen}-${ut.destino}`, ut.origen, ut.destino),
       )
@@ -175,13 +208,10 @@ function PanelUnidadesTransporte({ ocurrencias, tiempoAnimacion }) {
     )
   }, [listaBase, filtroDestino, filtroSemaforo, rangosSemaforo, sortConfig])
 
+  // Mantener la ref actualizada para que aplicarFiltroMapa lea la lista actual
   useEffect(() => {
-    setFiltroUT({
-      texto: filtroDestino,
-      semaforo: filtroSemaforo,
-      visibles: listaVisible.map((ut) => ut.key),
-    })
-  }, [filtroDestino, filtroSemaforo, listaVisible, setFiltroUT])
+    listaVisibleRef.current = listaVisible
+  }, [listaVisible])
 
   function handleSort(key) {
     setSortConfig((prev) => ({
@@ -190,7 +220,7 @@ function PanelUnidadesTransporte({ ocurrencias, tiempoAnimacion }) {
     }))
   }
 
-  const usaMock = !ocurrencias || ocurrenciasAUt(ocurrencias, tiempoAnimacion)?.length === 0
+  const usaMock = !manifest?.ocurrencias && (!ocurrencias || ocurrenciasAUt(ocurrencias, tiempoAnimacion, offsetMin)?.length === 0)
 
   return (
     <div className={styles.contenedor}>
@@ -202,12 +232,28 @@ function PanelUnidadesTransporte({ ocurrencias, tiempoAnimacion }) {
         <Search size={13} className={styles.filtroIcon} />
         <input
           type="text"
-          className={styles.filtroInput}
-          placeholder="Código, tramo, origen o destino (admite *)"
+          className={`${styles.filtroInput} ${styles.filtroInputConBtn}`}
+          placeholder="Buscar: código, tramo, origen o destino..."
           value={filtroDestino}
           onChange={(e) => setFiltroDestino(e.target.value)}
         />
+        <button
+          type="button"
+          className={styles.btnBuscar}
+          onClick={aplicarFiltroMapa}
+          title="Aplicar filtro al mapa"
+        >
+          Filtrar
+        </button>
       </div>
+      {filtroMapaActivo && (
+        <div className={styles.filtroActivoWrap}>
+          <span className={styles.filtroActivoLabel}>Mapa filtrado: <strong>{filtroDestino || 'semáforo'}</strong></span>
+          <button type="button" className={styles.filtroActivoLimpiar} onClick={limpiarFiltroMapa}>
+            ✕ Limpiar
+          </button>
+        </div>
+      )}
       <select
         className={styles.filtroSelect}
         value={filtroSemaforo}
@@ -266,6 +312,11 @@ function PanelUnidadesTransporte({ ocurrencias, tiempoAnimacion }) {
                           {expandida ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                         </button>
                         {ut.codigo}
+                        {ut.estado && ut.estado !== 'activo' && (
+                          <span className={ut.estado === 'futuro' ? styles.badgeFuturo : styles.badgePasado}>
+                            {ut.estado === 'futuro' ? '▸' : '✓'}
+                          </span>
+                        )}
                       </td>
                       <td className={styles.mono}>{ut.origen}</td>
                       <td className={styles.mono}>{ut.destino}</td>
