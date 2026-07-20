@@ -54,26 +54,48 @@ function useAnimacionTimeline() {
   }, [setVelocidadAnimacion])
 
   const cargarManifest = useCallback((data) => {
-    tiempoRef.current  = 0
-    lastSaltoRef.current = 0
-    setTiempoDisplay(0)
-    setPlayingAnimacion(false)
-    setManifest(data)
-
-    // En día a día la velocidad es 1x (1 s real = 1 min simulado)
-    // y la animación arranca sola: es una simulación en tiempo real.
+    // Día a día: anclar el reloj local al "ahora" simulado del backend para que
+    // un navegador que entra a mitad de simulación no arranque desde el minuto 0.
     const escenario = useSimulacionStore.getState().escenarioActivo
-    if (escenario === 'DIA_A_DIA') {
+    const esDiaADia = escenario === 'DIA_A_DIA'
+    const anclaBackend = esDiaADia && data?.tiempoSimuladoActualMin >= 0
+      ? data.tiempoSimuladoActualMin
+      : 0
+
+    // setManifest resetea tiempoAnimacion a 0 en el store — anclar DESPUÉS.
+    setManifest(data)
+    tiempoRef.current  = anclaBackend
+    lastSaltoRef.current = Math.floor(anclaBackend / SA_SALTO_ALGORITMO_MIN)
+    setTiempoDisplay(anclaBackend)
+    setTiempoAnimacion(anclaBackend)
+    setPlayingAnimacion(false)
+
+    if (esDiaADia) {
+      // Velocidad 1 = 1 min simulado por segundo real (factor 60x del enunciado).
+      // La animación arranca sola: es una simulación en tiempo real.
       velocidadRef.current = 1
       setVelocidadState(1)
       setVelocidadAnimacion(1)
       setPlayingAnimacion(true)
     }
-  }, [setManifest, setPlayingAnimacion, setVelocidadAnimacion])
+  }, [setManifest, setPlayingAnimacion, setVelocidadAnimacion, setTiempoAnimacion])
 
   const actualizarManifest = useCallback((data) => {
     useSimulacionStore.getState().updateManifest(data)
-  }, [])
+
+    // Día a día: corregir el drift del reloj local contra el backend tras cada
+    // tick, solo si la desviación supera 2 min simulados (evita saltos visuales).
+    const escenario = useSimulacionStore.getState().escenarioActivo
+    if (escenario === 'DIA_A_DIA' && data?.tiempoSimuladoActualMin >= 0) {
+      const drift = Math.abs(tiempoRef.current - data.tiempoSimuladoActualMin)
+      if (drift > 2) {
+        tiempoRef.current = data.tiempoSimuladoActualMin
+        lastSaltoRef.current = Math.floor(data.tiempoSimuladoActualMin / SA_SALTO_ALGORITMO_MIN)
+        setTiempoDisplay(data.tiempoSimuladoActualMin)
+        setTiempoAnimacion(data.tiempoSimuladoActualMin)
+      }
+    }
+  }, [setTiempoAnimacion])
 
   const onTick = useCallback((t) => {
     setTiempoDisplay(t)

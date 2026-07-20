@@ -125,6 +125,8 @@ public class PlanificadorService {
     private volatile ScheduledFuture<?> tareaDiaADia = null;
     /** Cursor del último bloque ya procesado por el scheduler. */
     private volatile LocalDateTime cursorDiaADia = null;
+    /** Instante real en que arrancó el escenario día a día (para el reloj simulado 60x). */
+    private volatile java.time.Instant inicioRealDiaADia = null;
     /** IDs de envíos registrados manualmente via API durante la simulación activa. */
     private final Set<String> pendingManualEnvioIds = Collections.synchronizedSet(new HashSet<>());
 
@@ -244,6 +246,7 @@ public class PlanificadorService {
             schedulerDiaADia = null;
         }
         cursorDiaADia = null;
+        inicioRealDiaADia = null;
     }
 
     // =========================================================================
@@ -409,6 +412,7 @@ public class PlanificadorService {
     private void iniciarSchedulerDiaADia(LocalDateTime fechaBase, final Map<String, Aeropuerto> aeropuertos) {
         detenerSchedulerDiaADia(); // ← resetea cursorDiaADia = null
         cursorDiaADia = fechaBase.plusDays(1); // ← se asigna DESPUÉS del reset
+        inicioRealDiaADia = java.time.Instant.now();
         schedulerDiaADia = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "scheduler-dia-a-dia");
             t.setDaemon(true);
@@ -1317,7 +1321,17 @@ public class PlanificadorService {
         int duracionTotal = duracionManifest(maxLlegada, duracionVentana);
         // Día a día: el timeline avanza al ritmo del cursor aunque un bloque no traiga vuelos nuevos.
         if (cursor != null) duracionTotal = Math.max(duracionTotal, minutosCursor);
-        return new AnimacionManifestDTO(duracionTotal, inicioAbs, ocurrencias, aeropuertos);
+        AnimacionManifestDTO manifest = new AnimacionManifestDTO(duracionTotal, inicioAbs, ocurrencias, aeropuertos);
+
+        // Día a día: reloj simulado 60x (1 s real = 1 min simulado) para que cualquier
+        // navegador que entre a mitad de simulación se ancle al "ahora".
+        java.time.Instant inicioReal = inicioRealDiaADia;
+        if ("DIA_A_DIA".equalsIgnoreCase(escenarioActual) && inicioReal != null) {
+            long segundosReales = java.time.Duration.between(inicioReal, java.time.Instant.now()).getSeconds();
+            manifest.setTiempoSimuladoActualMin((int) Math.min(segundosReales, duracionTotal));
+            manifest.setTickIntervaloSegundos(intervaloDiaADiaMin * 60);
+        }
+        return manifest;
     }
 
     public List<Map<String, Object>> getConsumoBloques() {
