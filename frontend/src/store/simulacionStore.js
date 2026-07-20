@@ -18,6 +18,8 @@ const useSimulacionStore = create((set) => ({
   tiempoAnimacion: 0,       // minuto simulado actual (actualizado por día, no por frame)
   velocidadAnimacion: 120,  // min simulados / segundo real
   playingAnimacion: false,
+  // Día a día: timestamp (Date.now) del último tick de replanificación recibido
+  ultimoTickTs: null,
 
   setEscenario: (escenario) => set({ escenarioActivo: escenario }),
   setEstado: (estado) => set({ estadoEjecucion: estado }),
@@ -27,7 +29,8 @@ const useSimulacionStore = create((set) => ({
     set((s) => ({ parametros: { ...s.parametros, ...parametros } })),
   incrementarTiempo: () => set((s) => ({ tiempoSegundos: s.tiempoSegundos + 1 })),
   setManifest: (manifest) => set({ manifest, tiempoAnimacion: 0, playingAnimacion: false }),
-  updateManifest: (manifest) => set((s) => ({ manifest, wsVersion: s.wsVersion + 1 })),
+  updateManifest: (manifest) =>
+    set((s) => ({ manifest, wsVersion: s.wsVersion + 1, ultimoTickTs: Date.now() })),
   clearManifest: () => set({ manifest: null, tiempoAnimacion: 0, playingAnimacion: false }),
   setTiempoAnimacion: (t) => set({ tiempoAnimacion: t }),
   setVelocidadAnimacion: (v) => set({ velocidadAnimacion: v }),

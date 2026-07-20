@@ -33,6 +33,8 @@ import {
 import { formatearDuracion } from '../../../utils/tiempos'
 import usePlanificadorStore from '../../../store/planificadorStore'
 import { simulacionService } from '../../../services/simulacionService'
+import { obtenerDetalleRuta } from '../../../services/rutasService'
+import useTickDiaADia from '../../../hooks/useTickDiaADia'
 import styles from './Sidebar.module.css'
 
 function Sidebar() {
@@ -52,6 +54,45 @@ function Sidebar() {
   const [formEnvio, setFormEnvio] = useState({ origen: '', destino: '', cantidad: 1, fechaHora: '' })
   const [formCargando, setFormCargando] = useState(false)
   const [formFeedback, setFormFeedback] = useState(null)
+  // Seguimiento del último envío registrado en vivo: { id, intentos }
+  const [envioTrackeado, setEnvioTrackeado] = useState(null)
+  const tickInfo = useTickDiaADia()
+  const wsVersion = useSimulacionStore((s) => s.wsVersion)
+
+  // Tras cada tick (wsVersion cambia), verificar si el envío registrado ya tiene ruta.
+  useEffect(() => {
+    if (!envioTrackeado) return
+    let cancelado = false
+    obtenerDetalleRuta(envioTrackeado.id)
+      .then((detalle) => {
+        if (cancelado) return
+        const tramos = detalle?.tramos ?? []
+        if (tramos.length > 0) {
+          setFormFeedback({
+            ok: true,
+            texto: `✓ Envío ${envioTrackeado.id} planificado: ${detalle.origen}→${detalle.destino} (${tramos.length} tramo${tramos.length !== 1 ? 's' : ''})`,
+          })
+          setEnvioTrackeado(null)
+        } else if (envioTrackeado.intentos >= 2) {
+          setFormFeedback({ ok: false, texto: `⚠ Envío ${envioTrackeado.id} aún sin ruta tras 2 replanificaciones` })
+          setEnvioTrackeado(null)
+        } else {
+          setEnvioTrackeado((prev) => prev && { ...prev, intentos: prev.intentos + 1 })
+        }
+      })
+      .catch(() => {
+        if (cancelado) return
+        // La ruta aún no existe (envío pendiente de incorporar): reintentar en el próximo tick
+        if (envioTrackeado.intentos >= 2) {
+          setFormFeedback({ ok: false, texto: `⚠ Envío ${envioTrackeado.id} aún sin ruta tras 2 replanificaciones` })
+          setEnvioTrackeado(null)
+        } else {
+          setEnvioTrackeado((prev) => prev && { ...prev, intentos: prev.intentos + 1 })
+        }
+      })
+    return () => { cancelado = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wsVersion])
   const [limpiarConfirmar, setLimpiarConfirmar] = useState(false)
 
   const aeropuertoSeleccionado = useSeleccionStore((s) => s.aeropuertoSeleccionado)
@@ -339,8 +380,11 @@ function Sidebar() {
         fechaHora: formEnvio.fechaHora || undefined,
       })
       const d = res.data
-      setFormFeedback({ ok: true, texto: `Registrado: ${d.origen}→${d.destino}, ${d.cantidad} maletas` })
+      const eta = tickInfo.activo ? ` — entrará en la próxima replanificación (~${tickInfo.segundosRestantes}s)` : ''
+      setFormFeedback({ ok: true, texto: `Registrado ${d.origen}→${d.destino}, ${d.cantidad} maletas${eta}` })
       setFormEnvio((f) => ({ ...f, cantidad: 1 }))
+      // Iniciar seguimiento: al llegar los próximos ticks se consulta si ya tiene ruta.
+      if (d.id) setEnvioTrackeado({ id: d.id, intentos: 0 })
     } catch (err) {
       setFormFeedback({ ok: false, texto: err.response?.data?.error ?? 'Error al registrar envío' })
     } finally {

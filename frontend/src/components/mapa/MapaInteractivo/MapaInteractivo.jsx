@@ -11,6 +11,7 @@ import MapController from './MapController'
 import PanelConfiguracionMapa from './PanelConfiguracionMapa'
 import PanelBusquedaRuta from './PanelBusquedaRuta'
 import SimulacionControles from '../../SimulacionControles/SimulacionControles'
+import IndicadorTick from '../../simulacion/IndicadorTick/IndicadorTick'
 import { getColorSemaforo, COLORES_SEMAFORO } from '../../../utils/semaforo'
 import { formatearCapacidad } from '../../../utils/formatters'
 import { formatearFechaHora, sumarMinutos } from '../../../utils/tiempos'
@@ -815,6 +816,9 @@ function MapaInteractivo() {
       />
 
       {hayDatosSimulacion && <LeyendaMapa />}
+
+      {/* Día a día: countdown del ciclo de replanificación + toast de plan actualizado */}
+      <IndicadorTick />
 
       {/* Botón ir al colapso */}
       {colapso && manifest && colapso.minutosColapso > 0 && (
