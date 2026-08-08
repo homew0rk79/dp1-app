@@ -34,9 +34,11 @@ and a stress simulation that runs until the network collapses.
   auto-restart on reboot.
 
 ## Repository structure
+```
 dp1-app/
 ├── frontend/ # React + Vite + Zustand
 └── backend/ # Spring Boot, Maven, Java 21
+```
 
 ## Status
 
